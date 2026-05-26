@@ -121,12 +121,6 @@ Desktop.ini
 docker-compose.override.yml
 .docker/
 
-# =========================
-# App folders (excluded from repo)
-# =========================
-Agent/
-House Owner App/
-Servant/
 
 # =========================
 # Misc
