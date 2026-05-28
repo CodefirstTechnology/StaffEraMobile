@@ -123,6 +123,12 @@ docker-compose.override.yml
 
 
 # =========================
+# Stitch design exports (large reference assets)
+# =========================
+stitch_staffera_premium_service_app/
+stitch_staffera_premium_service_app.zip
+
+# =========================
 # Misc
 # =========================
 .eslintcache
