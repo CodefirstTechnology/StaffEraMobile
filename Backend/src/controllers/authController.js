@@ -42,7 +42,7 @@ const issueTokens = async (user) => {
 };
 
 exports.registerOwner = async (req, res) => {
-  const { name, password, address, city } = req.body;
+  const { name, password, address, city, latitude, longitude } = req.body;
   const email = normalizeEmail(req.body.email);
   const phone = normalizePhone(req.body.phone);
 
@@ -61,7 +61,12 @@ exports.registerOwner = async (req, res) => {
       password: hashed,
       role: "HOUSE_OWNER",
       houseOwner: {
-        create: { address, city }
+        create: {
+          address,
+          city,
+          latitude: latitude ?? undefined,
+          longitude: longitude ?? undefined
+        }
       }
     },
     include: { houseOwner: true }
@@ -162,6 +167,36 @@ exports.me = async (req, res) => {
   if (!user) throw new ApiError(404, "User not found");
 
   sendSuccess(res, { user: sanitizeUser(user) });
+};
+
+exports.updateLocation = async (req, res) => {
+  if (req.user.role !== "HOUSE_OWNER") {
+    throw new ApiError(403, "Only house owners can update home location");
+  }
+
+  const houseOwner = await prisma.houseOwner.findUnique({
+    where: { userId: req.user.id }
+  });
+  if (!houseOwner) throw new ApiError(404, "House owner profile not found");
+
+  const { address, city, latitude, longitude } = req.body;
+
+  const updated = await prisma.houseOwner.update({
+    where: { id: houseOwner.id },
+    data: {
+      ...(address !== undefined && { address }),
+      ...(city !== undefined && { city }),
+      ...(latitude !== undefined && { latitude }),
+      ...(longitude !== undefined && { longitude })
+    }
+  });
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    include: { houseOwner: true, servant: true, agent: true }
+  });
+
+  sendSuccess(res, { houseOwner: updated, user: sanitizeUser(user) });
 };
 
 const resetTokens = new Map();

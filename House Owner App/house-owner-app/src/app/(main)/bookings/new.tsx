@@ -1,23 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
+import { LocationPicker } from '@/components/ui/LocationPicker';
+import type { LocationValue } from '@/lib/locationTypes';
 
 export default function NewBookingScreen() {
   const { servantId } = useLocalSearchParams<{ servantId: string }>();
+  const user = useAuthStore((s) => s.user);
   const [bookingType, setBookingType] = useState<'SESSION' | 'MONTHLY'>('SESSION');
   const [sessionDate, setSessionDate] = useState(new Date());
   const [sessionStart, setSessionStart] = useState('09:00');
@@ -28,10 +31,22 @@ export default function NewBookingScreen() {
     d.setMonth(d.getMonth() + 1);
     return d;
   });
-  const [address, setAddress] = useState('');
+  const [location, setLocation] = useState<LocationValue | null>(null);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
+
+  useEffect(() => {
+    const ho = user?.houseOwner;
+    if (ho?.latitude != null && ho?.longitude != null && ho.address) {
+      setLocation({
+        address: ho.address,
+        city: ho.city,
+        latitude: ho.latitude,
+        longitude: ho.longitude,
+      });
+    }
+  }, [user?.houseOwner]);
 
   const { data: servant } = useQuery({
     queryKey: ['servant', servantId],
@@ -57,12 +72,18 @@ export default function NewBookingScreen() {
       Alert.alert('Error', 'Select a helper from Browse first');
       return;
     }
+    if (!location?.address) {
+      Alert.alert('Location required', 'Please set the visit location on the map.');
+      return;
+    }
     setLoading(true);
     try {
       const payload: Record<string, unknown> = {
         servantId: Number(servantId),
         bookingType,
-        address: address.trim() || undefined,
+        address: location.address,
+        latitude: location.latitude,
+        longitude: location.longitude,
         notes: notes.trim() || undefined,
         totalAmount: totalAmount || undefined,
       };
@@ -141,15 +162,17 @@ export default function NewBookingScreen() {
         </>
       ) : (
         <>
-          <Text style={styles.hint}>Monthly: {monthlyStart.toLocaleDateString('en-IN')} → {monthlyEnd.toLocaleDateString('en-IN')}</Text>
+          <Text style={styles.hint}>
+            Monthly: {monthlyStart.toLocaleDateString('en-IN')} → {monthlyEnd.toLocaleDateString('en-IN')}
+          </Text>
         </>
       )}
 
-      <GhostInput
-        label="Home address"
-        value={address}
-        onChangeText={setAddress}
-        placeholder="Flat, street, area"
+      <LocationPicker
+        label="Visit location"
+        placeholder="Search your home address or tap the map"
+        value={location}
+        onChange={setLocation}
       />
       <GhostInput label="Notes (optional)" value={notes} onChangeText={setNotes} />
 

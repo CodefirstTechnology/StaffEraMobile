@@ -73,6 +73,8 @@ exports.createBooking = async (req, res) => {
         sessionEndTime: bookingData.sessionEndTime,
         sessionHours: bookingData.sessionHours,
         address: bookingData.address || houseOwner.address,
+        latitude: bookingData.latitude ?? houseOwner.latitude ?? undefined,
+        longitude: bookingData.longitude ?? houseOwner.longitude ?? undefined,
         totalAmount: bookingData.totalAmount,
         notes: bookingData.notes,
         status: "PENDING"
@@ -332,4 +334,69 @@ exports.createReview = async (req, res) => {
   });
 
   sendSuccess(res, { review }, 201);
+};
+
+const trackingPayload = (booking) => ({
+  status: booking.status,
+  home: {
+    address: booking.address,
+    latitude: booking.latitude,
+    longitude: booking.longitude
+  },
+  servant:
+    booking.servantLatitude != null && booking.servantLongitude != null
+      ? {
+          latitude: booking.servantLatitude,
+          longitude: booking.servantLongitude,
+          updatedAt: booking.servantLocationAt
+        }
+      : null
+});
+
+exports.getBookingTracking = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const booking = await prisma.booking.findUnique({
+    where: { id },
+    include: {
+      servant: { include: { user: { select: { id: true, name: true } } } },
+      houseOwner: { include: { user: { select: { id: true } } } }
+    }
+  });
+
+  if (!booking) throw new ApiError(404, "Booking not found");
+  await assertBookingAccess(req, booking);
+
+  sendSuccess(res, trackingPayload(booking));
+};
+
+exports.updateBookingTracking = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { latitude, longitude } = req.body;
+
+  const booking = await prisma.booking.findUnique({
+    where: { id },
+    include: {
+      servant: { include: { user: { select: { id: true } } } },
+      houseOwner: { include: { user: { select: { id: true, name: true } } } }
+    }
+  });
+
+  if (!booking) throw new ApiError(404, "Booking not found");
+  if (booking.servant.userId !== req.user.id) {
+    throw new ApiError(403, "Only the assigned servant can share location");
+  }
+  if (!["CONFIRMED", "ACTIVE"].includes(booking.status)) {
+    throw new ApiError(400, "Location sharing is only available for confirmed or active bookings");
+  }
+
+  const updated = await prisma.booking.update({
+    where: { id },
+    data: {
+      servantLatitude: latitude,
+      servantLongitude: longitude,
+      servantLocationAt: new Date()
+    }
+  });
+
+  sendSuccess(res, trackingPayload(updated));
 };

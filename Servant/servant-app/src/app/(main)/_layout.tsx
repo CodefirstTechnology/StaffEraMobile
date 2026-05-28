@@ -1,8 +1,22 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 
 export default function MainLayout() {
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={Stitch.colors.primary} />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
+
   return (
     <Tabs
       screenOptions={{

@@ -1,13 +1,16 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 
 export default function ScheduleScreen() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { data } = useQuery({
     queryKey: ['schedule'],
+    enabled: isAuthenticated,
     queryFn: async () => {
       const res = await api.get('/servants/me/schedule');
       return res.data.data.bookings as Array<{

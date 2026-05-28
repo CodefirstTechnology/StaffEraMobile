@@ -48,6 +48,20 @@ npm start
 
 Set `EXPO_PUBLIC_API_BASE_URL` in each app `.env`.
 
+**Google Maps (location picker + live tracking):** use the same API key on the backend and both mobile apps, plus your **Map ID** from Map Management:
+
+```bash
+# Backend/.env
+GOOGLE_MAPS_API_KEY=your_key
+GOOGLE_MAP_ID=your_map_id
+
+# House Owner + Servant app/.env
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your_key
+EXPO_PUBLIC_GOOGLE_MAP_ID=your_map_id
+```
+
+In [Google Cloud Console](https://console.cloud.google.com/), enable **Places API**, **Geocoding API**, **Maps SDK for Android**, and **Maps SDK for iOS** for the same key (restrict by API in production). After changing `.env`, restart the backend and run `npx expo start -c` for the apps.
+
 **Physical phone:** do not use `localhost` — use your PC's LAN IP, e.g. `http://192.168.0.243:5000/api/v1` (find yours with `ipconfig`). Restart Expo with `npx expo start -c` after changing `.env`.
 
 **Servant login:** account must be created in the Agent portal first. Default onboarding password in the form is `Servant@123` unless the agent changed it.

@@ -14,6 +14,8 @@ const createBookingSchema = z.object({
       sessionEndTime: z.string().optional(),
       sessionHours: z.coerce.number().optional(),
       address: z.string().optional(),
+      latitude: z.coerce.number().min(-90).max(90).optional(),
+      longitude: z.coerce.number().min(-180).max(180).optional(),
       notes: z.string().optional(),
       totalAmount: z.coerce.number().optional()
     })
@@ -50,4 +52,16 @@ const rejectBookingSchema = z.object({
   })
 });
 
-module.exports = { createBookingSchema, reviewSchema, rejectBookingSchema };
+const updateTrackingSchema = z.object({
+  body: z.object({
+    latitude: z.coerce.number().min(-90).max(90),
+    longitude: z.coerce.number().min(-180).max(180)
+  })
+});
+
+module.exports = {
+  createBookingSchema,
+  reviewSchema,
+  rejectBookingSchema,
+  updateTrackingSchema
+};

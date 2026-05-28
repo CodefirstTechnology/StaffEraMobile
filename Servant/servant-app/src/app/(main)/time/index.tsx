@@ -1,12 +1,15 @@
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 
 export default function TimeScreen() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['time-today'],
+    enabled: isAuthenticated,
     queryFn: async () => {
       const res = await api.get('/time/today');
       return res.data.data;

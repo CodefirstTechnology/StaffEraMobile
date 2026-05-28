@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
+import { setSessionExpiredHandler } from '@/lib/authSession';
 import { clearAuthTokens, getToken, setToken } from '@/lib/tokenStorage';
 
 type User = {
@@ -60,3 +61,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, isAuthenticated: false });
   },
 }));
+
+setSessionExpiredHandler(() => {
+  useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
+});

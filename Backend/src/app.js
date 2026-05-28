@@ -42,6 +42,7 @@ app.use("/api/v1/agent", require("./routes/agentRoutes"));
 app.use("/api/v1/admin", require("./routes/adminRoutes"));
 app.use("/api/v1/notifications", require("./routes/notificationRoutes"));
 app.use("/api/v1/zones", require("./routes/zoneRoutes"));
+app.use("/api/v1/geo", require("./routes/geoRoutes"));
 
 app.get("/", (req, res) => {
   res.json({ success: true, message: "StaffEra API Running" });

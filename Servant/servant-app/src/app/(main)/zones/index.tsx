@@ -19,11 +19,16 @@ import { GhostInput } from '@/components/ui/GhostInput';
 import { GradientButton } from '@/components/ui/GradientButton';
 
 
+import { LocationPicker } from '@/components/ui/LocationPicker';
+import type { LocationValue } from '@/lib/locationTypes';
+
 type Zone = {
   id: number;
   name: string;
   description?: string | null;
   city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export default function ZonesScreen() {
@@ -33,6 +38,7 @@ export default function ZonesScreen() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [city, setCity] = useState('');
+  const [zoneLocation, setZoneLocation] = useState<LocationValue | null>(null);
 
   const { data: zones = [], isLoading } = useQuery({
     queryKey: ['my-zones'],
@@ -46,6 +52,7 @@ export default function ZonesScreen() {
     setName('');
     setDescription('');
     setCity('');
+    setZoneLocation(null);
     setEditing(null);
   };
 
@@ -59,15 +66,27 @@ export default function ZonesScreen() {
     setName(zone.name);
     setDescription(zone.description || '');
     setCity(zone.city || '');
+    if (zone.latitude != null && zone.longitude != null) {
+      setZoneLocation({
+        address: zone.name,
+        city: zone.city,
+        latitude: zone.latitude,
+        longitude: zone.longitude,
+      });
+    } else {
+      setZoneLocation(null);
+    }
     setModalOpen(true);
   };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
-        name: name.trim(),
+        name: name.trim() || zoneLocation?.address?.split(',')[0] || '',
         description: description.trim() || undefined,
-        city: city.trim() || undefined,
+        city: zoneLocation?.city || city.trim() || undefined,
+        latitude: zoneLocation?.latitude,
+        longitude: zoneLocation?.longitude,
       };
       if (editing) {
         await api.patch(`/zones/${editing.id}`, payload);
@@ -158,6 +177,19 @@ export default function ZonesScreen() {
               value={name}
               onChangeText={setName}
             />
+            <LocationPicker
+              label="Zone on map"
+              placeholder="Search area or landmark"
+              value={zoneLocation}
+              onChange={(location) => {
+                setZoneLocation(location);
+                if (!name.trim()) {
+                  setName(location.address.split(',')[0]?.trim() || location.address);
+                }
+                if (location.city) setCity(location.city);
+              }}
+              height={180}
+            />
             <GhostInput
               label="City"
               placeholder="Mumbai"
@@ -174,7 +206,13 @@ export default function ZonesScreen() {
             />
             <GradientButton
               title={saveMutation.isPending ? 'Saving…' : 'Save'}
-              onPress={() => saveMutation.mutate()}
+              onPress={() => {
+                if (!name.trim() && !zoneLocation) {
+                  Alert.alert('Zone required', 'Add a zone name or pick a location on the map.');
+                  return;
+                }
+                saveMutation.mutate();
+              }}
               style={{ marginTop: 20 }}
             />
             <GradientButton

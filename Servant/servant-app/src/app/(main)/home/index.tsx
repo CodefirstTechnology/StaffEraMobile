@@ -9,23 +9,41 @@ import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { LocationMapPreview } from '@/components/ui/LocationMapPreview';
+import { JobTrackingMap } from '@/components/ui/JobTrackingMap';
+import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
 
 type Booking = {
   id: number;
   status: string;
   bookingType: string;
   address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   houseOwner: { user: { name: string } };
 };
 
 export default function ServantHomeScreen() {
   const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const qc = useQueryClient();
   const [elapsed, setElapsed] = useState(0);
   const [activeBookingId, setActiveBookingId] = useState<number | null>(null);
   const [activeEntry, setActiveEntry] = useState<{ clockIn: string; bookingId?: number } | null>(
     null,
   );
+  const [actingId, setActingId] = useState<number | null>(null);
+  const [onWayBookingId, setOnWayBookingId] = useState<number | null>(null);
+
+  const trackingBookingId = activeBookingId ?? onWayBookingId;
+  useServantLocationReporter(trackingBookingId, trackingBookingId != null);
+
+  const refreshBookings = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['bookings'] }),
+      qc.invalidateQueries({ queryKey: ['notifications'] }),
+      qc.invalidateQueries({ queryKey: ['schedule'] }),
+    ]);
 
   const { data: bookings } = useQuery({
     queryKey: ['bookings'],
@@ -33,6 +51,7 @@ export default function ServantHomeScreen() {
       const res = await api.get('/bookings');
       return res.data.data.bookings as Booking[];
     },
+    enabled: isAuthenticated,
   });
 
   const { data: notifications } = useQuery({
@@ -41,7 +60,8 @@ export default function ServantHomeScreen() {
       const res = await api.get('/notifications');
       return res.data.data.notifications as Array<{ id: number; title: string; body: string; isRead: boolean }>;
     },
-    refetchInterval: 30000,
+    enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 30000 : false,
   });
 
   const { data: today } = useQuery({
@@ -50,6 +70,7 @@ export default function ServantHomeScreen() {
       const res = await api.get('/time/today');
       return res.data.data;
     },
+    enabled: isAuthenticated,
   });
 
   useEffect(() => {
@@ -89,8 +110,12 @@ export default function ServantHomeScreen() {
   const clockIn = async (bookingId: number) => {
     try {
       await api.post('/time/clock-in', { bookingId });
+      setOnWayBookingId(null);
       setActiveBookingId(bookingId);
-      qc.invalidateQueries({ queryKey: ['time-today', 'bookings'] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['time-today'] }),
+        qc.invalidateQueries({ queryKey: ['bookings'] }),
+      ]);
       Alert.alert('Work started', 'You are on duty at the customer location.');
     } catch (e: unknown) {
       Alert.alert('Could not start', apiError(e, 'Check booking is confirmed'));
@@ -102,7 +127,10 @@ export default function ServantHomeScreen() {
       await api.post('/time/clock-out');
       setActiveEntry(null);
       setActiveBookingId(null);
-      qc.invalidateQueries({ queryKey: ['time-today', 'bookings'] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['time-today'] }),
+        qc.invalidateQueries({ queryKey: ['bookings'] }),
+      ]);
       Alert.alert('Clocked out', 'Hours saved for payout.');
     } catch (e: unknown) {
       Alert.alert('Error', apiError(e, 'Could not clock out'));
@@ -110,22 +138,42 @@ export default function ServantHomeScreen() {
   };
 
   const confirm = async (id: number) => {
+    if (actingId != null) return;
+    setActingId(id);
     try {
       await api.patch(`/bookings/${id}/confirm`);
-      qc.invalidateQueries({ queryKey: ['bookings', 'notifications'] });
+      await refreshBookings();
       Alert.alert('Accepted', 'The customer has been notified.');
     } catch (e: unknown) {
-      Alert.alert('Could not accept', apiError(e, 'Try again'));
+      const message = apiError(e, 'Try again');
+      if (message.toLowerCase().includes('not pending')) {
+        await refreshBookings();
+        Alert.alert('Already handled', 'This request was already accepted or declined.');
+      } else {
+        Alert.alert('Could not accept', message);
+      }
+    } finally {
+      setActingId(null);
     }
   };
 
   const reject = async (id: number) => {
+    if (actingId != null) return;
+    setActingId(id);
     try {
       await api.patch(`/bookings/${id}/reject`, { reason: 'Unavailable at this time' });
-      qc.invalidateQueries({ queryKey: ['bookings', 'notifications'] });
+      await refreshBookings();
       Alert.alert('Declined', 'The customer has been notified.');
     } catch (e: unknown) {
-      Alert.alert('Could not decline', apiError(e, 'Try again'));
+      const message = apiError(e, 'Try again');
+      if (message.toLowerCase().includes('not pending')) {
+        await refreshBookings();
+        Alert.alert('Already handled', 'This request was already accepted or declined.');
+      } else {
+        Alert.alert('Could not decline', message);
+      }
+    } finally {
+      setActingId(null);
     }
   };
 
@@ -182,13 +230,33 @@ export default function ServantHomeScreen() {
       </View>
 
       {activeEntry ? (
-        <LinearGradient colors={[Stitch.colors.error, '#c62828']} style={styles.clockCard}>
-          <Text style={styles.clockLabel}>Work in progress</Text>
-          <Text style={styles.clockTime}>{formatElapsed(elapsed)}</Text>
-          <TouchableOpacity style={styles.clockBtn} onPress={clockOut}>
-            <Text style={styles.clockBtnText}>End work & clock out</Text>
-          </TouchableOpacity>
-        </LinearGradient>
+        <>
+          <LinearGradient colors={[Stitch.colors.error, '#c62828']} style={styles.clockCard}>
+            <Text style={styles.clockLabel}>Work in progress</Text>
+            <Text style={styles.clockTime}>{formatElapsed(elapsed)}</Text>
+            <TouchableOpacity style={styles.clockBtn} onPress={clockOut}>
+              <Text style={styles.clockBtnText}>End work & clock out</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+          {(() => {
+            const activeJob = todayJobs.find((b) => b.id === activeBookingId);
+            const home =
+              activeJob?.latitude != null && activeJob?.longitude != null
+                ? { latitude: activeJob.latitude, longitude: activeJob.longitude }
+                : null;
+            return (
+              <View style={styles.liveMap}>
+                <JobTrackingMap
+                  home={home}
+                  homeLabel={activeJob?.houseOwner.user.name || 'Customer'}
+                  showMyLocation
+                  height={220}
+                  caption="Sharing live location with customer"
+                />
+              </View>
+            );
+          })()}
+        </>
       ) : null}
 
       {pending.length > 0 && (
@@ -199,11 +267,27 @@ export default function ServantHomeScreen() {
               <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
               <Text style={styles.cardMeta}>{b.bookingType}</Text>
               {b.address ? <Text style={styles.addr}>{b.address}</Text> : null}
+              <LocationMapPreview
+                latitude={b.latitude}
+                longitude={b.longitude}
+                address={b.address}
+                height={140}
+              />
               <View style={styles.row}>
-                <TouchableOpacity style={styles.accept} onPress={() => confirm(b.id)}>
-                  <Text style={styles.acceptText}>Accept</Text>
+                <TouchableOpacity
+                  style={[styles.accept, actingId === b.id && styles.btnDisabled]}
+                  onPress={() => confirm(b.id)}
+                  disabled={actingId != null}
+                >
+                  <Text style={styles.acceptText}>
+                    {actingId === b.id ? 'Please wait…' : 'Accept'}
+                  </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.reject} onPress={() => reject(b.id)}>
+                <TouchableOpacity
+                  style={[styles.reject, actingId === b.id && styles.btnDisabled]}
+                  onPress={() => reject(b.id)}
+                  disabled={actingId != null}
+                >
                   <Text style={styles.rejectText}>Decline</Text>
                 </TouchableOpacity>
               </View>
@@ -230,12 +314,46 @@ export default function ServantHomeScreen() {
                 </View>
               </View>
               <StatusPill status={b.status} />
-              {!activeEntry && b.status === 'CONFIRMED' && (
-                <GradientButton
-                  title="I arrived — start work"
-                  onPress={() => clockIn(b.id)}
-                  style={{ marginTop: 12 }}
+              {b.latitude != null && b.longitude != null ? (
+                <JobTrackingMap
+                  home={{ latitude: b.latitude, longitude: b.longitude }}
+                  homeLabel={b.houseOwner.user.name}
+                  showMyLocation={!activeEntry}
+                  height={160}
+                  caption={
+                    onWayBookingId === b.id
+                      ? 'Location shared with customer'
+                      : 'Tap directions to navigate'
+                  }
                 />
+              ) : (
+                <LocationMapPreview
+                  latitude={b.latitude}
+                  longitude={b.longitude}
+                  address={b.address}
+                  height={140}
+                />
+              )}
+              {!activeEntry && b.status === 'CONFIRMED' && (
+                <>
+                  <TouchableOpacity
+                    style={styles.onWayBtn}
+                    onPress={() =>
+                      setOnWayBookingId((prev) => (prev === b.id ? null : b.id))
+                    }
+                  >
+                    <Text style={styles.onWayText}>
+                      {onWayBookingId === b.id
+                        ? 'Stop sharing location'
+                        : "I'm on my way — share location"}
+                    </Text>
+                  </TouchableOpacity>
+                  <GradientButton
+                    title="I arrived — start work"
+                    onPress={() => clockIn(b.id)}
+                    style={{ marginTop: 12 }}
+                  />
+                </>
               )}
               {isActive && activeEntry && (
                 <Text style={styles.onDuty}>You are clocked in at this home</Text>
@@ -311,7 +429,8 @@ const styles = StyleSheet.create({
   },
   jobsNum: { fontSize: 22, fontWeight: '700', color: Stitch.colors.secondary },
   jobsLbl: { fontSize: 10, fontWeight: '700', color: Stitch.colors.secondary },
-  clockCard: { marginHorizontal: 24, borderRadius: 24, padding: 24, marginBottom: 20 },
+  clockCard: { marginHorizontal: 24, borderRadius: 24, padding: 24, marginBottom: 12 },
+  liveMap: { marginHorizontal: 24, marginBottom: 20 },
   clockLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 14 },
   clockTime: { color: '#fff', fontSize: 32, fontWeight: '700', marginVertical: 12 },
   clockBtn: {
@@ -351,6 +470,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rejectText: { color: Stitch.colors.error, fontWeight: '600' },
+  btnDisabled: { opacity: 0.55 },
+  onWayBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Stitch.colors.secondary,
+  },
+  onWayText: { color: Stitch.colors.secondary, fontWeight: '600', fontSize: 13 },
   jobRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   empty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant },
   onDuty: { marginTop: 10, color: Stitch.colors.success, fontWeight: '600' },

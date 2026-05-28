@@ -44,7 +44,13 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
-      <ScreenHeader location={user?.houseOwner?.city || 'Set your city in profile'} />
+      <ScreenHeader
+        location={
+          user?.houseOwner?.address
+            ? user.houseOwner.address.split(',').slice(0, 2).join(',').trim()
+            : user?.houseOwner?.city || 'Set your home location in Profile'
+        }
+      />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.searchWrap}>
           <MaterialIcons name="search" size={22} color={Stitch.colors.onSurfaceVariant} />

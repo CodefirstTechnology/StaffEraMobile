@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 
 export function getLoginErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
@@ -6,14 +7,20 @@ export function getLoginErrorMessage(error: unknown): string {
       return String(error.response.data.message);
     }
     if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-      const base = process.env.EXPO_PUBLIC_API_BASE_URL || '';
+      const base = getApiBaseUrl();
       if (base.includes('localhost') || base.includes('127.0.0.1')) {
         return (
-          'Cannot reach the server. On a real phone, change .env to your computer IP, e.g. ' +
-          'EXPO_PUBLIC_API_BASE_URL=http://192.168.1.5:5000/api/v1 then restart Expo (npx expo start -c).'
+          'Cannot reach the server. On a real phone, set EXPO_PUBLIC_API_BASE_URL in .env to your PC IP ' +
+          '(run ipconfig), then restart: npx expo start -c'
         );
       }
-      return 'Cannot reach the server. Check that the backend is running and your phone is on the same Wi‑Fi.';
+      return (
+        `Cannot reach ${base}\n\n` +
+        '• Backend running? (npm start in Backend)\n' +
+        '• Phone on same Wi‑Fi as PC (not mobile data)\n' +
+        '• Windows Firewall: allow Node/port 5000\n' +
+        '• Restart app after .env change: npx expo start -c'
+      );
     }
   }
 

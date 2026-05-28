@@ -112,6 +112,8 @@ model Zone {
   name        String
   description String?
   city        String?
+  latitude    Float?
+  longitude   Float?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -158,6 +160,11 @@ model Booking {
   sessionHours     Float?
 
   address          String?
+  latitude         Float?
+  longitude        Float?
+  servantLatitude  Float?
+  servantLongitude Float?
+  servantLocationAt DateTime?
   totalAmount      Float?
   isPaid           Boolean       @default(false)
   paymentId        String?

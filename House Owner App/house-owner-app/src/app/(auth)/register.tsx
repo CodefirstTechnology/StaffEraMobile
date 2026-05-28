@@ -5,6 +5,8 @@ import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
+import { LocationPicker } from '@/components/ui/LocationPicker';
+import type { LocationValue } from '@/lib/locationTypes';
 
 export default function RegisterScreen() {
   const register = useAuthStore((s) => s.register);
@@ -16,6 +18,7 @@ export default function RegisterScreen() {
     confirmPassword: '',
     city: '',
   });
+  const [homeLocation, setHomeLocation] = useState<LocationValue | null>(null);
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
@@ -30,7 +33,10 @@ export default function RegisterScreen() {
         email: form.email,
         phone: form.phone,
         password: form.password,
-        city: form.city,
+        city: homeLocation?.city || form.city,
+        address: homeLocation?.address,
+        latitude: homeLocation?.latitude,
+        longitude: homeLocation?.longitude,
       });
       router.replace('/(main)/home');
     } catch (e: unknown) {
@@ -45,7 +51,6 @@ export default function RegisterScreen() {
     { key: 'name' as const, label: 'Full name', secure: false },
     { key: 'email' as const, label: 'Email', secure: false },
     { key: 'phone' as const, label: 'Phone (+91)', secure: false, keyboard: 'phone-pad' as const },
-    { key: 'city' as const, label: 'City', secure: false },
     { key: 'password' as const, label: 'Password', secure: true },
     { key: 'confirmPassword' as const, label: 'Confirm password', secure: true },
   ];
@@ -65,6 +70,27 @@ export default function RegisterScreen() {
           onChangeText={(v) => setForm((prev) => ({ ...prev, [f.key]: v }))}
         />
       ))}
+
+      <LocationPicker
+        label="Home location (optional)"
+        placeholder="Search your society, street, or area"
+        value={homeLocation}
+        onChange={(location) => {
+          setHomeLocation(location);
+          if (location.city) {
+            setForm((prev) => ({ ...prev, city: location.city || prev.city }));
+          }
+        }}
+      />
+
+      {!homeLocation ? (
+        <GhostInput
+          label="City (if location not set)"
+          value={form.city}
+          onChangeText={(v) => setForm((prev) => ({ ...prev, city: v }))}
+        />
+      ) : null}
+
       <GradientButton title="Create account" onPress={submit} loading={loading} />
     </ScrollView>
   );

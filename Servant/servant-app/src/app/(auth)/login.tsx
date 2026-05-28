@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { getLoginErrorMessage } from '@/lib/getLoginErrorMessage';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
@@ -56,6 +57,11 @@ export default function LoginScreen() {
           No self-signup. Your agent creates your account and verifies your ID.
         </Text>
         <Text style={styles.trust}>{Stitch.copy.safeData}</Text>
+        {__DEV__ ? (
+          <Text style={styles.apiHint} selectable>
+            API: {getApiBaseUrl()}
+          </Text>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -115,5 +121,11 @@ const styles = StyleSheet.create({
     marginTop: 24,
     fontSize: 12,
     opacity: 0.75,
+  },
+  apiHint: {
+    marginTop: 16,
+    fontSize: 11,
+    color: Stitch.colors.secondary,
+    textAlign: 'center',
   },
 });

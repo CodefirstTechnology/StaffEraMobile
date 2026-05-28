@@ -6,9 +6,12 @@ import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { JobTrackingMap } from '@/components/ui/JobTrackingMap';
+import { useBookingTrackingPoll } from '@/hooks/useBookingTrackingPoll';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const bookingId = id ? parseInt(id, 10) : null;
   const qc = useQueryClient();
 
   const { data: booking, isLoading } = useQuery({
@@ -19,6 +22,18 @@ export default function BookingDetailScreen() {
       return res.data.data.booking;
     },
   });
+
+  const trackLive = ['CONFIRMED', 'ACTIVE'].includes(booking?.status ?? '');
+  const { data: tracking } = useBookingTrackingPoll(bookingId, trackLive);
+
+  const home =
+    booking?.latitude != null && booking?.longitude != null
+      ? { latitude: booking.latitude, longitude: booking.longitude }
+      : null;
+
+  const servant = tracking?.servant
+    ? { latitude: tracking.servant.latitude, longitude: tracking.servant.longitude }
+    : null;
 
   const cancel = async () => {
     try {
@@ -42,8 +57,8 @@ export default function BookingDetailScreen() {
 
   const statusHint: Record<string, string> = {
     PENDING: 'Waiting for helper to accept',
-    CONFIRMED: 'Helper accepted — they will start when they arrive',
-    ACTIVE: 'Work in progress at your home',
+    CONFIRMED: 'Helper accepted — you will see them on the map when they share location',
+    ACTIVE: 'Work in progress — live location updates below',
     REJECTED: 'Helper declined this request',
     CANCELLED: 'You cancelled this booking',
     COMPLETED: 'Visit completed',
@@ -59,7 +74,7 @@ export default function BookingDetailScreen() {
         <StatusPill status={booking.status} />
         <Text style={styles.hint}>{statusHint[booking.status] || ''}</Text>
         <Text style={styles.row}>Type: {booking.bookingType}</Text>
-        {booking.address && <Text style={styles.row}>Address: {booking.address}</Text>}
+        {booking.address ? <Text style={styles.row}>Address: {booking.address}</Text> : null}
         {booking.totalAmount != null && (
           <Text style={styles.amount}>
             {Stitch.copy.rupee}
@@ -67,6 +82,14 @@ export default function BookingDetailScreen() {
           </Text>
         )}
       </GlassCard>
+
+      {home && trackLive ? (
+        <JobTrackingMap
+          home={home}
+          servant={servant}
+          lastUpdated={tracking?.servant?.updatedAt ?? null}
+        />
+      ) : null}
 
       {['PENDING', 'CONFIRMED'].includes(booking.status) && (
         <GradientButton

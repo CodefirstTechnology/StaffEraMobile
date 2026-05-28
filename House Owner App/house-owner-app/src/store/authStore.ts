@@ -7,7 +7,13 @@ type User = {
   name: string;
   email: string;
   role: string;
-  houseOwner?: { id: number; city?: string };
+  houseOwner?: {
+    id: number;
+    city?: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+  };
 };
 
 type AuthState = {
@@ -15,9 +21,10 @@ type AuthState = {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: Record<string, string>) => Promise<void>;
+  register: (data: Record<string, unknown>) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
+  setUser: (user: User | null) => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -60,9 +67,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   register: async (payload) => {
+    const body = payload as Record<string, string | number | undefined>;
     const { data } = await api.post('/auth/register-owner', {
-      ...payload,
-      email: payload.email.trim().toLowerCase(),
+      ...body,
+      email: String(body.email).trim().toLowerCase(),
     });
     await setToken('accessToken', data.data.accessToken);
     await setToken('refreshToken', data.data.refreshToken);
@@ -79,4 +87,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     await clearAuthTokens();
     set({ user: null, isAuthenticated: false });
   },
+
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
 }));
