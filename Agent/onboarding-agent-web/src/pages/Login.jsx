@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -13,7 +13,13 @@ const schema = z.object({
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [error, setError] = useState('')
+  const location = useLocation()
+  const [error, setError] = useState(
+    () =>
+      (location.state?.forbidden
+        ? 'You do not have access to this portal. Sign in with an agent or admin account.'
+        : '') || '',
+  )
   const {
     register,
     handleSubmit,
@@ -24,6 +30,13 @@ export default function Login() {
     setError('')
     try {
       const user = await login(data.email, data.password)
+      if (!['AGENT', 'ADMIN'].includes(user.role)) {
+        localStorage.clear()
+        setError(
+          'This portal is for agents and admins only. Servants and house owners must use the mobile app.',
+        )
+        return
+      }
       if (user.role === 'ADMIN') navigate('/admin')
       else navigate('/')
     } catch (e) {

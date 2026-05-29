@@ -14,6 +14,40 @@ const SKILLS = [
 ]
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 
+function ReviewItem({ label, children }) {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-4">
+      <dt className="w-36 shrink-0 text-sm text-subtext">{label}</dt>
+      <dd className="text-sm font-medium">{children}</dd>
+    </div>
+  )
+}
+
+function ReviewSection({ title, children }) {
+  return (
+    <section className="space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4">
+      <h4 className="text-sm font-semibold text-gray-700">{title}</h4>
+      <dl className="space-y-2">{children}</dl>
+    </section>
+  )
+}
+
+function ReviewChips({ items }) {
+  if (!items?.length) return <span className="text-subtext">—</span>
+  return (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => (
+        <span
+          key={item}
+          className="rounded-full bg-primary/10 px-3 py-1 text-xs text-primary"
+        >
+          {item.replace(/_/g, ' ')}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function OnboardServant() {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
@@ -214,9 +248,58 @@ export default function OnboardServant() {
       {step === 5 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Review & Submit</h3>
-          <pre className="overflow-auto rounded bg-gray-50 p-4 text-xs">
-            {JSON.stringify(form, null, 2)}
-          </pre>
+          <p className="text-sm text-subtext">
+            Please confirm the details below before submitting.
+          </p>
+
+          <ReviewSection title="Personal Info">
+            <ReviewItem label="Name">{form.name || '—'}</ReviewItem>
+            <ReviewItem label="Email">{form.email || '—'}</ReviewItem>
+            <ReviewItem label="Phone">{form.phone || '—'}</ReviewItem>
+            <ReviewItem label="Password">
+              {form.password ? '•'.repeat(Math.min(form.password.length, 8)) : '—'}
+            </ReviewItem>
+          </ReviewSection>
+
+          <ReviewSection title="Skills & Rates">
+            <ReviewItem label="Skills">
+              <ReviewChips items={form.skills} />
+            </ReviewItem>
+            <ReviewItem label="Experience">
+              {form.experience ? `${form.experience} year(s)` : '—'}
+            </ReviewItem>
+            <ReviewItem label="Bio">{form.bio || '—'}</ReviewItem>
+            <ReviewItem label="Hourly rate">
+              {form.hourlyRate ? `₹${form.hourlyRate}/hr` : '—'}
+            </ReviewItem>
+            <ReviewItem label="Monthly rate">
+              {form.monthlyRate ? `₹${form.monthlyRate}/mo` : '—'}
+            </ReviewItem>
+          </ReviewSection>
+
+          <ReviewSection title="Availability">
+            <ReviewItem label="Working hours">
+              {form.availableFrom && form.availableTo
+                ? `${form.availableFrom} – ${form.availableTo}`
+                : '—'}
+            </ReviewItem>
+            <ReviewItem label="Working days">
+              <ReviewChips items={form.workingDays} />
+            </ReviewItem>
+          </ReviewSection>
+
+          <ReviewSection title="ID Verification">
+            <ReviewItem label="ID type">
+              {form.idProofType?.replace(/_/g, ' ') || '—'}
+            </ReviewItem>
+            <ReviewItem label="ID proof">
+              {idProof?.name || 'Not uploaded'}
+            </ReviewItem>
+            <ReviewItem label="Profile photo">
+              {profilePhoto?.name || 'Not uploaded'}
+            </ReviewItem>
+          </ReviewSection>
+
           {error && <p className="text-error text-sm">{error}</p>}
           <Button onClick={submit}>Submit</Button>
         </div>

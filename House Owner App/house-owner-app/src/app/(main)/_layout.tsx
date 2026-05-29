@@ -33,7 +33,7 @@ export default function MainLayout() {
         }}
       />
       <Tabs.Screen
-        name="browse/index"
+        name="browse"
         options={{
           title: 'Browse',
           tabBarIcon: ({ color, size }) => (
@@ -42,11 +42,11 @@ export default function MainLayout() {
         }}
       />
       <Tabs.Screen
-        name="bookings/index"
+        name="bookings"
         options={{
           title: 'Bookings',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="event" size={size} color={color} />
+            <MaterialIcons name="calendar-today" size={size} color={color} />
           ),
         }}
       />

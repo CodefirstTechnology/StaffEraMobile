@@ -136,7 +136,11 @@ exports.fetchStaticMap = async (latitude, longitude) => {
   const url = `https://maps.googleapis.com/maps/api/staticmap?${params}`;
   const res = await fetch(url);
   if (!res.ok) {
-    throw new ApiError(502, "Could not load map preview");
+    const hint =
+      res.status === 403
+        ? "Google Maps API key denied (enable Static Maps API and check key restrictions)"
+        : "Could not load map preview";
+    throw new ApiError(502, hint);
   }
   return res.arrayBuffer();
 };

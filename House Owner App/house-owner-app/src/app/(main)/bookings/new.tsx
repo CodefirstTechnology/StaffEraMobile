@@ -113,8 +113,21 @@ export default function NewBookingScreen() {
       );
       router.replace(`/(main)/bookings/${res.data.data.booking.id}`);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Booking failed', err.response?.data?.message || 'Please try again');
+      const err = e as { response?: { status?: number; data?: { message?: string } } };
+      const message = err.response?.data?.message || 'Please try again';
+      const title =
+        err.response?.status === 409 ? 'Time not available' : 'Booking failed';
+      const buttons =
+        err.response?.status === 409
+          ? [
+              { text: 'Change time', style: 'cancel' as const },
+              {
+                text: 'My bookings',
+                onPress: () => router.push('/(main)/bookings'),
+              },
+            ]
+          : [{ text: 'OK' }];
+      Alert.alert(title, message, buttons);
     } finally {
       setLoading(false);
     }

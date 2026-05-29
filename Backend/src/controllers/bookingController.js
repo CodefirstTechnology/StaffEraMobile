@@ -57,7 +57,7 @@ exports.createBooking = async (req, res) => {
   };
 
   const booking = await prisma.$transaction(async (tx) => {
-    await checkBookingConflict(servant.id, bookingData);
+    await checkBookingConflict(servant.id, bookingData, undefined, houseOwner.id);
 
     return tx.booking.create({
       data: {

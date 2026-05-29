@@ -41,7 +41,7 @@ export default function MainLayout() {
         }}
       />
       <Tabs.Screen
-        name="schedule/index"
+        name="schedule"
         options={{
           title: 'Schedule',
           tabBarIcon: ({ color, size }) => (
@@ -50,7 +50,7 @@ export default function MainLayout() {
         }}
       />
       <Tabs.Screen
-        name="time/index"
+        name="time"
         options={{
           title: 'Time',
           tabBarIcon: ({ color, size }) => <MaterialIcons name="schedule" size={size} color={color} />,

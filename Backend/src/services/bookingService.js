@@ -1,7 +1,8 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 
-const ACTIVE_STATUSES = ["CONFIRMED", "ACTIVE"];
+/** Block new bookings when these already occupy the servant's schedule. */
+const BLOCKING_STATUSES = ["PENDING", "CONFIRMED", "ACTIVE"];
 
 const parseJsonArray = (value) => {
   if (!value) return [];
@@ -51,7 +52,7 @@ const checkSessionConflict = async (servantId, bookingData, excludeBookingId) =>
     where: {
       servantId,
       bookingType: "SESSION",
-      status: { in: ACTIVE_STATUSES },
+      status: { in: BLOCKING_STATUSES },
       sessionDate: { gte: dayStart, lte: dayEnd },
       ...(excludeBookingId ? { id: { not: excludeBookingId } } : {})
     }
@@ -77,7 +78,7 @@ const checkMonthlyConflict = async (servantId, bookingData, excludeBookingId) =>
     where: {
       servantId,
       bookingType: "MONTHLY",
-      status: { in: ACTIVE_STATUSES },
+      status: { in: BLOCKING_STATUSES },
       ...(excludeBookingId ? { id: { not: excludeBookingId } } : {})
     }
   });
@@ -103,7 +104,71 @@ const checkMonthlyConflict = async (servantId, bookingData, excludeBookingId) =>
   return false;
 };
 
-const checkBookingConflict = async (servantId, bookingData, excludeBookingId) => {
+const checkOwnerPendingDuplicate = async (houseOwnerId, servantId, bookingData) => {
+  const pending = await prisma.booking.findMany({
+    where: {
+      houseOwnerId,
+      servantId,
+      status: "PENDING"
+    }
+  });
+
+  for (const b of pending) {
+    if (bookingData.bookingType === "SESSION" && b.bookingType === "SESSION") {
+      const sameDay =
+        b.sessionDate &&
+        bookingData.sessionDate &&
+        new Date(b.sessionDate).toDateString() ===
+          new Date(bookingData.sessionDate).toDateString();
+      if (
+        sameDay &&
+        rangesOverlap(
+          b.sessionStartTime,
+          b.sessionEndTime,
+          bookingData.sessionStartTime,
+          bookingData.sessionEndTime
+        )
+      ) {
+        return true;
+      }
+    }
+    if (bookingData.bookingType === "MONTHLY" && b.bookingType === "MONTHLY") {
+      if (
+        dateRangesOverlap(
+          b.monthlyStartDate,
+          b.monthlyEndDate,
+          bookingData.monthlyStartDate,
+          bookingData.monthlyEndDate
+        ) &&
+        daysOverlap(b.workingDays, bookingData.workingDays)
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+const checkBookingConflict = async (
+  servantId,
+  bookingData,
+  excludeBookingId,
+  houseOwnerId
+) => {
+  if (houseOwnerId) {
+    const ownPending = await checkOwnerPendingDuplicate(
+      houseOwnerId,
+      servantId,
+      bookingData
+    );
+    if (ownPending) {
+      throw new ApiError(
+        409,
+        "You already have a pending request for this helper at this time. Check My Bookings or pick a different slot."
+      );
+    }
+  }
+
   if (bookingData.bookingType === "SESSION") {
     const conflict = await checkSessionConflict(
       servantId,
@@ -111,7 +176,10 @@ const checkBookingConflict = async (servantId, bookingData, excludeBookingId) =>
       excludeBookingId
     );
     if (conflict) {
-      throw new ApiError(409, "Servant is already booked for this session time");
+      throw new ApiError(
+        409,
+        "This helper is not available for that visit time. Choose another date, time, or helper."
+      );
     }
   }
 
@@ -122,7 +190,10 @@ const checkBookingConflict = async (servantId, bookingData, excludeBookingId) =>
       excludeBookingId
     );
     if (conflict) {
-      throw new ApiError(409, "Servant has a conflicting monthly booking");
+      throw new ApiError(
+        409,
+        "This helper already has a monthly booking in that period. Choose different dates or another helper."
+      );
     }
   }
 };
@@ -130,5 +201,5 @@ const checkBookingConflict = async (servantId, bookingData, excludeBookingId) =>
 module.exports = {
   checkBookingConflict,
   parseJsonArray,
-  ACTIVE_STATUSES
+  BLOCKING_STATUSES
 };
