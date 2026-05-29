@@ -18,12 +18,12 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 
 const CATEGORIES = [
-  { icon: 'cleaning-services' as const, label: 'Cleaning' },
-  { icon: 'restaurant' as const, label: 'Cooking' },
-  { icon: 'child-care' as const, label: 'Childcare' },
-  { icon: 'elderly' as const, label: 'Elderly care' },
-  { icon: 'local-laundry-service' as const, label: 'Laundry' },
-  { icon: 'drive-eta' as const, label: 'Driver' },
+  { icon: 'cleaning-services' as const, label: 'Cleaning', skill: 'CLEANING' },
+  { icon: 'restaurant' as const, label: 'Cooking', skill: 'COOKING' },
+  { icon: 'child-care' as const, label: 'Childcare', skill: 'CHILDCARE' },
+  { icon: 'elderly' as const, label: 'Elderly care', skill: 'ELDERLY_CARE' },
+  { icon: 'local-laundry-service' as const, label: 'Laundry', skill: 'LAUNDRY' },
+  { icon: 'drive-eta' as const, label: 'Driver', skill: 'DRIVING' },
 ];
 
 export default function HomeScreen() {
@@ -83,7 +83,9 @@ export default function HomeScreen() {
             <TouchableOpacity
               key={c.label}
               style={styles.cat}
-              onPress={() => router.push('/(main)/browse')}
+              onPress={() =>
+                router.push({ pathname: '/(main)/browse', params: { skill: c.skill } })
+              }
             >
               <View style={styles.catIcon}>
                 <MaterialIcons name={c.icon} size={28} color={Stitch.colors.primary} />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   TextInput,
   ScrollView,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
@@ -18,9 +18,18 @@ import { GlassCard } from '@/components/ui/GlassCard';
 const SKILLS = ['COOKING', 'CLEANING', 'CHILDCARE', 'DRIVING', 'LAUNDRY', 'ELDERLY_CARE'];
 
 export default function BrowseScreen() {
+  const { skill: skillParam } = useLocalSearchParams<{ skill?: string }>();
   const [skill, setSkill] = useState('');
   const [city, setCity] = useState('');
   const [zone, setZone] = useState('');
+
+  useEffect(() => {
+    const raw = Array.isArray(skillParam) ? skillParam[0] : skillParam;
+    const next = raw?.toUpperCase();
+    if (next && SKILLS.includes(next)) {
+      setSkill(next);
+    }
+  }, [skillParam]);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['servants', skill, city, zone],
