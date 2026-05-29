@@ -129,6 +129,18 @@ model ServantSkill {
   skillName String
 }
 
+model Skill {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  label     String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
 model Agent {
   id         Int       @id @default(autoincrement())
   userId     Int       @unique

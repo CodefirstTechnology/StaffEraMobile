@@ -14,6 +14,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminBookings from './pages/admin/AdminBookings'
 import AdminServants from './pages/admin/AdminServants'
+import AdminSkills from './pages/admin/AdminSkills'
 
 const qc = new QueryClient()
 
@@ -51,6 +52,7 @@ export default function App() {
               <Route path="users" element={<AdminUsers />} />
               <Route path="bookings" element={<AdminBookings />} />
               <Route path="servants" element={<AdminServants />} />
+              <Route path="skills" element={<AdminSkills />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

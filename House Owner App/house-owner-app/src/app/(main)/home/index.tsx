@@ -16,18 +16,21 @@ import { Stitch } from '@/theme/stitch';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { useSkills } from '@/hooks/useSkills';
 
-const CATEGORIES = [
-  { icon: 'cleaning-services' as const, label: 'Cleaning', skill: 'CLEANING' },
-  { icon: 'restaurant' as const, label: 'Cooking', skill: 'COOKING' },
-  { icon: 'child-care' as const, label: 'Childcare', skill: 'CHILDCARE' },
-  { icon: 'elderly' as const, label: 'Elderly care', skill: 'ELDERLY_CARE' },
-  { icon: 'local-laundry-service' as const, label: 'Laundry', skill: 'LAUNDRY' },
-  { icon: 'drive-eta' as const, label: 'Driver', skill: 'DRIVING' },
-];
+const SKILL_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
+  CLEANING: 'cleaning-services',
+  COOKING: 'restaurant',
+  CHILDCARE: 'child-care',
+  ELDERLY_CARE: 'elderly',
+  LAUNDRY: 'local-laundry-service',
+  DRIVING: 'drive-eta',
+  GARDENING: 'yard',
+};
 
 export default function HomeScreen() {
   const user = useAuthStore((s) => s.user);
+  const { data: skills = [] } = useSkills();
 
   const { data: bookings } = useQuery({
     queryKey: ['bookings'],
@@ -79,16 +82,20 @@ export default function HomeScreen() {
 
         <Text style={styles.sectionTitle}>Explore services</Text>
         <View style={styles.grid}>
-          {CATEGORIES.map((c) => (
+          {skills.map((c) => (
             <TouchableOpacity
-              key={c.label}
+              key={c.code}
               style={styles.cat}
               onPress={() =>
-                router.push({ pathname: '/(main)/browse', params: { skill: c.skill } })
+                router.push({ pathname: '/(main)/browse', params: { skill: c.code } })
               }
             >
               <View style={styles.catIcon}>
-                <MaterialIcons name={c.icon} size={28} color={Stitch.colors.primary} />
+                <MaterialIcons
+                  name={SKILL_ICONS[c.code] || 'handyman'}
+                  size={28}
+                  color={Stitch.colors.primary}
+                />
               </View>
               <Text style={styles.catLabel}>{c.label}</Text>
             </TouchableOpacity>

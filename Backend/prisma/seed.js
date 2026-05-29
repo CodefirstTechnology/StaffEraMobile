@@ -33,9 +33,28 @@ async function main() {
     include: { agent: true }
   });
 
+  const defaultSkills = [
+    { code: "COOKING", label: "Cooking", sortOrder: 1 },
+    { code: "CLEANING", label: "Cleaning", sortOrder: 2 },
+    { code: "CHILDCARE", label: "Childcare", sortOrder: 3 },
+    { code: "DRIVING", label: "Driving", sortOrder: 4 },
+    { code: "LAUNDRY", label: "Laundry", sortOrder: 5 },
+    { code: "ELDERLY_CARE", label: "Elderly care", sortOrder: 6 },
+    { code: "GARDENING", label: "Gardening", sortOrder: 7 }
+  ];
+
+  for (const skill of defaultSkills) {
+    await prisma.skill.upsert({
+      where: { code: skill.code },
+      update: { label: skill.label, sortOrder: skill.sortOrder, isActive: true },
+      create: skill
+    });
+  }
+
   console.log("Seed complete:");
   console.log("  Admin: admin@staffera.com / StaffEra@123");
   console.log("  Agent: agent@staffera.com / StaffEra@123");
+  console.log(`  Skills: ${defaultSkills.length} default skills`);
   console.log("  Register house owners via POST /api/v1/auth/register-owner");
 }
 

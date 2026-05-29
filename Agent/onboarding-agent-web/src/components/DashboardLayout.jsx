@@ -53,6 +53,9 @@ export function DashboardLayout() {
               <NavLink to="/admin/servants" className={linkClass}>
                 All servants
               </NavLink>
+              <NavLink to="/admin/skills" className={linkClass}>
+                Skills
+              </NavLink>
             </>
           )}
         </nav>

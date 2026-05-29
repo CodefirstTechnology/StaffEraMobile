@@ -14,22 +14,23 @@ import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
-
-const SKILLS = ['COOKING', 'CLEANING', 'CHILDCARE', 'DRIVING', 'LAUNDRY', 'ELDERLY_CARE'];
+import { useSkills } from '@/hooks/useSkills';
 
 export default function BrowseScreen() {
   const { skill: skillParam } = useLocalSearchParams<{ skill?: string }>();
+  const { data: skills = [] } = useSkills();
   const [skill, setSkill] = useState('');
   const [city, setCity] = useState('');
   const [zone, setZone] = useState('');
+  const skillCodes = skills.map((s) => s.code);
 
   useEffect(() => {
     const raw = Array.isArray(skillParam) ? skillParam[0] : skillParam;
     const next = raw?.toUpperCase();
-    if (next && SKILLS.includes(next)) {
+    if (next && skillCodes.includes(next)) {
       setSkill(next);
     }
-  }, [skillParam]);
+  }, [skillParam, skillCodes.join(',')]);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['servants', skill, city, zone],
@@ -72,14 +73,14 @@ export default function BrowseScreen() {
         />
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-        {SKILLS.map((s) => (
+        {skills.map((s) => (
           <TouchableOpacity
-            key={s}
-            style={[styles.chip, skill === s && styles.chipOn]}
-            onPress={() => setSkill(skill === s ? '' : s)}
+            key={s.code}
+            style={[styles.chip, skill === s.code && styles.chipOn]}
+            onPress={() => setSkill(skill === s.code ? '' : s.code)}
           >
-            <Text style={[styles.chipText, skill === s && styles.chipTextOn]}>
-              {s.replace('_', ' ')}
+            <Text style={[styles.chipText, skill === s.code && styles.chipTextOn]}>
+              {s.label}
             </Text>
           </TouchableOpacity>
         ))}

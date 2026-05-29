@@ -4,6 +4,7 @@ const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const { createNotification } = require("../services/notificationService");
 const { normalizeEmail, normalizePhone } = require("../utils/normalize");
+const { validateActiveSkillCodes } = require("../services/skillService");
 
 const parseSkills = (skills) => {
   if (!skills) return [];
@@ -67,7 +68,7 @@ exports.createServant = async (req, res) => {
     ? `/uploads/${req.files.idProof[0].filename}`
     : req.body.idProofUrl;
 
-  const skillList = parseSkills(skills);
+  const skillList = await validateActiveSkillCodes(parseSkills(skills));
   const hashed = await bcrypt.hash(password, 12);
 
   const wd = Array.isArray(workingDays)
@@ -196,7 +197,7 @@ exports.updateServant = async (req, res) => {
     if (phoneTaken) throw new ApiError(400, "Phone number already registered");
   }
 
-  const skillList = skills ? parseSkills(skills) : null;
+  const skillList = skills ? await validateActiveSkillCodes(parseSkills(skills)) : null;
 
   const profilePhoto = req.files?.profilePhoto?.[0]
     ? `/uploads/${req.files.profilePhoto[0].filename}`

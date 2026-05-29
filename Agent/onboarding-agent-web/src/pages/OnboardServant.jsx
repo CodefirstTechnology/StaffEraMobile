@@ -2,17 +2,32 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
-
-const SKILLS = [
-  'COOKING',
-  'CLEANING',
-  'CHILDCARE',
-  'DRIVING',
-  'LAUNDRY',
-  'ELDERLY_CARE',
-  'GARDENING',
-]
+import { useSkills } from '../hooks/useSkills'
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+
+const PERSONAL_FIELDS = [
+  { key: 'name', label: 'Full name', placeholder: 'Enter full name', type: 'text' },
+  { key: 'email', label: 'Email', placeholder: 'Enter email address', type: 'email' },
+  { key: 'phone', label: 'Phone', placeholder: 'Enter mobile number', type: 'tel' },
+  { key: 'password', label: 'Password', placeholder: 'Create login password', type: 'password' },
+]
+
+function Field({ label, children }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function FieldLabel({ children }) {
+  return <span className="text-sm font-medium text-gray-700">{children}</span>
+}
+
+function inputClassName() {
+  return 'w-full rounded-lg border px-3 py-2'
+}
 
 function ReviewItem({ label, children }) {
   return (
@@ -50,13 +65,14 @@ function ReviewChips({ items }) {
 
 export default function OnboardServant() {
   const navigate = useNavigate()
+  const { data: skills = [], isLoading: skillsLoading } = useSkills()
   const [step, setStep] = useState(1)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     name: '',
     email: '',
     phone: '',
-    password: 'Servant@123',
+    password: '',
     bio: '',
     experience: '',
     hourlyRate: '',
@@ -121,15 +137,16 @@ export default function OnboardServant() {
       {step === 1 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Personal Info</h3>
-          {['name', 'email', 'phone', 'password'].map((f) => (
-            <input
-              key={f}
-              placeholder={f}
-              value={form[f]}
-              onChange={(e) => update(f, e.target.value)}
-              type={f === 'password' ? 'password' : 'text'}
-              className="w-full rounded-lg border px-3 py-2"
-            />
+          {PERSONAL_FIELDS.map((f) => (
+            <Field key={f.key} label={f.label}>
+              <input
+                placeholder={f.placeholder}
+                value={form[f.key]}
+                onChange={(e) => update(f.key, e.target.value)}
+                type={f.type}
+                className={inputClassName()}
+              />
+            </Field>
           ))}
         </div>
       )}
@@ -137,75 +154,101 @@ export default function OnboardServant() {
       {step === 2 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Skills & Rates</h3>
-          <div className="flex flex-wrap gap-2">
-            {SKILLS.map((s) => (
-              <label key={s} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.skills.includes(s)}
-                  onChange={() => toggleSkill(s)}
-                />
-                {s}
-              </label>
-            ))}
+          <div className="space-y-1.5">
+            <FieldLabel>Skills</FieldLabel>
+            {skillsLoading ? (
+              <p className="text-sm text-subtext">Loading skills…</p>
+            ) : skills.length === 0 ? (
+              <p className="text-sm text-subtext">
+                No skills available. Ask an admin to add skills first.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {skills.map((s) => (
+                  <label key={s.code} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.skills.includes(s.code)}
+                      onChange={() => toggleSkill(s.code)}
+                    />
+                    {s.label}
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
-          <input
-            placeholder="Years of experience"
-            type="number"
-            value={form.experience}
-            onChange={(e) => update('experience', e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-          <textarea
-            placeholder="Bio"
-            value={form.bio}
-            onChange={(e) => update('bio', e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-            rows={3}
-          />
-          <input
-            placeholder="Hourly rate"
-            type="number"
-            value={form.hourlyRate}
-            onChange={(e) => update('hourlyRate', e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-          <input
-            placeholder="Monthly rate"
-            type="number"
-            value={form.monthlyRate}
-            onChange={(e) => update('monthlyRate', e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
+          <Field label="Years of experience">
+            <input
+              placeholder="e.g. 3"
+              type="number"
+              value={form.experience}
+              onChange={(e) => update('experience', e.target.value)}
+              className={inputClassName()}
+            />
+          </Field>
+          <Field label="Bio">
+            <textarea
+              placeholder="Short description about the servant"
+              value={form.bio}
+              onChange={(e) => update('bio', e.target.value)}
+              className={inputClassName()}
+              rows={3}
+            />
+          </Field>
+          <Field label="Hourly rate (₹)">
+            <input
+              placeholder="e.g. 150"
+              type="number"
+              value={form.hourlyRate}
+              onChange={(e) => update('hourlyRate', e.target.value)}
+              className={inputClassName()}
+            />
+          </Field>
+          <Field label="Monthly rate (₹)">
+            <input
+              placeholder="e.g. 15000"
+              type="number"
+              value={form.monthlyRate}
+              onChange={(e) => update('monthlyRate', e.target.value)}
+              className={inputClassName()}
+            />
+          </Field>
         </div>
       )}
 
       {step === 3 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Availability</h3>
-          <input
-            type="time"
-            value={form.availableFrom}
-            onChange={(e) => update('availableFrom', e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-          <input
-            type="time"
-            value={form.availableTo}
-            onChange={(e) => update('availableTo', e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-          <div className="flex flex-wrap gap-2">
-            {DAYS.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => toggleDay(d)}
-                className={`rounded-full px-3 py-1 text-sm ${form.workingDays.includes(d) ? 'bg-primary text-white' : 'bg-gray-100'}`}
-              >
-                {d}
-              </button>
-            ))}
+          <Field label="Available from">
+            <input
+              type="time"
+              value={form.availableFrom}
+              onChange={(e) => update('availableFrom', e.target.value)}
+              className={inputClassName()}
+            />
+          </Field>
+          <Field label="Available to">
+            <input
+              type="time"
+              value={form.availableTo}
+              onChange={(e) => update('availableTo', e.target.value)}
+              className={inputClassName()}
+            />
+          </Field>
+          <div className="space-y-1.5">
+            <FieldLabel>Working days</FieldLabel>
+            <div className="flex flex-wrap gap-2">
+              {DAYS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleDay(d)}
+                  className={`rounded-full px-3 py-1 text-sm ${form.workingDays.includes(d) ? 'bg-primary text-white' : 'bg-gray-100'}`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -213,35 +256,35 @@ export default function OnboardServant() {
       {step === 4 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">ID Verification</h3>
-          <select
-            value={form.idProofType}
-            onChange={(e) => update('idProofType', e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          >
-            {['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID'].map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <label className="block">
-            <span className="text-sm">ID Proof</span>
+          <Field label="ID proof type">
+            <select
+              value={form.idProofType}
+              onChange={(e) => update('idProofType', e.target.value)}
+              className={inputClassName()}
+            >
+              {['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID'].map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="ID proof document">
             <input
               type="file"
               accept="image/*"
               onChange={(e) => setIdProof(e.target.files[0])}
-              className="mt-1 w-full"
+              className="w-full text-sm"
             />
-          </label>
-          <label className="block">
-            <span className="text-sm">Profile Photo</span>
+          </Field>
+          <Field label="Profile photo">
             <input
               type="file"
               accept="image/*"
               onChange={(e) => setProfilePhoto(e.target.files[0])}
-              className="mt-1 w-full"
+              className="w-full text-sm"
             />
-          </label>
+          </Field>
         </div>
       )}
 
@@ -263,7 +306,13 @@ export default function OnboardServant() {
 
           <ReviewSection title="Skills & Rates">
             <ReviewItem label="Skills">
-              <ReviewChips items={form.skills} />
+              <ReviewChips
+                items={form.skills.map(
+                  (code) =>
+                    skills.find((s) => s.code === code)?.label ||
+                    code.replace(/_/g, ' '),
+                )}
+              />
             </ReviewItem>
             <ReviewItem label="Experience">
               {form.experience ? `${form.experience} year(s)` : '—'}

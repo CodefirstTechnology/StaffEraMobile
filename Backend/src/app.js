@@ -36,6 +36,7 @@ app.use("/uploads", express.static(uploadDir));
 
 app.use("/api/v1/auth", require("./routes/authRoutes"));
 app.use("/api/v1/servants", require("./routes/servantRoutes"));
+app.use("/api/v1/skills", require("./routes/skillRoutes"));
 app.use("/api/v1/bookings", require("./routes/bookingRoutes"));
 app.use("/api/v1/time", require("./routes/timeRoutes"));
 app.use("/api/v1/agent", require("./routes/agentRoutes"));
