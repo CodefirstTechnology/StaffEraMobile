@@ -77,7 +77,14 @@ export default function ServantList() {
                       </div>
                     )}
                   </td>
-                  <td className="p-4 font-medium">{s.user.name}</td>
+                  <td className="p-4">
+                    <Link
+                      to={`/servants/${s.id}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {s.user.name}
+                    </Link>
+                  </td>
                   <td className="p-4">{s.user.phone || '—'}</td>
                   <td className="p-4">
                     {s.skills?.map((sk) => sk.skillName).join(', ')}

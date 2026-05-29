@@ -76,7 +76,14 @@ export default function Dashboard() {
             ) : (
               pending.slice(0, 10).map((s) => (
                 <tr key={s.id} className="border-t border-outline-variant/30">
-                  <td className="p-4 font-medium">{s.user.name}</td>
+                  <td className="p-4">
+                    <Link
+                      to={`/servants/${s.id}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {s.user.name}
+                    </Link>
+                  </td>
                   <td className="p-4">{s.user.phone || '—'}</td>
                   <td className="p-4">
                     <span className="rounded-full bg-tertiary-accent/20 px-2.5 py-0.5 text-xs font-semibold text-tertiary">
