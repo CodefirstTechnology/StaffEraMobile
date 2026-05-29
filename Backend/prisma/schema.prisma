@@ -98,6 +98,11 @@ model Servant {
   availableFrom      String?
   availableTo        String?
   workingDays        String?
+  offersSession      Boolean            @default(true)
+  offersMonthly      Boolean            @default(true)
+  weekOffDays        String?
+  hoursPerDay        Float?
+  availabilityNotes  String?
   bookings           Booking[]
   timeEntries        TimeEntry[]
   zones              Zone[]

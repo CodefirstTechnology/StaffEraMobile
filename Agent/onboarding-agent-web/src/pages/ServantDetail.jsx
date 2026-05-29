@@ -7,6 +7,20 @@ import { Button } from '../components/ui/Button'
 
 const API_HOST = 'http://localhost:5000'
 
+const parseWorkingDays = (wd) => {
+  if (!wd) return []
+  if (Array.isArray(wd)) return wd
+  try {
+    const parsed = JSON.parse(wd)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return String(wd)
+      .split(',')
+      .map((d) => d.trim())
+      .filter(Boolean)
+  }
+}
+
 export default function ServantDetail() {
   const { id } = useParams()
   const qc = useQueryClient()
@@ -91,10 +105,25 @@ export default function ServantDetail() {
                 {servant.monthlyRate != null ? ` · ₹${servant.monthlyRate}/mo` : ''}
               </p>
             )}
-            {(servant.availableFrom || servant.availableTo) && (
+            {(servant.availableFrom || servant.availableTo) && servant.offersSession !== false && (
               <p className="text-sm text-subtext">
-                Available {servant.availableFrom || '—'} – {servant.availableTo || '—'}
+                Session: {servant.availableFrom || '—'} – {servant.availableTo || '—'}
               </p>
+            )}
+            {servant.offersMonthly !== false && (
+              <>
+                {servant.workingDays && (
+                  <p className="text-sm text-subtext">
+                    Monthly working days: {parseWorkingDays(servant.workingDays).join(', ') || '—'}
+                  </p>
+                )}
+                {servant.hoursPerDay != null && (
+                  <p className="text-sm text-subtext">{servant.hoursPerDay} hrs/day</p>
+                )}
+                {servant.availabilityNotes && (
+                  <p className="text-sm text-subtext">{servant.availabilityNotes}</p>
+                )}
+              </>
             )}
           </div>
         </div>

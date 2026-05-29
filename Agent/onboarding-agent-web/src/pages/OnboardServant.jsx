@@ -80,6 +80,10 @@ export default function OnboardServant() {
     availableFrom: '09:00',
     availableTo: '18:00',
     workingDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+    hoursPerDay: '8',
+    availabilityNotes: '',
+    offersSession: true,
+    offersMonthly: true,
     skills: [],
     idProofType: 'AADHAR',
   })
@@ -104,10 +108,19 @@ export default function OnboardServant() {
 
   const submit = async () => {
     setError('')
+    if (!form.offersSession && !form.offersMonthly) {
+      setError('Select at least one booking type: Session or Monthly')
+      return
+    }
     const fd = new FormData()
     Object.entries(form).forEach(([k, v]) => {
-      if (k === 'skills' || k === 'workingDays') fd.append(k, JSON.stringify(v))
-      else fd.append(k, String(v))
+      if (k === 'skills' || k === 'workingDays') {
+        fd.append(k, JSON.stringify(v))
+      } else if (typeof v === 'boolean') {
+        fd.append(k, v ? 'true' : 'false')
+      } else {
+        fd.append(k, String(v))
+      }
     })
     if (profilePhoto) fd.append('profilePhoto', profilePhoto)
     if (idProof) fd.append('idProof', idProof)
@@ -219,37 +232,98 @@ export default function OnboardServant() {
       {step === 3 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Availability</h3>
-          <Field label="Available from">
-            <input
-              type="time"
-              value={form.availableFrom}
-              onChange={(e) => update('availableFrom', e.target.value)}
-              className={inputClassName()}
-            />
-          </Field>
-          <Field label="Available to">
-            <input
-              type="time"
-              value={form.availableTo}
-              onChange={(e) => update('availableTo', e.target.value)}
-              className={inputClassName()}
-            />
-          </Field>
-          <div className="space-y-1.5">
-            <FieldLabel>Working days</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              {DAYS.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => toggleDay(d)}
-                  className={`rounded-full px-3 py-1 text-sm ${form.workingDays.includes(d) ? 'bg-primary text-white' : 'bg-gray-100'}`}
-                >
-                  {d}
-                </button>
-              ))}
+          <p className="text-sm text-subtext">
+            Choose which booking types this servant accepts and set the schedule for each.
+          </p>
+
+          <div className="space-y-2">
+            <FieldLabel>Booking types offered</FieldLabel>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.offersSession}
+                  onChange={(e) => update('offersSession', e.target.checked)}
+                />
+                Session (one visit)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.offersMonthly}
+                  onChange={(e) => update('offersMonthly', e.target.checked)}
+                />
+                Monthly contract
+              </label>
             </div>
           </div>
+
+          {form.offersSession && (
+            <div className="space-y-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <h4 className="text-sm font-semibold text-gray-700">Session</h4>
+              <Field label="Session start time">
+                <input
+                  type="time"
+                  value={form.availableFrom}
+                  onChange={(e) => update('availableFrom', e.target.value)}
+                  className={inputClassName()}
+                />
+              </Field>
+              <Field label="Session end time">
+                <input
+                  type="time"
+                  value={form.availableTo}
+                  onChange={(e) => update('availableTo', e.target.value)}
+                  className={inputClassName()}
+                />
+              </Field>
+            </div>
+          )}
+
+          {form.offersMonthly && (
+            <div className="space-y-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <h4 className="text-sm font-semibold text-gray-700">Monthly</h4>
+              <div className="space-y-1.5">
+                <FieldLabel>Working days</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => toggleDay(d)}
+                      className={`rounded-full px-3 py-1 text-sm ${
+                        form.workingDays.includes(d)
+                          ? 'bg-primary text-white'
+                          : 'bg-gray-100'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Field label="Hours per day">
+                <input
+                  type="number"
+                  min="1"
+                  max="24"
+                  placeholder="e.g. 8"
+                  value={form.hoursPerDay}
+                  onChange={(e) => update('hoursPerDay', e.target.value)}
+                  className={inputClassName()}
+                />
+              </Field>
+              <Field label="Monthly availability notes">
+                <textarea
+                  placeholder="e.g. Second Saturday off, half day on Friday…"
+                  value={form.availabilityNotes}
+                  onChange={(e) => update('availabilityNotes', e.target.value)}
+                  className={inputClassName()}
+                  rows={3}
+                />
+              </Field>
+            </div>
+          )}
         </div>
       )}
 
@@ -327,14 +401,34 @@ export default function OnboardServant() {
           </ReviewSection>
 
           <ReviewSection title="Availability">
-            <ReviewItem label="Working hours">
-              {form.availableFrom && form.availableTo
-                ? `${form.availableFrom} – ${form.availableTo}`
-                : '—'}
+            <ReviewItem label="Booking types">
+              {[
+                form.offersSession && 'Session',
+                form.offersMonthly && 'Monthly',
+              ]
+                .filter(Boolean)
+                .join(', ') || '—'}
             </ReviewItem>
-            <ReviewItem label="Working days">
-              <ReviewChips items={form.workingDays} />
-            </ReviewItem>
+            {form.offersSession && (
+              <ReviewItem label="Session hours">
+                {form.availableFrom && form.availableTo
+                  ? `${form.availableFrom} – ${form.availableTo}`
+                  : '—'}
+              </ReviewItem>
+            )}
+            {form.offersMonthly && (
+              <>
+                <ReviewItem label="Working days">
+                  <ReviewChips items={form.workingDays} />
+                </ReviewItem>
+                <ReviewItem label="Hours per day">
+                  {form.hoursPerDay || '—'}
+                </ReviewItem>
+                <ReviewItem label="Notes">
+                  {form.availabilityNotes || '—'}
+                </ReviewItem>
+              </>
+            )}
           </ReviewSection>
 
           <ReviewSection title="ID Verification">

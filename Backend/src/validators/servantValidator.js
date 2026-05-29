@@ -6,7 +6,12 @@ const updateServantMeSchema = z.object({
     profilePhoto: z.string().optional(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
-    workingDays: z.union([z.string(), z.array(z.string())]).optional()
+    workingDays: z.union([z.string(), z.array(z.string())]).optional(),
+    offersSession: z.coerce.boolean().optional(),
+    offersMonthly: z.coerce.boolean().optional(),
+    weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
+    hoursPerDay: z.coerce.number().optional(),
+    availabilityNotes: z.string().optional()
   })
 });
 
@@ -23,6 +28,11 @@ const createServantSchema = z.object({
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
+    offersSession: z.coerce.boolean().optional(),
+    offersMonthly: z.coerce.boolean().optional(),
+    weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
+    hoursPerDay: z.coerce.number().optional(),
+    availabilityNotes: z.string().optional(),
     idProofType: z.string().optional(),
     skills: z.union([z.string(), z.array(z.string())]).optional()
   })
@@ -39,6 +49,11 @@ const updateServantSchema = z.object({
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
+    offersSession: z.coerce.boolean().optional(),
+    offersMonthly: z.coerce.boolean().optional(),
+    weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
+    hoursPerDay: z.coerce.number().optional(),
+    availabilityNotes: z.string().optional(),
     idProofType: z.string().optional(),
     skills: z.union([z.string(), z.array(z.string())]).optional()
   })

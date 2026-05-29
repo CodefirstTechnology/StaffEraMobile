@@ -19,6 +19,19 @@ const parseSkills = (skills) => {
   }
 };
 
+const stringifyDays = (days) =>
+  days === undefined || days === null
+    ? undefined
+    : Array.isArray(days)
+      ? JSON.stringify(days)
+      : days;
+
+const parseBool = (value, fallback = true) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  return String(value).toLowerCase() === "true";
+};
+
 const getAgent = async (userId) => {
   const agent = await prisma.agent.findUnique({ where: { userId } });
   if (!agent) throw new ApiError(403, "Agent profile required");
@@ -45,6 +58,11 @@ exports.createServant = async (req, res) => {
     availableFrom,
     availableTo,
     workingDays,
+    weekOffDays,
+    hoursPerDay,
+    availabilityNotes,
+    offersSession,
+    offersMonthly,
     idProofType,
     skills
   } = req.body;
@@ -71,9 +89,8 @@ exports.createServant = async (req, res) => {
   const skillList = await validateActiveSkillCodes(parseSkills(skills));
   const hashed = await bcrypt.hash(password, 12);
 
-  const wd = Array.isArray(workingDays)
-    ? JSON.stringify(workingDays)
-    : workingDays;
+  const wd = stringifyDays(workingDays);
+  const wod = stringifyDays(weekOffDays);
 
   const user = await prisma.user.create({
     data: {
@@ -92,6 +109,11 @@ exports.createServant = async (req, res) => {
           availableFrom,
           availableTo,
           workingDays: wd,
+          weekOffDays: wod,
+          hoursPerDay: hoursPerDay ? parseFloat(hoursPerDay) : null,
+          availabilityNotes: availabilityNotes || null,
+          offersSession: parseBool(offersSession, true),
+          offersMonthly: parseBool(offersMonthly, true),
           idProofType,
           idProofUrl,
           profilePhoto,
@@ -185,6 +207,11 @@ exports.updateServant = async (req, res) => {
     availableFrom,
     availableTo,
     workingDays,
+    weekOffDays,
+    hoursPerDay,
+    availabilityNotes,
+    offersSession,
+    offersMonthly,
     skills
   } = req.body;
 
@@ -235,9 +262,22 @@ exports.updateServant = async (req, res) => {
         ...(availableFrom !== undefined && { availableFrom }),
         ...(availableTo !== undefined && { availableTo }),
         ...(workingDays !== undefined && {
-          workingDays: Array.isArray(workingDays)
-            ? JSON.stringify(workingDays)
-            : workingDays
+          workingDays: stringifyDays(workingDays)
+        }),
+        ...(weekOffDays !== undefined && {
+          weekOffDays: stringifyDays(weekOffDays)
+        }),
+        ...(hoursPerDay !== undefined && {
+          hoursPerDay: hoursPerDay === '' ? null : parseFloat(hoursPerDay)
+        }),
+        ...(availabilityNotes !== undefined && {
+          availabilityNotes: availabilityNotes || null
+        }),
+        ...(offersSession !== undefined && {
+          offersSession: parseBool(offersSession, true)
+        }),
+        ...(offersMonthly !== undefined && {
+          offersMonthly: parseBool(offersMonthly, true)
         }),
         ...(profilePhoto && { profilePhoto }),
         ...(idProofUrl && { idProofUrl }),
