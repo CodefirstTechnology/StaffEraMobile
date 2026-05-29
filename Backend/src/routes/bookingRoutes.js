@@ -18,6 +18,12 @@ router.post(
   bookingController.createBooking
 );
 router.get("/", authenticate, bookingController.listBookings);
+router.get(
+  "/open-requests",
+  authenticate,
+  requireRole("SERVANT"),
+  bookingController.listOpenRequests
+);
 router.get("/:id", authenticate, bookingController.getBooking);
 router.get("/:id/tracking", authenticate, bookingController.getBookingTracking);
 router.post(

@@ -59,6 +59,7 @@ export default function MainLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="notifications/index" options={{ href: null }} />
     </Tabs>
   );
 }

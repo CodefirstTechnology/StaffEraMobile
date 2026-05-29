@@ -7,6 +7,8 @@ type Props = {
   location?: string;
   title?: string;
   onProfile?: () => void;
+  unreadNotifications?: number;
+  onNotifications?: () => void;
 };
 
 export function ScreenHeader({
@@ -14,6 +16,8 @@ export function ScreenHeader({
   location = 'Mumbai, India',
   title,
   onProfile,
+  unreadNotifications = 0,
+  onNotifications,
 }: Props) {
   return (
     <View style={styles.header}>
@@ -25,13 +29,27 @@ export function ScreenHeader({
             <Text style={styles.locValue}>{location}</Text>
           </View>
         </View>
-        {title ? (
-          <Text style={styles.brand}>{title}</Text>
-        ) : (
-          <Pressable onPress={onProfile} style={styles.avatar}>
-            <MaterialIcons name="person" size={22} color={Stitch.colors.primary} />
-          </Pressable>
-        )}
+        <View style={styles.actions}>
+          {onNotifications ? (
+            <Pressable onPress={onNotifications} style={styles.avatar}>
+              <MaterialIcons name="notifications" size={22} color={Stitch.colors.primary} />
+              {unreadNotifications > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ) : null}
+          {title ? (
+            <Text style={styles.brand}>{title}</Text>
+          ) : (
+            <Pressable onPress={onProfile} style={styles.avatar}>
+              <MaterialIcons name="person" size={22} color={Stitch.colors.primary} />
+            </Pressable>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -51,6 +69,7 @@ const styles = StyleSheet.create({
   locLabel: { ...Stitch.typography.caption, color: Stitch.colors.onSurfaceVariant },
   locValue: { ...Stitch.typography.label, color: Stitch.colors.onBackground },
   brand: { ...Stitch.typography.headline, color: Stitch.colors.primary },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   avatar: {
     width: 40,
     height: 40,
@@ -61,4 +80,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Stitch.colors.outlineVariant,
   },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Stitch.colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });

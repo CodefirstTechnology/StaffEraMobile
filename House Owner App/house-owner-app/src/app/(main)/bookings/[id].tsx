@@ -21,6 +21,10 @@ export default function BookingDetailScreen() {
       const res = await api.get(`/bookings/${id}`);
       return res.data.data.booking;
     },
+    refetchInterval: (query) => {
+      const b = query.state.data;
+      return b?.status === 'PENDING' && !b?.servant ? 5000 : false;
+    },
   });
 
   const trackLive = ['CONFIRMED', 'ACTIVE'].includes(booking?.status ?? '');
@@ -56,7 +60,9 @@ export default function BookingDetailScreen() {
   }
 
   const statusHint: Record<string, string> = {
-    PENDING: 'Waiting for helper to accept',
+    PENDING: booking.servant
+      ? 'Waiting for helper to accept'
+      : 'Broadcast to nearby helpers — first to accept gets the job',
     CONFIRMED: 'Helper accepted — you will see them on the map when they share location',
     ACTIVE: 'Work in progress — live location updates below',
     REJECTED: 'Helper declined this request',
@@ -70,7 +76,9 @@ export default function BookingDetailScreen() {
         ← Back
       </Text>
       <GlassCard>
-        <Text style={styles.name}>{booking.servant.user.name}</Text>
+        <Text style={styles.name}>
+          {booking.servant?.user?.name || 'Finding nearby helper…'}
+        </Text>
         <StatusPill status={booking.status} />
         <Text style={styles.hint}>{statusHint[booking.status] || ''}</Text>
         <Text style={styles.row}>Type: {booking.bookingType}</Text>

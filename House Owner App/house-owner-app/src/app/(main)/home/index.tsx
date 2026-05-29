@@ -17,6 +17,7 @@ import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { useSkills } from '@/hooks/useSkills';
+import { useNotifications } from '@/hooks/useNotifications';
 
 const SKILL_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   CLEANING: 'cleaning-services',
@@ -31,6 +32,8 @@ const SKILL_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
 export default function HomeScreen() {
   const user = useAuthStore((s) => s.user);
   const { data: skills = [] } = useSkills();
+  const { data: notifications = [] } = useNotifications();
+  const unreadNotifications = notifications.filter((n) => !n.isRead).length;
 
   const { data: bookings } = useQuery({
     queryKey: ['bookings'],
@@ -53,6 +56,8 @@ export default function HomeScreen() {
             ? user.houseOwner.address.split(',').slice(0, 2).join(',').trim()
             : user?.houseOwner?.city || 'Set your home location in Profile'
         }
+        unreadNotifications={unreadNotifications}
+        onNotifications={() => router.push('/(main)/notifications')}
       />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.searchWrap}>
@@ -108,13 +113,15 @@ export default function HomeScreen() {
             <Text style={styles.empty}>No bookings yet — find help in Browse</Text>
           </GlassCard>
         ) : (
-          upcoming.map((b: { id: number; status: string; servant: { user: { name: string } }; bookingType: string }) => (
+          upcoming.map((b: { id: number; status: string; servant: { user: { name: string } } | null; bookingType: string }) => (
             <TouchableOpacity
               key={b.id}
               onPress={() => router.push(`/(main)/bookings/${b.id}`)}
             >
               <GlassCard style={styles.bookingCard}>
-                <Text style={styles.bookingName}>{b.servant.user.name}</Text>
+                <Text style={styles.bookingName}>
+                  {b.servant?.user?.name || 'Finding nearby helper…'}
+                </Text>
                 <Text style={styles.bookingMeta}>{b.bookingType}</Text>
                 <StatusPill status={b.status} />
               </GlassCard>

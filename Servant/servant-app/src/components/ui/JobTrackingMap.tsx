@@ -14,6 +14,7 @@ type Props = {
   homeLabel?: string;
   servant?: Coord | null;
   showMyLocation?: boolean;
+  showMapInitially?: boolean;
   height?: number;
   caption?: string;
 };
@@ -38,14 +39,16 @@ export function JobTrackingMap({
   homeLabel = 'Home',
   servant,
   showMyLocation = false,
+  showMapInitially = false,
   height = 220,
   caption,
 }: Props) {
   const mapRef = useRef<MapView>(null);
+  const [mapVisible, setMapVisible] = useState(showMapInitially);
   const [myLocation, setMyLocation] = useState<Coord | null>(null);
 
   useEffect(() => {
-    if (!showMyLocation) return;
+    if (!showMyLocation || !mapVisible) return;
     let sub: Location.LocationSubscription | undefined;
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -57,7 +60,7 @@ export function JobTrackingMap({
       );
     })();
     return () => sub?.remove();
-  }, [showMyLocation]);
+  }, [showMyLocation, mapVisible]);
 
   const points: Coord[] = [];
   if (home) points.push(home);
@@ -65,47 +68,73 @@ export function JobTrackingMap({
   if (myLocation) points.push(myLocation);
 
   useEffect(() => {
-    if (points.length < 1) return;
+    if (!mapVisible || points.length < 1) return;
     mapRef.current?.animateToRegion(fitRegion(points), 400);
-  }, [home?.latitude, home?.longitude, servant?.latitude, servant?.longitude, myLocation?.latitude, myLocation?.longitude]);
+  }, [
+    mapVisible,
+    home?.latitude,
+    home?.longitude,
+    servant?.latitude,
+    servant?.longitude,
+    myLocation?.latitude,
+    myLocation?.longitude,
+  ]);
 
   if (!home) return null;
 
   const initial = points.length > 0 ? fitRegion(points) : { ...home, latitudeDelta: 0.02, longitudeDelta: 0.02 };
 
-  const openDirections = () => {
+  const openExternalDirections = () => {
     const origin = myLocation || servant || null;
     Linking.openURL(mapsDirectionsUrl(home, origin));
   };
 
+  const showMap = () => setMapVisible(true);
+
   return (
     <View style={styles.wrap}>
-      <View style={[styles.mapBox, { height }]}>
-        <MapView
-          ref={mapRef}
-          style={StyleSheet.absoluteFill}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          initialRegion={initial}
-          showsUserLocation={showMyLocation}
-          {...mapViewProps()}
-        >
-          <Marker coordinate={home} title={homeLabel} pinColor={Stitch.colors.primary} />
-          {servant ? (
-            <Marker coordinate={servant} title="Helper" pinColor={Stitch.colors.secondary} />
-          ) : null}
-        </MapView>
-        {caption ? <Text style={styles.caption}>{caption}</Text> : null}
-      </View>
-      <TouchableOpacity style={styles.dirBtn} onPress={openDirections}>
-        <MaterialIcons name="directions" size={20} color="#fff" />
-        <Text style={styles.dirText}>Directions to home</Text>
-      </TouchableOpacity>
+      {mapVisible ? (
+        <View style={[styles.mapBox, { height }]}>
+          <MapView
+            ref={mapRef}
+            style={StyleSheet.absoluteFill}
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            initialRegion={initial}
+            showsUserLocation={showMyLocation}
+            {...mapViewProps()}
+          >
+            <Marker coordinate={home} title={homeLabel} pinColor={Stitch.colors.primary} />
+            {servant ? (
+              <Marker coordinate={servant} title="Helper" pinColor={Stitch.colors.secondary} />
+            ) : null}
+          </MapView>
+          {caption ? <Text style={styles.caption}>{caption}</Text> : null}
+        </View>
+      ) : caption ? (
+        <Text style={styles.hint}>{caption}</Text>
+      ) : null}
+      {mapVisible ? (
+        <TouchableOpacity style={styles.dirBtn} onPress={openExternalDirections}>
+          <MaterialIcons name="navigation" size={20} color="#fff" />
+          <Text style={styles.dirText}>Open in Google Maps</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.dirBtn} onPress={showMap}>
+          <MaterialIcons name="directions" size={20} color="#fff" />
+          <Text style={styles.dirText}>Directions to home</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { marginTop: 12 },
+  hint: {
+    fontSize: 13,
+    color: Stitch.colors.onSurfaceVariant,
+    marginBottom: 10,
+  },
   mapBox: {
     borderRadius: Stitch.radius.lg,
     overflow: 'hidden',

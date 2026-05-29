@@ -15,10 +15,12 @@ import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useSkills } from '@/hooks/useSkills';
+import { useLiveLocation } from '@/hooks/useLiveLocation';
 
 export default function BrowseScreen() {
   const { skill: skillParam } = useLocalSearchParams<{ skill?: string }>();
   const { data: skills = [] } = useSkills();
+  const { location, loading: locLoading, error: locError } = useLiveLocation();
   const [skill, setSkill] = useState('');
   const [city, setCity] = useState('');
   const [zone, setZone] = useState('');
@@ -33,15 +35,24 @@ export default function BrowseScreen() {
   }, [skillParam, skillCodes.join(',')]);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['servants', skill, city, zone],
+    queryKey: ['servants', skill, city, zone, location?.latitude, location?.longitude],
+    enabled: !locLoading,
     queryFn: async () => {
-      const res = await api.get('/servants', {
-        params: {
-          skill: skill || undefined,
-          city: city || undefined,
-          zone: zone || undefined,
-        },
-      });
+      const params: Record<string, string | number> = {
+        skill: skill || undefined,
+        city: city || undefined,
+        zone: zone || undefined,
+      } as Record<string, string | number>;
+      if (
+        location?.latitude != null &&
+        location?.longitude != null &&
+        !Number.isNaN(location.latitude) &&
+        !Number.isNaN(location.longitude)
+      ) {
+        params.latitude = location.latitude;
+        params.longitude = location.longitude;
+      }
+      const res = await api.get('/servants', { params });
       return res.data.data.servants;
     },
   });
@@ -50,8 +61,32 @@ export default function BrowseScreen() {
     <View style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.title}>Find verified help</Text>
-        <Text style={styles.sub}>All staff are agent-verified</Text>
+        <Text style={styles.sub}>Helpers near your live location</Text>
       </View>
+      {location ? (
+        <View style={styles.liveLoc}>
+          <MaterialIcons name="my-location" size={18} color={Stitch.colors.secondary} />
+          <Text style={styles.liveLocText} numberOfLines={2}>
+            {location.address}
+          </Text>
+        </View>
+      ) : locError ? (
+        <Text style={styles.locError}>{locError}</Text>
+      ) : null}
+      <TouchableOpacity
+        style={styles.broadcastBtn}
+        onPress={() =>
+          router.push({
+            pathname: '/(main)/bookings/request',
+            params: skill ? { skill } : undefined,
+          })
+        }
+      >
+        <Text style={styles.broadcastTitle}>Request help in my area</Text>
+        <Text style={styles.broadcastSub}>
+          Notify all nearby verified helpers — first to accept gets the job
+        </Text>
+      </TouchableOpacity>
       <View style={styles.searchWrap}>
         <MaterialIcons name="location-city" size={20} color={Stitch.colors.onSurfaceVariant} />
         <TextInput
@@ -124,7 +159,13 @@ export default function BrowseScreen() {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <Text style={styles.empty}>{isLoading ? 'Loading…' : 'No helpers in this area yet'}</Text>
+          <Text style={styles.empty}>
+            {isLoading || locLoading
+              ? 'Loading…'
+              : location
+                ? 'No verified helpers in your area yet — try Request help in my area'
+                : 'Enable location to see nearby helpers'}
+          </Text>
         }
       />
     </View>
@@ -136,6 +177,32 @@ const styles = StyleSheet.create({
   header: { paddingTop: 56, paddingHorizontal: Stitch.spacing.padding, paddingBottom: 8 },
   title: { ...Stitch.typography.headline, fontSize: 26, color: Stitch.colors.primary },
   sub: { ...Stitch.typography.caption, color: Stitch.colors.onSurfaceVariant, marginTop: 4 },
+  liveLoc: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: Stitch.spacing.padding,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: Stitch.radius.lg,
+    backgroundColor: Stitch.colors.surfaceLow,
+  },
+  liveLocText: { flex: 1, fontSize: 13, color: Stitch.colors.onSurfaceVariant },
+  locError: {
+    marginHorizontal: Stitch.spacing.padding,
+    marginBottom: 12,
+    fontSize: 13,
+    color: Stitch.colors.error,
+  },
+  broadcastBtn: {
+    marginHorizontal: Stitch.spacing.padding,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: Stitch.radius.lg,
+    backgroundColor: Stitch.colors.secondary,
+  },
+  broadcastTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  broadcastSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12, marginTop: 4 },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',

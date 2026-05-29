@@ -2,6 +2,12 @@ const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const { parseJsonArray } = require("../services/bookingService");
+const {
+  findServantsNearLocation,
+  servantCoversLocation,
+  bookingMatchesServantSkill,
+  DEFAULT_RADIUS_KM
+} = require("../services/locationService");
 
 const servantInclude = {
   user: { select: { id: true, name: true, email: true, phone: true } },
@@ -11,10 +17,13 @@ const servantInclude = {
 };
 
 exports.listServants = async (req, res) => {
-  const { skill, city, zone, type } = req.query;
+  const { skill, city, zone, type, latitude, longitude, radiusKm } = req.query;
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, parseInt(req.query.limit, 10) || 20);
   const skip = (page - 1) * limit;
+  const lat = latitude != null ? Number(latitude) : null;
+  const lng = longitude != null ? Number(longitude) : null;
+  const radius = radiusKm != null ? Number(radiusKm) : DEFAULT_RADIUS_KM;
 
   const where = {
     verificationStatus: "VERIFIED",
@@ -44,18 +53,20 @@ exports.listServants = async (req, res) => {
       : {})
   };
 
-  const [servants, total] = await Promise.all([
-    prisma.servant.findMany({
-      where,
-      include: servantInclude,
-      skip,
-      take: limit,
-      orderBy: { rating: "desc" }
-    }),
-    prisma.servant.count({ where })
-  ]);
+  let servants = await prisma.servant.findMany({
+    where,
+    include: servantInclude,
+    orderBy: { rating: "desc" }
+  });
 
-  sendSuccess(res, { servants, pagination: { page, limit, total } });
+  if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+    servants = servants.filter((s) => servantCoversLocation(s, lat, lng, radius));
+  }
+
+  const total = servants.length;
+  const paged = servants.slice(skip, skip + limit);
+
+  sendSuccess(res, { servants: paged, pagination: { page, limit, total } });
 };
 
 exports.getServant = async (req, res) => {

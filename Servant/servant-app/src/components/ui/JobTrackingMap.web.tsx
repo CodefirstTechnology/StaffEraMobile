@@ -10,11 +10,18 @@ type Props = {
   homeLabel?: string;
   servant?: Coord | null;
   showMyLocation?: boolean;
+  showMapInitially?: boolean;
   height?: number;
   caption?: string;
 };
 
-export function JobTrackingMap({ home, homeLabel = 'Home', servant, caption }: Props) {
+export function JobTrackingMap({
+  home,
+  homeLabel = 'Home',
+  servant,
+  showMapInitially = false,
+  caption,
+}: Props) {
   if (!home) return null;
 
   const openDirections = () => {
@@ -34,18 +41,22 @@ export function JobTrackingMap({ home, homeLabel = 'Home', servant, caption }: P
           Helper: {servant.latitude.toFixed(5)}, {servant.longitude.toFixed(5)}
         </Text>
       ) : null}
-      <Text style={styles.coords}>
-        Home: {home.latitude.toFixed(5)}, {home.longitude.toFixed(5)}
-      </Text>
+      {showMapInitially ? (
+        <Text style={styles.coords}>
+          Home: {home.latitude.toFixed(5)}, {home.longitude.toFixed(5)}
+        </Text>
+      ) : null}
       <View style={styles.row}>
         <TouchableOpacity style={styles.btn} onPress={openDirections}>
           <MaterialIcons name="directions" size={18} color="#fff" />
           <Text style={styles.btnText}>Directions</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, styles.btnOutline]} onPress={openHome}>
-          <MaterialIcons name="place" size={18} color={Stitch.colors.primary} />
-          <Text style={[styles.btnText, styles.btnTextOutline]}>View home</Text>
-        </TouchableOpacity>
+        {showMapInitially ? (
+          <TouchableOpacity style={[styles.btn, styles.btnOutline]} onPress={openHome}>
+            <MaterialIcons name="place" size={18} color={Stitch.colors.primary} />
+            <Text style={[styles.btnText, styles.btnTextOutline]}>View home</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );

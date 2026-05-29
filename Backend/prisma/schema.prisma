@@ -161,10 +161,11 @@ model Booking {
   id               Int           @id @default(autoincrement())
   houseOwnerId     Int
   houseOwner       HouseOwner    @relation(fields: [houseOwnerId], references: [id])
-  servantId        Int
-  servant          Servant       @relation(fields: [servantId], references: [id])
+  servantId        Int?
+  servant          Servant?      @relation(fields: [servantId], references: [id])
   bookingType      BookingType
   status           BookingStatus @default(PENDING)
+  requestedSkill   String?
 
   monthlyStartDate DateTime?
   monthlyEndDate   DateTime?

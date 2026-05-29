@@ -38,13 +38,15 @@ export default function BookingsListScreen() {
             id: number;
             status: string;
             bookingType: string;
-            servant: { user: { name: string } };
+            servant: { user: { name: string } } | null;
             totalAmount?: number;
           };
         }) => (
           <TouchableOpacity onPress={() => router.push(`/(main)/bookings/${item.id}`)}>
             <GlassCard style={styles.card}>
-              <Text style={styles.name}>{item.servant.user.name}</Text>
+              <Text style={styles.name}>
+                {item.servant?.user?.name || 'Finding nearby helper…'}
+              </Text>
               <Text style={styles.meta}>{item.bookingType}</Text>
               {item.totalAmount != null && (
                 <Text style={styles.amount}>

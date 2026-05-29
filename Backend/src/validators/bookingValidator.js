@@ -1,23 +1,25 @@
 const { z } = require("zod");
+const { optionalNumber, optionalPositiveInt } = require("./zodHelpers");
 
 const createBookingSchema = z.object({
   body: z
     .object({
-      servantId: z.coerce.number().int().positive(),
+      servantId: optionalPositiveInt(),
       bookingType: z.enum(["MONTHLY", "SESSION"]),
+      requestedSkill: z.string().optional(),
       monthlyStartDate: z.string().min(1).optional(),
       monthlyEndDate: z.string().min(1).optional(),
-      hoursPerDay: z.coerce.number().optional(),
+      hoursPerDay: optionalNumber(),
       workingDays: z.union([z.string(), z.array(z.string())]).optional(),
       sessionDate: z.string().min(1).optional(),
       sessionStartTime: z.string().optional(),
       sessionEndTime: z.string().optional(),
-      sessionHours: z.coerce.number().optional(),
+      sessionHours: optionalNumber(),
       address: z.string().optional(),
-      latitude: z.coerce.number().min(-90).max(90).optional(),
-      longitude: z.coerce.number().min(-180).max(180).optional(),
+      latitude: optionalNumber(z.number().min(-90).max(90)),
+      longitude: optionalNumber(z.number().min(-180).max(180)),
       notes: z.string().optional(),
-      totalAmount: z.coerce.number().optional()
+      totalAmount: optionalNumber()
     })
     .superRefine((data, ctx) => {
       if (data.bookingType === "MONTHLY") {
@@ -33,6 +35,20 @@ const createBookingSchema = z.object({
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: "Session bookings require date and time range"
+          });
+        }
+      }
+      if (!data.servantId) {
+        if (data.latitude == null || data.longitude == null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Live location (latitude and longitude) is required for area requests"
+          });
+        }
+        if (!data.address?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Address is required for area requests"
           });
         }
       }

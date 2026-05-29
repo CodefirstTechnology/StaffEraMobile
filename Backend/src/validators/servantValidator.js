@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { optionalNumber } = require("./zodHelpers");
 
 const updateServantMeSchema = z.object({
   body: z.object({
@@ -10,7 +11,7 @@ const updateServantMeSchema = z.object({
     offersSession: z.coerce.boolean().optional(),
     offersMonthly: z.coerce.boolean().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
-    hoursPerDay: z.coerce.number().optional(),
+    hoursPerDay: optionalNumber(),
     availabilityNotes: z.string().optional()
   })
 });
@@ -22,16 +23,16 @@ const createServantSchema = z.object({
     phone: z.string().optional(),
     password: z.string().min(6),
     bio: z.string().optional(),
-    experience: z.coerce.number().optional(),
-    hourlyRate: z.coerce.number().optional(),
-    monthlyRate: z.coerce.number().optional(),
+    experience: optionalNumber(),
+    hourlyRate: optionalNumber(),
+    monthlyRate: optionalNumber(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
     offersSession: z.coerce.boolean().optional(),
     offersMonthly: z.coerce.boolean().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
-    hoursPerDay: z.coerce.number().optional(),
+    hoursPerDay: optionalNumber(),
     availabilityNotes: z.string().optional(),
     idProofType: z.string().optional(),
     skills: z.union([z.string(), z.array(z.string())]).optional()
@@ -43,16 +44,16 @@ const updateServantSchema = z.object({
     name: z.string().min(2).optional(),
     phone: z.string().optional(),
     bio: z.string().optional(),
-    experience: z.coerce.number().optional(),
-    hourlyRate: z.coerce.number().optional(),
-    monthlyRate: z.coerce.number().optional(),
+    experience: optionalNumber(),
+    hourlyRate: optionalNumber(),
+    monthlyRate: optionalNumber(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
     offersSession: z.coerce.boolean().optional(),
     offersMonthly: z.coerce.boolean().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
-    hoursPerDay: z.coerce.number().optional(),
+    hoursPerDay: optionalNumber(),
     availabilityNotes: z.string().optional(),
     idProofType: z.string().optional(),
     skills: z.union([z.string(), z.array(z.string())]).optional()
