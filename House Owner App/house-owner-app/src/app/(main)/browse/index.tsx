@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,15 +16,44 @@ import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useSkills } from '@/hooks/useSkills';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
+import { useAuthStore } from '@/store/authStore';
+import type { LocationValue } from '@/lib/locationTypes';
 
 export default function BrowseScreen() {
   const { skill: skillParam } = useLocalSearchParams<{ skill?: string }>();
+  const user = useAuthStore((s) => s.user);
   const { data: skills = [] } = useSkills();
-  const { location, loading: locLoading, error: locError } = useLiveLocation();
+  const { location: liveLocation, loading: locLoading, error: locError } = useLiveLocation();
   const [skill, setSkill] = useState('');
   const [city, setCity] = useState('');
   const [zone, setZone] = useState('');
   const skillCodes = skills.map((s) => s.code);
+
+  const searchLocation = useMemo<LocationValue | null>(() => {
+    if (
+      liveLocation?.latitude != null &&
+      liveLocation?.longitude != null &&
+      !Number.isNaN(liveLocation.latitude) &&
+      !Number.isNaN(liveLocation.longitude)
+    ) {
+      return liveLocation;
+    }
+    const ho = user?.houseOwner;
+    if (
+      ho?.latitude != null &&
+      ho?.longitude != null &&
+      !Number.isNaN(ho.latitude) &&
+      !Number.isNaN(ho.longitude)
+    ) {
+      return {
+        address: ho.address || ho.city || 'Your saved home',
+        city: ho.city,
+        latitude: ho.latitude,
+        longitude: ho.longitude,
+      };
+    }
+    return null;
+  }, [liveLocation, user?.houseOwner]);
 
   useEffect(() => {
     const raw = Array.isArray(skillParam) ? skillParam[0] : skillParam;
@@ -35,23 +64,16 @@ export default function BrowseScreen() {
   }, [skillParam, skillCodes.join(',')]);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['servants', skill, city, zone, location?.latitude, location?.longitude],
-    enabled: !locLoading,
+    queryKey: ['servants', skill, city, zone, searchLocation?.latitude, searchLocation?.longitude],
+    enabled: !locLoading && !!searchLocation,
     queryFn: async () => {
       const params: Record<string, string | number> = {
         skill: skill || undefined,
         city: city || undefined,
         zone: zone || undefined,
+        latitude: searchLocation!.latitude,
+        longitude: searchLocation!.longitude,
       } as Record<string, string | number>;
-      if (
-        location?.latitude != null &&
-        location?.longitude != null &&
-        !Number.isNaN(location.latitude) &&
-        !Number.isNaN(location.longitude)
-      ) {
-        params.latitude = location.latitude;
-        params.longitude = location.longitude;
-      }
       const res = await api.get('/servants', { params });
       return res.data.data.servants;
     },
@@ -63,15 +85,17 @@ export default function BrowseScreen() {
         <Text style={styles.title}>Find verified help</Text>
         <Text style={styles.sub}>Helpers near your live location</Text>
       </View>
-      {location ? (
+      {searchLocation ? (
         <View style={styles.liveLoc}>
           <MaterialIcons name="my-location" size={18} color={Stitch.colors.secondary} />
           <Text style={styles.liveLocText} numberOfLines={2}>
-            {location.address}
+            {searchLocation.address}
           </Text>
         </View>
-      ) : locError ? (
-        <Text style={styles.locError}>{locError}</Text>
+      ) : locError || !locLoading ? (
+        <Text style={styles.locError}>
+          {locError || 'Set your home location in Profile to see helpers in your area'}
+        </Text>
       ) : null}
       <TouchableOpacity
         style={styles.broadcastBtn}
@@ -162,9 +186,9 @@ export default function BrowseScreen() {
           <Text style={styles.empty}>
             {isLoading || locLoading
               ? 'Loading…'
-              : location
-                ? 'No verified helpers in your area yet — try Request help in my area'
-                : 'Enable location to see nearby helpers'}
+              : !searchLocation
+                ? 'Enable location or set your home address in Profile'
+                : 'No verified helpers in your area yet — try Request help in my area'}
           </Text>
         }
       />

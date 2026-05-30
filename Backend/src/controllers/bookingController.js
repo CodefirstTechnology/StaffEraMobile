@@ -113,10 +113,19 @@ exports.createBooking = async (req, res) => {
   }
 
   const servant = await prisma.servant.findUnique({
-    where: { id: req.body.servantId }
+    where: { id: req.body.servantId },
+    include: { zones: true }
   });
   if (!servant || servant.verificationStatus !== "VERIFIED") {
     throw new ApiError(400, "Servant not available for booking");
+  }
+
+  if (
+    latitude != null &&
+    longitude != null &&
+    !servantCoversLocation(servant, latitude, longitude)
+  ) {
+    throw new ApiError(400, "This helper does not serve your area");
   }
 
   const booking = await prisma.$transaction(async (tx) => {

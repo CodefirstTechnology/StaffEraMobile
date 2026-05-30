@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -6,23 +7,54 @@ import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { useLiveLocation } from '@/hooks/useLiveLocation';
+import { useAuthStore } from '@/store/authStore';
 
 export default function ServantDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const user = useAuthStore((s) => s.user);
+  const { location: liveLocation } = useLiveLocation();
 
-  const { data: servant, isLoading } = useQuery({
-    queryKey: ['servant', id],
+  const searchLocation = useMemo(() => {
+    if (liveLocation?.latitude != null && liveLocation?.longitude != null) {
+      return liveLocation;
+    }
+    const ho = user?.houseOwner;
+    if (ho?.latitude != null && ho?.longitude != null) {
+      return { latitude: ho.latitude, longitude: ho.longitude };
+    }
+    return null;
+  }, [liveLocation, user?.houseOwner]);
+
+  const { data: servant, isLoading, error } = useQuery({
+    queryKey: ['servant', id, searchLocation?.latitude, searchLocation?.longitude],
     enabled: !!id,
     queryFn: async () => {
-      const res = await api.get(`/servants/${id}`);
+      const params: Record<string, number> = {};
+      if (searchLocation) {
+        params.latitude = searchLocation.latitude;
+        params.longitude = searchLocation.longitude;
+      }
+      const res = await api.get(`/servants/${id}`, { params });
       return res.data.data.servant;
     },
   });
 
-  if (isLoading || !servant) {
+  if (isLoading) {
     return (
       <View style={styles.center}>
         <Text style={styles.muted}>Loading profile…</Text>
+      </View>
+    );
+  }
+
+  if (error || !servant) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.muted}>This helper is not available in your area</Text>
+        <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}>
+          <Text style={styles.backLink}>← Back to browse</Text>
+        </Pressable>
       </View>
     );
   }
@@ -86,6 +118,7 @@ const styles = StyleSheet.create({
   scroll: { padding: Stitch.spacing.padding, paddingTop: 52, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   muted: { color: Stitch.colors.onSurfaceVariant },
+  backLink: { color: Stitch.colors.primary, fontWeight: '600' },
   back: { marginBottom: 16 },
   avatar: {
     width: 72,

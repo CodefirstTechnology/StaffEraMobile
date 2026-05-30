@@ -16,13 +16,27 @@ const servantInclude = {
   agent: { include: { user: { select: { name: true } } } }
 };
 
+const resolveHouseOwnerCoords = async (userId, queryLat, queryLng) => {
+  let lat = queryLat != null ? Number(queryLat) : null;
+  let lng = queryLng != null ? Number(queryLng) : null;
+
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
+    const ho = await prisma.houseOwner.findUnique({ where: { userId } });
+    if (ho?.latitude != null && ho?.longitude != null) {
+      lat = ho.latitude;
+      lng = ho.longitude;
+    }
+  }
+
+  return { lat, lng };
+};
+
 exports.listServants = async (req, res) => {
-  const { skill, city, zone, type, latitude, longitude, radiusKm } = req.query;
+  const { skill, city, zone, latitude, longitude, radiusKm } = req.query;
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, parseInt(req.query.limit, 10) || 20);
   const skip = (page - 1) * limit;
-  const lat = latitude != null ? Number(latitude) : null;
-  const lng = longitude != null ? Number(longitude) : null;
+  const { lat, lng } = await resolveHouseOwnerCoords(req.user.id, latitude, longitude);
   const radius = radiusKm != null ? Number(radiusKm) : DEFAULT_RADIUS_KM;
 
   const where = {
@@ -53,15 +67,21 @@ exports.listServants = async (req, res) => {
       : {})
   };
 
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
+    return sendSuccess(res, {
+      servants: [],
+      pagination: { page, limit, total: 0 },
+      locationRequired: true
+    });
+  }
+
   let servants = await prisma.servant.findMany({
     where,
     include: servantInclude,
     orderBy: { rating: "desc" }
   });
 
-  if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)) {
-    servants = servants.filter((s) => servantCoversLocation(s, lat, lng, radius));
-  }
+  servants = servants.filter((s) => servantCoversLocation(s, lat, lng, radius));
 
   const total = servants.length;
   const paged = servants.slice(skip, skip + limit);
@@ -85,11 +105,21 @@ exports.getServant = async (req, res) => {
   });
 
   if (!servant) throw new ApiError(404, "Servant not found");
-  if (
-    req.user.role === "HOUSE_OWNER" &&
-    servant.verificationStatus !== "VERIFIED"
-  ) {
-    throw new ApiError(404, "Servant not found");
+  if (req.user.role === "HOUSE_OWNER") {
+    if (servant.verificationStatus !== "VERIFIED") {
+      throw new ApiError(404, "Servant not found");
+    }
+
+    const { lat, lng } = await resolveHouseOwnerCoords(
+      req.user.id,
+      req.query.latitude,
+      req.query.longitude
+    );
+    if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+      if (!servantCoversLocation(servant, lat, lng)) {
+        throw new ApiError(404, "Servant not found");
+      }
+    }
   }
 
   sendSuccess(res, { servant });
