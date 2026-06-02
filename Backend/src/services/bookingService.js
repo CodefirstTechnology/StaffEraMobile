@@ -158,6 +158,82 @@ const checkOwnerPendingDuplicate = async (houseOwnerId, servantId, bookingData) 
   return false;
 };
 
+const getSessionEndAt = (booking) => {
+  if (booking.bookingType !== "SESSION" || !booking.sessionDate) return null;
+  const endTime = booking.sessionEndTime || "23:59";
+  const [h, m] = endTime.split(":").map(Number);
+  const endAt = new Date(booking.sessionDate);
+  endAt.setHours(h, m || 0, 0, 0);
+  return endAt;
+};
+
+const isSessionPast = (booking, now = new Date()) => {
+  const endAt = getSessionEndAt(booking);
+  return endAt ? endAt.getTime() <= now.getTime() : false;
+};
+
+const computeBookingEarnings = (booking, hourlyRate) => {
+  if (booking.totalAmount != null && booking.totalAmount > 0) {
+    return booking.totalAmount;
+  }
+  const rate = hourlyRate || 0;
+  if (!rate) return 0;
+
+  const entries = booking.timeEntries || [];
+  const hoursFromEntries = entries.reduce((sum, e) => sum + (e.hoursWorked || 0), 0);
+  if (hoursFromEntries > 0) {
+    return Math.round(hoursFromEntries * rate * 100) / 100;
+  }
+
+  if (booking.sessionHours && booking.sessionHours > 0) {
+    return Math.round(booking.sessionHours * rate * 100) / 100;
+  }
+
+  return 0;
+};
+
+const resolveExpiredSessionStatus = (booking) => {
+  if (!["PENDING", "CONFIRMED", "ACTIVE"].includes(booking.status)) return null;
+  if (booking.bookingType !== "SESSION" || !isSessionPast(booking)) return null;
+
+  const hasWork = Array.isArray(booking.timeEntries) && booking.timeEntries.length > 0;
+  if (booking.status === "PENDING") return "EXPIRED";
+  return hasWork ? "COMPLETED" : "EXPIRED";
+};
+
+const expireStaleSessionBookings = async (whereExtra = {}) => {
+  const candidates = await prisma.booking.findMany({
+    where: {
+      bookingType: "SESSION",
+      status: { in: BLOCKING_STATUSES },
+      sessionDate: { not: null },
+      ...whereExtra
+    },
+    include: {
+      timeEntries: true,
+      servant: { select: { hourlyRate: true } }
+    }
+  });
+
+  for (const booking of candidates) {
+    const nextStatus = resolveExpiredSessionStatus(booking);
+    if (!nextStatus) continue;
+
+    const totalAmount =
+      nextStatus === "COMPLETED"
+        ? computeBookingEarnings(booking, booking.servant?.hourlyRate)
+        : booking.totalAmount;
+
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: nextStatus,
+        ...(totalAmount != null && totalAmount > 0 ? { totalAmount } : {})
+      }
+    });
+  }
+};
+
 const checkBookingConflict = async (
   servantId,
   bookingData,
@@ -211,5 +287,9 @@ module.exports = {
   checkBookingConflict,
   parseJsonArray,
   getBookingSlots,
+  getSessionEndAt,
+  isSessionPast,
+  computeBookingEarnings,
+  expireStaleSessionBookings,
   BLOCKING_STATUSES
 };

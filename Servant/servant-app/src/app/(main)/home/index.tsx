@@ -15,6 +15,7 @@ import { JobTrackingMap } from '@/components/ui/JobTrackingMap';
 import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatSessionSlotsLabel } from '@/lib/timeSlots';
+import { computeTodayEarnings, computeMonthlyEarnings } from '@/lib/earnings';
 
 type Booking = {
   id: number;
@@ -28,6 +29,10 @@ type Booking = {
   sessionEndTime?: string | null;
   sessionSlots?: string | null;
   sessionDate?: string | null;
+  sessionHours?: number | null;
+  monthlyStartDate?: string | null;
+  totalAmount?: number | null;
+  updatedAt?: string;
   houseOwner: { user: { name: string } };
 };
 
@@ -54,11 +59,21 @@ export default function ServantHomeScreen() {
       qc.invalidateQueries({ queryKey: ['schedule'] }),
     ]);
 
-  const { data: bookings } = useQuery({
+  const { data: bookings, refetch: refetchBookings } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
       const res = await api.get('/bookings');
       return res.data.data.bookings as Booking[];
+    },
+    enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 20000 : false,
+  });
+
+  const { data: profile } = useQuery({
+    queryKey: ['servant-profile'],
+    queryFn: async () => {
+      const res = await api.get('/servants/me');
+      return res.data.data.servant as { hourlyRate?: number | null };
     },
     enabled: isAuthenticated,
   });
@@ -75,17 +90,47 @@ export default function ServantHomeScreen() {
 
   const { data: notifications } = useNotifications();
 
-  const { data: today } = useQuery({
+  const { data: today, refetch: refetchToday } = useQuery({
     queryKey: ['time-today'],
     queryFn: async () => {
       const res = await api.get('/time/today');
-      return res.data.data;
+      return res.data.data as {
+        totalHours?: number;
+        estimatedEarnings?: number;
+        hourlyRate?: number;
+        entries?: { clockOut: string | null; clockIn: string; bookingId?: number }[];
+      };
     },
     enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 20000 : false,
+  });
+
+  const { data: monthStats } = useQuery({
+    queryKey: ['time-month'],
+    queryFn: async () => {
+      const res = await api.get('/time/month');
+      return res.data.data as {
+        totalEarnings?: number;
+        completedCount?: number;
+        monthLabel?: string;
+      };
+    },
+    enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 20000 : false,
   });
 
   useEffect(() => {
-    const open = today?.entries?.find((e: { clockOut: string | null }) => !e.clockOut);
+    if (!isAuthenticated) return;
+    const timer = setInterval(() => {
+      refetchBookings();
+      refetchToday();
+      qc.invalidateQueries({ queryKey: ['time-month'] });
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [isAuthenticated, refetchBookings, refetchToday]);
+
+  useEffect(() => {
+    const open = today?.entries?.find((e) => !e.clockOut);
     if (open) {
       setActiveEntry({ clockIn: open.clockIn, bookingId: open.bookingId });
       setActiveBookingId(open.bookingId ?? null);
@@ -125,6 +170,7 @@ export default function ServantHomeScreen() {
       setActiveBookingId(bookingId);
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['time-today'] }),
+        qc.invalidateQueries({ queryKey: ['time-month'] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
       ]);
       Alert.alert('Work started', 'You are on duty at the customer location.');
@@ -140,6 +186,7 @@ export default function ServantHomeScreen() {
       setActiveBookingId(null);
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['time-today'] }),
+        qc.invalidateQueries({ queryKey: ['time-month'] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
       ]);
       Alert.alert('Clocked out', 'Hours saved for payout.');
@@ -194,9 +241,15 @@ export default function ServantHomeScreen() {
     router.push(`/(main)/schedule/${bookingId}`);
   };
 
-  const todayEarnings = (bookings || [])
-    .filter((b) => b.status === 'COMPLETED')
-    .reduce((s, b) => s + ((b as Booking & { totalAmount?: number }).totalAmount || 0), 0);
+  const hourlyRate = profile?.hourlyRate ?? today?.hourlyRate ?? 0;
+  const todayStats = computeTodayEarnings(bookings || [], hourlyRate, today);
+  const monthlyFromBookings = computeMonthlyEarnings(bookings || [], hourlyRate);
+  const monthlyAmount = Math.max(monthStats?.totalEarnings ?? 0, monthlyFromBookings.amount);
+  const monthlyCount = Math.max(
+    monthStats?.completedCount ?? 0,
+    monthlyFromBookings.completedCount,
+  );
+  const monthLabel = monthStats?.monthLabel ?? monthlyFromBookings.monthLabel;
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
@@ -245,7 +298,14 @@ export default function ServantHomeScreen() {
           <Text style={styles.earnLabel}>TODAY&apos;S EARNINGS</Text>
           <Text style={styles.earnValue}>
             {Stitch.copy.rupee}
-            {todayEarnings.toLocaleString('en-IN')}
+            {todayStats.amount.toLocaleString('en-IN')}
+          </Text>
+          <Text style={styles.earnSub}>
+            {todayStats.completedCount > 0
+              ? `${todayStats.completedCount} job${todayStats.completedCount === 1 ? '' : 's'} completed today`
+              : todayStats.hoursToday > 0
+                ? `${todayStats.hoursToday.toFixed(1)} hrs logged today`
+                : 'Earnings update when slots end or you clock out'}
           </Text>
         </View>
         <View style={styles.jobsBadge}>
@@ -253,6 +313,29 @@ export default function ServantHomeScreen() {
           <Text style={styles.jobsLbl}>JOBS</Text>
         </View>
       </View>
+
+      <GlassCard style={styles.monthCard}>
+        <View style={styles.monthRow}>
+          <View style={styles.monthIconWrap}>
+            <MaterialIcons name="calendar-month" size={22} color={Stitch.colors.secondary} />
+          </View>
+          <View style={styles.monthBody}>
+            <Text style={styles.monthLabel}>THIS MONTH · {monthLabel.toUpperCase()}</Text>
+            <Text style={styles.monthValue}>
+              {Stitch.copy.rupee}
+              {monthlyAmount.toLocaleString('en-IN')}
+            </Text>
+            <Text style={styles.monthSub}>
+              {monthlyCount > 0
+                ? `${monthlyCount} completed job${monthlyCount === 1 ? '' : 's'} this month`
+                : 'Completed visits count toward monthly total'}
+            </Text>
+          </View>
+          <Pressable onPress={() => router.push('/(main)/earnings')} hitSlop={8}>
+            <MaterialIcons name="chevron-right" size={24} color={Stitch.colors.onSurfaceVariant} />
+          </Pressable>
+        </View>
+      </GlassCard>
 
       {activeEntry ? (
         <>
@@ -531,6 +614,13 @@ const styles = StyleSheet.create({
   },
   earnLabel: { fontSize: 12, fontWeight: '600', color: Stitch.colors.onSurfaceVariant },
   earnValue: { fontSize: 36, fontWeight: '700', color: Stitch.colors.primary, marginTop: 4 },
+  earnSub: {
+    fontSize: 12,
+    color: Stitch.colors.onSurfaceVariant,
+    marginTop: 4,
+    maxWidth: 220,
+    lineHeight: 16,
+  },
   jobsBadge: {
     backgroundColor: 'rgba(214, 151, 254, 0.25)',
     paddingHorizontal: 16,
@@ -540,6 +630,35 @@ const styles = StyleSheet.create({
   },
   jobsNum: { fontSize: 22, fontWeight: '700', color: Stitch.colors.secondary },
   jobsLbl: { fontSize: 10, fontWeight: '700', color: Stitch.colors.secondary },
+  monthCard: { marginHorizontal: Stitch.spacing.padding, marginBottom: 20 },
+  monthRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  monthIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(214, 151, 254, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthBody: { flex: 1 },
+  monthLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Stitch.colors.onSurfaceVariant,
+    letterSpacing: 0.5,
+  },
+  monthValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Stitch.colors.secondary,
+    marginTop: 4,
+  },
+  monthSub: {
+    fontSize: 12,
+    color: Stitch.colors.onSurfaceVariant,
+    marginTop: 4,
+    lineHeight: 16,
+  },
   clockCard: { marginHorizontal: 24, borderRadius: 24, padding: 24, marginBottom: 12 },
   liveMap: { marginHorizontal: 24, marginBottom: 20 },
   clockLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 14 },

@@ -1,7 +1,7 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
-const { checkBookingConflict, parseJsonArray } = require("../services/bookingService");
+const { checkBookingConflict, parseJsonArray, expireStaleSessionBookings, isSessionPast, computeBookingEarnings } = require("../services/bookingService");
 const { createNotification } = require("../services/notificationService");
 const {
   findServantsNearLocation,
@@ -248,6 +248,8 @@ exports.listBookings = async (req, res) => {
   } else {
     throw new ApiError(403, "Not allowed");
   }
+
+  await expireStaleSessionBookings(where);
 
   if (status) where.status = status;
 
