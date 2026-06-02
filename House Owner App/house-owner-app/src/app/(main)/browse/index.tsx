@@ -3,10 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   TextInput,
   ScrollView,
+  Platform,
+  RefreshControl,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -14,6 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { GradientButton } from '@/components/ui/GradientButton';
 import { useSkills } from '@/hooks/useSkills';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useAuthStore } from '@/store/authStore';
@@ -79,26 +81,81 @@ export default function BrowseScreen() {
     },
   });
 
+  const nearbyCount = data?.length ?? 0;
+  const skillLabel = skill ? skills.find((s) => s.code === skill)?.label : null;
+
+  const broadcastMessage = (() => {
+    if (!searchLocation) {
+      return 'Enable location or set your home address to broadcast a request';
+    }
+    if (nearbyCount > 0) {
+      return `Send to ${nearbyCount} verified helper${nearbyCount === 1 ? '' : 's'} in your area — only they will see this on their dashboard. First to accept gets the job.`;
+    }
+    if (skillLabel) {
+      return `No ${skillLabel.toLowerCase()} helpers nearby yet — your request will wait until one is available in your area.`;
+    }
+    return 'No verified helpers in your area yet — your request will wait until one is available nearby.';
+  })();
+
   return (
-    <View style={styles.root}>
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.scroll}
+      refreshControl={
+        <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={Stitch.colors.primary} />
+      }
+    >
       <View style={styles.header}>
-        <Text style={styles.title}>Find verified help</Text>
-        <Text style={styles.sub}>Helpers near your live location</Text>
+        <Text style={styles.title} numberOfLines={2}>
+          {skillLabel ? `${skillLabel} helpers` : 'Find verified help'}
+        </Text>
+        <Text style={styles.sub}>
+          {skillLabel
+            ? nearbyCount > 0
+              ? `${nearbyCount} verified ${skillLabel.toLowerCase()} helper${nearbyCount === 1 ? '' : 's'} near you`
+              : `No ${skillLabel.toLowerCase()} helpers nearby yet — try a request`
+            : 'Helpers near your live location'}
+        </Text>
+        {skillLabel ? (
+          <View style={styles.activeFilterRow}>
+            <View style={styles.activeFilterPill}>
+              <MaterialIcons name="category" size={14} color={Stitch.colors.secondary} />
+              <Text style={styles.activeFilterText}>{skillLabel}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setSkill('')} hitSlop={8}>
+              <Text style={styles.clearFilter}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </View>
       {searchLocation ? (
-        <View style={styles.liveLoc}>
+        <TouchableOpacity
+          style={styles.liveLoc}
+          activeOpacity={0.85}
+          onPress={() => router.push('/(main)/profile')}
+        >
           <MaterialIcons name="my-location" size={18} color={Stitch.colors.secondary} />
           <Text style={styles.liveLocText} numberOfLines={2}>
             {searchLocation.address}
           </Text>
-        </View>
+          <MaterialIcons name="chevron-right" size={20} color={Stitch.colors.onSurfaceVariant} />
+        </TouchableOpacity>
       ) : locError || !locLoading ? (
-        <Text style={styles.locError}>
-          {locError || 'Set your home location in Profile to see helpers in your area'}
-        </Text>
+        <TouchableOpacity
+          style={styles.locErrorBtn}
+          activeOpacity={0.85}
+          onPress={() => router.push('/(main)/profile')}
+        >
+          <MaterialIcons name="location-off" size={18} color={Stitch.colors.error} />
+          <Text style={styles.locError}>
+            {locError || 'Tap to set your home location in Profile'}
+          </Text>
+          <MaterialIcons name="chevron-right" size={20} color={Stitch.colors.error} />
+        </TouchableOpacity>
       ) : null}
       <TouchableOpacity
-        style={styles.broadcastBtn}
+        style={[styles.broadcastBtn, !searchLocation && styles.broadcastBtnDisabled]}
+        disabled={!searchLocation}
         onPress={() =>
           router.push({
             pathname: '/(main)/bookings/request',
@@ -106,10 +163,15 @@ export default function BrowseScreen() {
           })
         }
       >
-        <Text style={styles.broadcastTitle}>Request help in my area</Text>
-        <Text style={styles.broadcastSub}>
-          Notify all nearby verified helpers — first to accept gets the job
+        <Text style={styles.broadcastTitle}>
+          {skillLabel ? `Request ${skillLabel.toLowerCase()} help` : 'Request help in my area'}
         </Text>
+        <Text style={styles.broadcastSub}>{broadcastMessage}</Text>
+        {skillLabel && searchLocation ? (
+          <View style={styles.broadcastBadge}>
+            <Text style={styles.broadcastBadgeText}>{skillLabel}</Text>
+          </View>
+        ) : null}
       </TouchableOpacity>
       <View style={styles.searchWrap}>
         <MaterialIcons name="location-city" size={20} color={Stitch.colors.onSurfaceVariant} />
@@ -131,76 +193,120 @@ export default function BrowseScreen() {
           onChangeText={setZone}
         />
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips}>
-        {skills.map((s) => (
-          <TouchableOpacity
-            key={s.code}
-            style={[styles.chip, skill === s.code && styles.chipOn]}
-            onPress={() => setSkill(skill === s.code ? '' : s.code)}
-          >
-            <Text style={[styles.chipText, skill === s.code && styles.chipTextOn]}>
-              {s.label}
+      <View style={styles.chipsSection}>
+        <Text style={styles.chipsLabel}>Category</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsRow}
+          contentContainerStyle={styles.chipsContent}
+        >
+          {skills.map((s) => {
+            const selected = skill === s.code;
+            return (
+              <TouchableOpacity
+                key={s.code}
+                style={[styles.chip, selected && styles.chipOn]}
+                onPress={() => setSkill(skill === s.code ? '' : s.code)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[styles.chipText, selected && styles.chipTextOn]}
+                  numberOfLines={1}
+                  {...(Platform.OS === 'android' ? { includeFontPadding: false } : {})}
+                >
+                  {s.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <GlassCard style={styles.countCard}>
+        <View style={styles.countRow}>
+          <View style={styles.countIcon}>
+            <MaterialIcons name="groups" size={32} color={Stitch.colors.secondary} />
+          </View>
+          <View style={styles.countBody}>
+            <Text style={styles.countValue}>
+              {isLoading || locLoading ? '…' : nearbyCount}
             </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-      <FlatList
-        data={data || []}
-        keyExtractor={(item: { id: number }) => String(item.id)}
-        refreshing={isLoading}
-        onRefresh={refetch}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }: { item: { id: number; user: { name: string }; skills: { skillName: string }[]; rating: number; hourlyRate?: number; monthlyRate?: number; zones?: { name: string; city?: string }[] } }) => (
-          <TouchableOpacity onPress={() => router.push(`/(main)/browse/${item.id}`)}>
-            <GlassCard style={styles.card}>
-              <View style={styles.cardRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{item.user.name[0]}</Text>
-                </View>
-                <View style={styles.cardBody}>
-                  <Text style={styles.name}>{item.user.name}</Text>
-                  <View style={styles.verified}>
-                    <MaterialIcons name="verified" size={14} color={Stitch.colors.success} />
-                    <Text style={styles.verifiedText}>Verified</Text>
-                  </View>
-                  <Text style={styles.skills}>
-                    {item.skills?.map((sk) => sk.skillName).join(' · ')}
-                  </Text>
-                  {item.zones?.length ? (
-                    <Text style={styles.zones}>
-                      {item.zones.map((z) => z.name).join(' · ')}
-                    </Text>
-                  ) : null}
-                  <Text style={styles.rate}>
-                    ★ {item.rating.toFixed(1)} · {Stitch.copy.rupee}
-                    {item.hourlyRate || '—'}/hr · {Stitch.copy.rupee}
-                    {item.monthlyRate || '—'}/mo
-                  </Text>
-                </View>
-                <MaterialIcons name="chevron-right" size={24} color={Stitch.colors.secondary} />
-              </View>
-            </GlassCard>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.empty}>
-            {isLoading || locLoading
-              ? 'Loading…'
-              : !searchLocation
-                ? 'Enable location or set your home address in Profile'
-                : 'No verified helpers in your area yet — try Request help in my area'}
-          </Text>
-        }
-      />
-    </View>
+            <Text style={styles.countLabel}>
+              {skillLabel
+                ? `${skillLabel} helper${nearbyCount === 1 ? '' : 's'} available`
+                : `Verified helper${nearbyCount === 1 ? '' : 's'} available`}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.countHint}>
+          {nearbyCount > 0
+            ? 'Helper profiles are private. Send a request — only nearby helpers see it, and the first to accept is assigned to you.'
+            : skillLabel
+              ? `No ${skillLabel.toLowerCase()} helpers in your area right now. You can still send a request — it will notify helpers when they come online.`
+              : 'No verified helpers in your area right now. Send a request and it will stay open until one accepts.'}
+        </Text>
+        <GradientButton
+          title={
+            skillLabel
+              ? `Request ${skillLabel.toLowerCase()} help`
+              : 'Send area request'
+          }
+          onPress={() =>
+            router.push({
+              pathname: '/(main)/bookings/request',
+              params: skill ? { skill } : undefined,
+            })
+          }
+          disabled={!searchLocation}
+          style={styles.countBtn}
+        />
+      </GlassCard>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Stitch.colors.background },
-  header: { paddingTop: 56, paddingHorizontal: Stitch.spacing.padding, paddingBottom: 8 },
-  title: { ...Stitch.typography.headline, fontSize: 26, color: Stitch.colors.primary },
-  sub: { ...Stitch.typography.caption, color: Stitch.colors.onSurfaceVariant, marginTop: 4 },
+  scroll: { paddingBottom: 100 },
+  header: { paddingTop: 56, paddingHorizontal: Stitch.spacing.padding, paddingBottom: 12 },
+  title: {
+    ...Stitch.typography.headline,
+    fontSize: 26,
+    lineHeight: 32,
+    color: Stitch.colors.primary,
+  },
+  sub: {
+    ...Stitch.typography.caption,
+    color: Stitch.colors.onSurfaceVariant,
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  activeFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  activeFilterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Stitch.colors.primaryFixed,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Stitch.radius.pill,
+  },
+  activeFilterText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+  },
+  clearFilter: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Stitch.colors.secondary,
+  },
   liveLoc: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -212,9 +318,18 @@ const styles = StyleSheet.create({
     backgroundColor: Stitch.colors.surfaceLow,
   },
   liveLocText: { flex: 1, fontSize: 13, color: Stitch.colors.onSurfaceVariant },
-  locError: {
+  locErrorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginHorizontal: Stitch.spacing.padding,
     marginBottom: 12,
+    padding: 12,
+    borderRadius: Stitch.radius.lg,
+    backgroundColor: Stitch.colors.errorContainer,
+  },
+  locError: {
+    flex: 1,
     fontSize: 13,
     color: Stitch.colors.error,
   },
@@ -225,8 +340,22 @@ const styles = StyleSheet.create({
     borderRadius: Stitch.radius.lg,
     backgroundColor: Stitch.colors.secondary,
   },
+  broadcastBtnDisabled: { opacity: 0.55 },
   broadcastTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  broadcastSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12, marginTop: 4 },
+  broadcastSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12, marginTop: 4, lineHeight: 18 },
+  broadcastBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Stitch.radius.pill,
+  },
+  broadcastBadgeText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -238,36 +367,58 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   search: { flex: 1, marginLeft: 8, fontSize: 16 },
-  chips: { paddingHorizontal: Stitch.spacing.padding, marginBottom: 12, maxHeight: 44 },
+  chipsSection: {
+    marginBottom: 12,
+  },
+  chipsLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Stitch.colors.onSurfaceVariant,
+    marginHorizontal: Stitch.spacing.padding,
+    marginBottom: 10,
+  },
+  chipsRow: { flexGrow: 0 },
+  chipsContent: {
+    paddingHorizontal: Stitch.spacing.padding,
+    alignItems: 'center',
+    paddingVertical: 4,
+    minHeight: 44,
+  },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    minHeight: 40,
+    justifyContent: 'center',
     borderRadius: Stitch.radius.pill,
     backgroundColor: Stitch.colors.surfaceContainer,
-    marginRight: 8,
+    marginRight: 10,
   },
   chipOn: { backgroundColor: Stitch.colors.secondary },
-  chipText: { fontSize: 12, fontWeight: '600', color: Stitch.colors.onSurfaceVariant },
+  chipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Stitch.colors.onSurfaceVariant,
+    lineHeight: 18,
+  },
   chipTextOn: { color: '#fff' },
-  list: { paddingHorizontal: Stitch.spacing.padding, paddingBottom: 100 },
-  card: { marginBottom: 12 },
-  cardRow: { flexDirection: 'row', alignItems: 'center' },
-  avatar: {
-    width: 52,
-    height: 52,
+  countCard: { marginHorizontal: Stitch.spacing.padding, marginTop: 8 },
+  countRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  countIcon: {
+    width: 56,
+    height: 56,
     borderRadius: 16,
     backgroundColor: Stitch.colors.primaryFixed,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
-  avatarText: { fontSize: 22, fontWeight: '700', color: Stitch.colors.primary },
-  cardBody: { flex: 1 },
-  name: { fontSize: 17, fontWeight: '600' },
-  verified: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  verifiedText: { fontSize: 11, color: Stitch.colors.success, fontWeight: '600' },
-  skills: { fontSize: 13, color: Stitch.colors.onSurfaceVariant, marginTop: 4 },
-  zones: { fontSize: 12, color: Stitch.colors.primary, marginTop: 4, fontWeight: '500' },
-  rate: { fontSize: 14, color: Stitch.colors.secondary, fontWeight: '600', marginTop: 6 },
-  empty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant, marginTop: 40 },
+  countBody: { flex: 1 },
+  countValue: { fontSize: 36, fontWeight: '700', color: Stitch.colors.primary },
+  countLabel: { fontSize: 15, fontWeight: '600', color: Stitch.colors.onSurfaceVariant, marginTop: 2 },
+  countHint: {
+    marginTop: 14,
+    fontSize: 13,
+    lineHeight: 20,
+    color: Stitch.colors.onSurfaceVariant,
+  },
+  countBtn: { marginTop: 16 },
 });

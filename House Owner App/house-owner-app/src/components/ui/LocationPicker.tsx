@@ -139,7 +139,7 @@ export function LocationPicker({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       <View style={styles.searchRow}>
         <MaterialIcons name="search" size={20} color={Stitch.colors.onSurfaceVariant} />
         <TextInput

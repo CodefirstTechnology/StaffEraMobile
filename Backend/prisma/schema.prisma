@@ -176,6 +176,7 @@ model Booking {
   sessionStartTime String?
   sessionEndTime   String?
   sessionHours     Float?
+  sessionSlots     String?
 
   address          String?
   latitude         Float?

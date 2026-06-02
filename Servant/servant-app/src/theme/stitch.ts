@@ -70,4 +70,5 @@ export const StatusColors: Record<string, { bg: string; text: string }> = {
   CANCELLED: { bg: Stitch.colors.errorContainer, text: Stitch.colors.error },
   REJECTED: { bg: Stitch.colors.errorContainer, text: Stitch.colors.error },
   VERIFIED: { bg: Stitch.colors.successBg, text: Stitch.colors.success },
+  UNDER_REVIEW: { bg: 'rgba(157, 161, 255, 0.25)', text: '#15157d' },
 };

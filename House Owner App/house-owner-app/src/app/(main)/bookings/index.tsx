@@ -1,62 +1,98 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { StatusPill } from '@/components/ui/StatusPill';
+import { GradientButton } from '@/components/ui/GradientButton';
+import { useSkills } from '@/hooks/useSkills';
+import {
+  BookingSummaryCard,
+  splitBookings,
+  type BookingSummary,
+} from '@/components/bookings/BookingSummaryCard';
 
 export default function BookingsListScreen() {
+  const { data: skills = [] } = useSkills();
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
       const res = await api.get('/bookings');
-      return res.data.data.bookings;
+      return res.data.data.bookings as BookingSummary[];
     },
+    refetchInterval: 20000,
   });
+
+  const bookings = data || [];
+  const { active, recent } = splitBookings(bookings);
+
+  const renderSection = (title: string, items: BookingSummary[], emptyText: string) => (
+    <View style={styles.section}>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionCount}>{items.length}</Text>
+      </View>
+      {items.length === 0 ? (
+        <GlassCard>
+          <Text style={styles.sectionEmpty}>{emptyText}</Text>
+        </GlassCard>
+      ) : (
+        items.map((item) => (
+          <BookingSummaryCard
+            key={item.id}
+            booking={item}
+            skills={skills}
+            onPress={() => router.push(`/(main)/bookings/${item.id}`)}
+          />
+        ))
+      )}
+    </View>
+  );
 
   return (
     <View style={styles.root}>
-      <Text style={styles.title}>My bookings</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>My bookings</Text>
+        <Text style={styles.sub}>Active requests and recent visits</Text>
+      </View>
+
       <FlatList
-        data={data || []}
-        keyExtractor={(item: { id: number }) => String(item.id)}
+        data={[{ key: 'content' }]}
+        keyExtractor={(item) => item.key}
         refreshing={isLoading}
         onRefresh={refetch}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <GlassCard>
-            <Text style={styles.empty}>
-              {isLoading ? 'Loading…' : 'No bookings yet. Browse verified helpers to book.'}
-            </Text>
-          </GlassCard>
-        }
-        renderItem={({
-          item,
-        }: {
-          item: {
-            id: number;
-            status: string;
-            bookingType: string;
-            servant: { user: { name: string } } | null;
-            totalAmount?: number;
-          };
-        }) => (
-          <TouchableOpacity onPress={() => router.push(`/(main)/bookings/${item.id}`)}>
-            <GlassCard style={styles.card}>
-              <Text style={styles.name}>
-                {item.servant?.user?.name || 'Finding nearby helper…'}
+        ListHeaderComponent={
+          bookings.length === 0 && !isLoading ? (
+            <GlassCard style={styles.emptyCard}>
+              <MaterialIcons name="event-busy" size={40} color={Stitch.colors.onSurfaceVariant} />
+              <Text style={styles.emptyTitle}>No bookings yet</Text>
+              <Text style={styles.emptySub}>
+                Send a request from Home — nearby helpers will see it and the first to accept is
+                assigned to you.
               </Text>
-              <Text style={styles.meta}>{item.bookingType}</Text>
-              {item.totalAmount != null && (
-                <Text style={styles.amount}>
-                  {Stitch.copy.rupee}
-                  {item.totalAmount.toLocaleString('en-IN')}
-                </Text>
-              )}
-              <StatusPill status={item.status} />
+              <GradientButton
+                title="Send a request"
+                onPress={() => router.push('/(main)/bookings/request')}
+                style={styles.emptyBtn}
+              />
             </GlassCard>
-          </TouchableOpacity>
+          ) : null
+        }
+        renderItem={() => (
+          <>
+            {renderSection(
+              'Active',
+              active,
+              'No active bookings — send a new request from Home',
+            )}
+            {renderSection(
+              'Recent',
+              recent,
+              'No past bookings yet — completed visits appear here',
+            )}
+          </>
         )}
       />
     </View>
@@ -65,18 +101,45 @@ export default function BookingsListScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Stitch.colors.background },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: Stitch.colors.primary,
+  header: {
     paddingTop: 56,
     paddingHorizontal: Stitch.spacing.padding,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
+  title: { fontSize: 28, fontWeight: '700', color: Stitch.colors.primary },
+  sub: { fontSize: 14, color: Stitch.colors.onSurfaceVariant, marginTop: 4 },
   list: { paddingHorizontal: Stitch.spacing.padding, paddingBottom: 100 },
-  card: { marginBottom: 12 },
-  name: { fontSize: 17, fontWeight: '600' },
-  meta: { color: Stitch.colors.onSurfaceVariant, marginTop: 4, marginBottom: 6 },
-  amount: { fontWeight: '600', color: Stitch.colors.secondary, marginBottom: 8 },
-  empty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant },
+  section: { marginBottom: 24 },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: Stitch.colors.onBackground },
+  sectionCount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Stitch.colors.secondary,
+    backgroundColor: Stitch.colors.primaryFixed,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Stitch.radius.pill,
+  },
+  sectionEmpty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant, lineHeight: 20 },
+  emptyCard: { alignItems: 'center', marginBottom: 24, paddingVertical: 28 },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Stitch.colors.onBackground,
+    marginTop: 12,
+  },
+  emptySub: {
+    textAlign: 'center',
+    color: Stitch.colors.onSurfaceVariant,
+    marginTop: 8,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  emptyBtn: { alignSelf: 'stretch' },
 });

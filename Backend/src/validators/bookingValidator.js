@@ -1,6 +1,11 @@
 const { z } = require("zod");
 const { optionalNumber, optionalPositiveInt } = require("./zodHelpers");
 
+const sessionSlotSchema = z.object({
+  start: z.string().min(1),
+  end: z.string().min(1)
+});
+
 const createBookingSchema = z.object({
   body: z
     .object({
@@ -15,6 +20,7 @@ const createBookingSchema = z.object({
       sessionStartTime: z.string().optional(),
       sessionEndTime: z.string().optional(),
       sessionHours: optionalNumber(),
+      sessionSlots: z.array(sessionSlotSchema).optional(),
       address: z.string().optional(),
       latitude: optionalNumber(z.number().min(-90).max(90)),
       longitude: optionalNumber(z.number().min(-180).max(180)),
@@ -31,10 +37,12 @@ const createBookingSchema = z.object({
         }
       }
       if (data.bookingType === "SESSION") {
-        if (!data.sessionDate || !data.sessionStartTime || !data.sessionEndTime) {
+        const hasSlots = Array.isArray(data.sessionSlots) && data.sessionSlots.length > 0;
+        const hasRange = data.sessionStartTime && data.sessionEndTime;
+        if (!data.sessionDate || (!hasSlots && !hasRange)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Session bookings require date and time range"
+            message: "Session bookings require date and at least one time slot"
           });
         }
       }

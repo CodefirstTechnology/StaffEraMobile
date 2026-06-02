@@ -7,6 +7,7 @@ type Props = {
   location?: string;
   title?: string;
   onProfile?: () => void;
+  onLocationPress?: () => void;
   unreadNotifications?: number;
   onNotifications?: () => void;
 };
@@ -16,19 +17,39 @@ export function ScreenHeader({
   location = 'Mumbai, India',
   title,
   onProfile,
+  onLocationPress,
   unreadNotifications = 0,
   onNotifications,
 }: Props) {
+  const locationContent = (
+    <>
+      <MaterialIcons name="location-on" size={22} color={Stitch.colors.primary} />
+      <View style={styles.locTextWrap}>
+        <Text style={styles.locLabel}>{locationLabel}</Text>
+        <Text style={styles.locValue} numberOfLines={2}>
+          {location}
+        </Text>
+      </View>
+      {onLocationPress ? (
+        <MaterialIcons name="chevron-right" size={20} color={Stitch.colors.onSurfaceVariant} />
+      ) : null}
+    </>
+  );
+
   return (
     <View style={styles.header}>
       <View style={styles.row}>
-        <View style={styles.loc}>
-          <MaterialIcons name="location-on" size={22} color={Stitch.colors.primary} />
-          <View>
-            <Text style={styles.locLabel}>{locationLabel}</Text>
-            <Text style={styles.locValue}>{location}</Text>
-          </View>
-        </View>
+        {onLocationPress ? (
+          <Pressable
+            onPress={onLocationPress}
+            style={({ pressed }) => [styles.loc, pressed && styles.locPressed]}
+            hitSlop={4}
+          >
+            {locationContent}
+          </Pressable>
+        ) : (
+          <View style={styles.loc}>{locationContent}</View>
+        )}
         <View style={styles.actions}>
           {onNotifications ? (
             <Pressable onPress={onNotifications} style={styles.avatar}>
@@ -65,7 +86,16 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.5)',
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  loc: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
+  loc: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    paddingVertical: 4,
+    paddingRight: 8,
+  },
+  locPressed: { opacity: 0.75 },
+  locTextWrap: { flex: 1 },
   locLabel: { ...Stitch.typography.caption, color: Stitch.colors.onSurfaceVariant },
   locValue: { ...Stitch.typography.label, color: Stitch.colors.onBackground },
   brand: { ...Stitch.typography.headline, color: Stitch.colors.primary },

@@ -27,6 +27,24 @@ const rangesOverlap = (startA, endA, startB, endB) =>
   timeToMinutes(startA) < timeToMinutes(endB) &&
   timeToMinutes(endA) > timeToMinutes(startB);
 
+const getBookingSlots = (booking) => {
+  const parsed = parseJsonArray(booking.sessionSlots);
+  if (parsed.length && parsed[0]?.start && parsed[0]?.end) {
+    return parsed;
+  }
+  if (booking.sessionStartTime && booking.sessionEndTime) {
+    return [{ start: booking.sessionStartTime, end: booking.sessionEndTime }];
+  }
+  return [];
+};
+
+const slotsConflict = (slotsA, slotsB) =>
+  slotsA.some((slotA) =>
+    slotsB.some((slotB) =>
+      rangesOverlap(slotA.start, slotA.end, slotB.start, slotB.end)
+    )
+  );
+
 const daysOverlap = (daysA, daysB) => {
   const a = parseJsonArray(daysA).map((d) => d.toUpperCase());
   const b = parseJsonArray(daysB).map((d) => d.toUpperCase());
@@ -58,15 +76,11 @@ const checkSessionConflict = async (servantId, bookingData, excludeBookingId) =>
     }
   });
 
+  const incomingSlots = getBookingSlots(bookingData);
+
   for (const b of existing) {
-    if (
-      rangesOverlap(
-        b.sessionStartTime,
-        b.sessionEndTime,
-        bookingData.sessionStartTime,
-        bookingData.sessionEndTime
-      )
-    ) {
+    const existingSlots = getBookingSlots(b);
+    if (slotsConflict(incomingSlots, existingSlots)) {
       return true;
     }
   }
@@ -122,12 +136,7 @@ const checkOwnerPendingDuplicate = async (houseOwnerId, servantId, bookingData) 
           new Date(bookingData.sessionDate).toDateString();
       if (
         sameDay &&
-        rangesOverlap(
-          b.sessionStartTime,
-          b.sessionEndTime,
-          bookingData.sessionStartTime,
-          bookingData.sessionEndTime
-        )
+        slotsConflict(getBookingSlots(b), getBookingSlots(bookingData))
       ) {
         return true;
       }
@@ -201,5 +210,6 @@ const checkBookingConflict = async (
 module.exports = {
   checkBookingConflict,
   parseJsonArray,
+  getBookingSlots,
   BLOCKING_STATUSES
 };

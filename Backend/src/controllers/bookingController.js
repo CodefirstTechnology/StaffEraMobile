@@ -36,14 +36,57 @@ const loadBooking = (id) =>
 const normalizeWorkingDays = (workingDays) =>
   Array.isArray(workingDays) ? JSON.stringify(workingDays) : workingDays;
 
+const timeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
+
+const normalizeSessionBooking = (body) => {
+  const slots = Array.isArray(body.sessionSlots)
+    ? body.sessionSlots.filter((slot) => slot?.start && slot?.end)
+    : [];
+
+  if (slots.length > 0) {
+    const sorted = [...slots].sort(
+      (a, b) => timeToMinutes(a.start) - timeToMinutes(b.start)
+    );
+    return {
+      sessionSlots: JSON.stringify(sorted),
+      sessionStartTime: sorted[0].start,
+      sessionEndTime: sorted[sorted.length - 1].end,
+      sessionHours: sorted.length
+    };
+  }
+
+  if (body.sessionStartTime && body.sessionEndTime) {
+    const single = [{ start: body.sessionStartTime, end: body.sessionEndTime }];
+    return {
+      sessionSlots: JSON.stringify(single),
+      sessionStartTime: body.sessionStartTime,
+      sessionEndTime: body.sessionEndTime,
+      sessionHours: body.sessionHours ?? 1
+    };
+  }
+
+  return {
+    sessionSlots: undefined,
+    sessionStartTime: body.sessionStartTime,
+    sessionEndTime: body.sessionEndTime,
+    sessionHours: body.sessionHours
+  };
+};
+
 exports.createBooking = async (req, res) => {
   const houseOwner = await prisma.houseOwner.findUnique({
     where: { userId: req.user.id }
   });
   if (!houseOwner) throw new ApiError(403, "House owner profile required");
 
+  const sessionFields = normalizeSessionBooking(req.body);
   const bookingData = {
     ...req.body,
+    ...sessionFields,
     workingDays: normalizeWorkingDays(req.body.workingDays),
     monthlyStartDate: req.body.monthlyStartDate
       ? new Date(req.body.monthlyStartDate)
@@ -62,6 +105,18 @@ exports.createBooking = async (req, res) => {
   const address = bookingData.address || houseOwner.address;
 
   if (!req.body.servantId) {
+    if (
+      latitude == null ||
+      longitude == null ||
+      Number.isNaN(Number(latitude)) ||
+      Number.isNaN(Number(longitude))
+    ) {
+      throw new ApiError(
+        400,
+        "Live location (latitude and longitude) is required for area requests"
+      );
+    }
+
     const booking = await prisma.booking.create({
       data: {
         houseOwnerId: houseOwner.id,
@@ -76,6 +131,7 @@ exports.createBooking = async (req, res) => {
         sessionStartTime: bookingData.sessionStartTime,
         sessionEndTime: bookingData.sessionEndTime,
         sessionHours: bookingData.sessionHours,
+        sessionSlots: bookingData.sessionSlots,
         address,
         latitude,
         longitude,
@@ -106,7 +162,10 @@ exports.createBooking = async (req, res) => {
       res,
       {
         booking,
-        broadcast: { notifiedServants: nearbyServants.length }
+        broadcast: {
+          notifiedServants: nearbyServants.length,
+          helperNames: nearbyServants.map((s) => s.user.name)
+        }
       },
       201
     );
@@ -145,6 +204,7 @@ exports.createBooking = async (req, res) => {
         sessionStartTime: bookingData.sessionStartTime,
         sessionEndTime: bookingData.sessionEndTime,
         sessionHours: bookingData.sessionHours,
+        sessionSlots: bookingData.sessionSlots,
         address,
         latitude,
         longitude,
@@ -563,8 +623,8 @@ exports.updateBookingTracking = async (req, res) => {
   const booking = await prisma.booking.findUnique({
     where: { id },
     include: {
-      servant: { include: { user: { select: { id: true } } } },
-      houseOwner: { include: { user: { select: { id: true, name: true } } } }
+      servant: { include: { user: { select: { id: true, name: true } } } },
+      houseOwner: { include: { user: { select: { id: true } } } }
     }
   });
 
@@ -576,6 +636,8 @@ exports.updateBookingTracking = async (req, res) => {
     throw new ApiError(400, "Location sharing is only available for confirmed or active bookings");
   }
 
+  const firstShare = booking.servantLatitude == null || booking.servantLongitude == null;
+
   const updated = await prisma.booking.update({
     where: { id },
     data: {
@@ -584,6 +646,16 @@ exports.updateBookingTracking = async (req, res) => {
       servantLocationAt: new Date()
     }
   });
+
+  if (firstShare && booking.houseOwner?.user?.id) {
+    await createNotification({
+      userId: booking.houseOwner.user.id,
+      title: "Helper is on the way",
+      body: `${booking.servant?.user?.name || "Your helper"} started sharing live location — open your booking to track on the map`,
+      type: "HELPER_ON_WAY",
+      data: { bookingId: id }
+    });
+  }
 
   sendSuccess(res, trackingPayload(updated));
 };

@@ -67,6 +67,7 @@ export const StatusColors: Record<string, { bg: string; text: string }> = {
   CONFIRMED: { bg: 'rgba(157, 161, 255, 0.25)', text: '#15157d' },
   ACTIVE: { bg: Stitch.colors.successBg, text: Stitch.colors.success },
   COMPLETED: { bg: Stitch.colors.surfaceContainer, text: Stitch.colors.onSurfaceVariant },
+  EXPIRED: { bg: 'rgba(120, 120, 128, 0.18)', text: '#5c5c66' },
   CANCELLED: { bg: Stitch.colors.errorContainer, text: Stitch.colors.error },
   REJECTED: { bg: Stitch.colors.errorContainer, text: Stitch.colors.error },
   VERIFIED: { bg: Stitch.colors.successBg, text: Stitch.colors.success },

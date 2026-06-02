@@ -14,6 +14,7 @@ import { LocationMapPreview } from '@/components/ui/LocationMapPreview';
 import { JobTrackingMap } from '@/components/ui/JobTrackingMap';
 import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
 import { useNotifications } from '@/hooks/useNotifications';
+import { formatSessionSlotsLabel } from '@/lib/timeSlots';
 
 type Booking = {
   id: number;
@@ -23,6 +24,10 @@ type Booking = {
   latitude?: number | null;
   longitude?: number | null;
   requestedSkill?: string | null;
+  sessionStartTime?: string | null;
+  sessionEndTime?: string | null;
+  sessionSlots?: string | null;
+  sessionDate?: string | null;
   houseOwner: { user: { name: string } };
 };
 
@@ -285,16 +290,36 @@ export default function ServantHomeScreen() {
 
       {openRequests && openRequests.length > 0 && (
         <>
-          <Text style={styles.section}>Nearby open requests — accept first</Text>
-          {openRequests.map((b) => (
+          <Text style={styles.section}>Open requests in your service area</Text>
+          <Text style={styles.sectionSub}>
+            Only customers near your zones appear here — helpers outside your area cannot see these.
+          </Text>
+          {openRequests.map((b) => {
+            const slotLabel = formatSessionSlotsLabel(
+              b.sessionSlots,
+              b.sessionStartTime,
+              b.sessionEndTime,
+            );
+            const visitDate = b.sessionDate
+              ? new Date(b.sessionDate).toLocaleDateString('en-IN')
+              : null;
+            return (
             <GlassCard key={`open-${b.id}`} style={styles.mb}>
               <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
                   <Text style={styles.cardMeta}>
-                    {b.bookingType}
-                    {b.requestedSkill ? ` · ${b.requestedSkill.replace(/_/g, ' ')}` : ''}
+                    {b.requestedSkill ? b.requestedSkill.replace(/_/g, ' ') : 'General help'}
+                    {' · '}
+                    {b.bookingType === 'SESSION' ? 'One visit' : 'Monthly'}
                   </Text>
+                  {visitDate && slotLabel ? (
+                    <Text style={styles.slotText}>
+                      {visitDate} · {slotLabel}
+                    </Text>
+                  ) : slotLabel ? (
+                    <Text style={styles.slotText}>{slotLabel}</Text>
+                  ) : null}
                   {b.address ? <Text style={styles.addr}>{b.address}</Text> : null}
                 </View>
                 <MaterialIcons
@@ -319,7 +344,8 @@ export default function ServantHomeScreen() {
                 </Text>
               </TouchableOpacity>
             </GlassCard>
-          ))}
+            );
+          })}
         </>
       )}
 
@@ -534,9 +560,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: 8,
   },
+  sectionSub: {
+    fontSize: 13,
+    color: Stitch.colors.onSurfaceVariant,
+    marginHorizontal: 24,
+    marginBottom: 12,
+    marginTop: -6,
+    lineHeight: 18,
+  },
   mb: { marginHorizontal: 24, marginBottom: 12 },
   cardTitle: { fontSize: 17, fontWeight: '600' },
   cardMeta: { color: Stitch.colors.onSurfaceVariant, marginTop: 4, marginBottom: 4 },
+  slotText: { fontSize: 13, color: Stitch.colors.primary, fontWeight: '600', marginBottom: 4 },
   addr: { fontSize: 13, color: Stitch.colors.secondary, marginBottom: 8 },
   row: { flexDirection: 'row', gap: 10 },
   accept: {

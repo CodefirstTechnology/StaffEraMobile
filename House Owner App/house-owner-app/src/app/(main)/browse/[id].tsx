@@ -7,12 +7,15 @@ import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { formatSkillLabel } from '@/lib/skills';
+import { useSkills } from '@/hooks/useSkills';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useAuthStore } from '@/store/authStore';
 
 export default function ServantDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = useAuthStore((s) => s.user);
+  const { data: skills = [] } = useSkills();
   const { location: liveLocation } = useLiveLocation();
 
   const searchLocation = useMemo(() => {
@@ -74,7 +77,9 @@ export default function ServantDetailScreen() {
           <Text style={styles.verifiedText}>Agent verified</Text>
         </View>
         <Text style={styles.skills}>
-          {servant.skills?.map((s: { skillName: string }) => s.skillName).join(' · ')}
+          {servant.skills
+            ?.map((s: { skillName: string }) => formatSkillLabel(s.skillName, skills))
+            .join(' · ')}
         </Text>
         <Text style={styles.rate}>
           ★ {servant.rating?.toFixed(1) || '0.0'} · {Stitch.copy.rupee}
