@@ -106,12 +106,31 @@ export default function OnboardServant() {
         : [...f.workingDays, d],
     }))
 
+  const validateDocuments = () => {
+    if (!idProof) {
+      setError('ID proof document is required (JPEG, PNG, or WebP, max 5 MB)')
+      return false
+    }
+    if (!profilePhoto) {
+      setError('Profile photo is required (JPEG, PNG, or WebP, max 5 MB)')
+      return false
+    }
+    return true
+  }
+
+  const goNext = () => {
+    setError('')
+    if (step === 4 && !validateDocuments()) return
+    setStep((s) => s + 1)
+  }
+
   const submit = async () => {
     setError('')
     if (!form.offersSession && !form.offersMonthly) {
       setError('Select at least one booking type: Session or Monthly')
       return
     }
+    if (!validateDocuments()) return
     const fd = new FormData()
     Object.entries(form).forEach(([k, v]) => {
       if (k === 'skills' || k === 'workingDays') {
@@ -330,6 +349,11 @@ export default function OnboardServant() {
       {step === 4 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">ID Verification</h3>
+          <p className="text-sm text-subtext">
+            Images are stored on the server; only the file path is saved in the
+            database.
+          </p>
+          {error && <p className="text-error text-sm">{error}</p>}
           <Field label="ID proof type">
             <select
               value={form.idProofType}
@@ -343,19 +367,21 @@ export default function OnboardServant() {
               ))}
             </select>
           </Field>
-          <Field label="ID proof document">
+          <Field label="ID proof document (required)">
             <input
               type="file"
-              accept="image/*"
-              onChange={(e) => setIdProof(e.target.files[0])}
+              accept="image/jpeg,image/png,image/webp"
+              required
+              onChange={(e) => setIdProof(e.target.files?.[0] || null)}
               className="w-full text-sm"
             />
           </Field>
-          <Field label="Profile photo">
+          <Field label="Profile photo (required)">
             <input
               type="file"
-              accept="image/*"
-              onChange={(e) => setProfilePhoto(e.target.files[0])}
+              accept="image/jpeg,image/png,image/webp"
+              required
+              onChange={(e) => setProfilePhoto(e.target.files?.[0] || null)}
               className="w-full text-sm"
             />
           </Field>
@@ -456,9 +482,7 @@ export default function OnboardServant() {
         >
           Back
         </Button>
-        {step < 5 && (
-          <Button onClick={() => setStep((s) => s + 1)}>Next</Button>
-        )}
+        {step < 5 && <Button onClick={goNext}>Next</Button>}
       </div>
     </div>
   )

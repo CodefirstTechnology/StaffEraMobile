@@ -11,7 +11,22 @@ const ApiError = require("./utils/ApiError");
 
 const app = express();
 
-app.use(helmet());
+const uploadDir = path.join(process.cwd(), process.env.UPLOAD_DIR || "uploads");
+app.use(
+  "/uploads",
+  express.static(uploadDir, {
+    setHeaders(res) {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
+  })
+);
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+  })
+);
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "*",
@@ -30,9 +45,6 @@ app.use(
     max: 200
   })
 );
-
-const uploadDir = path.join(process.cwd(), process.env.UPLOAD_DIR || "uploads");
-app.use("/uploads", express.static(uploadDir));
 
 app.use("/api/v1/auth", require("./routes/authRoutes"));
 app.use("/api/v1/servants", require("./routes/servantRoutes"));

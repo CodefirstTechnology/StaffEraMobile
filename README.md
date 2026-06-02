@@ -66,6 +66,8 @@ In [Google Cloud Console](https://console.cloud.google.com/), enable **Places AP
 
 **Servant login:** account must be created in the Agent portal first. Default onboarding password in the form is `Servant@123` unless the agent changed it.
 
+**Agent uploads (ID proof & profile photo):** files are saved under `Backend/uploads/` (or `UPLOAD_DIR`). The database stores paths like `/uploads/<filename>` on the `Servant` record. Agent web loads images via the API origin — set `VITE_API_BASE_URL` in `Agent/onboarding-agent-web/.env` (see `.env.example`).
+
 ## Business rules
 
 - Servants cannot self-register (agent-only via `POST /api/v1/agent/servants`)

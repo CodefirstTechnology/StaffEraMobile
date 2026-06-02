@@ -78,13 +78,15 @@ exports.createServant = async (req, res) => {
     if (phoneTaken) throw new ApiError(400, "Phone number already registered");
   }
 
-  const profilePhoto = req.files?.profilePhoto?.[0]
-    ? `/uploads/${req.files.profilePhoto[0].filename}`
-    : req.body.profilePhoto;
+  if (!req.files?.profilePhoto?.[0]) {
+    throw new ApiError(400, "Profile photo is required");
+  }
+  if (!req.files?.idProof?.[0]) {
+    throw new ApiError(400, "ID proof document is required");
+  }
 
-  const idProofUrl = req.files?.idProof?.[0]
-    ? `/uploads/${req.files.idProof[0].filename}`
-    : req.body.idProofUrl;
+  const profilePhoto = `/uploads/${req.files.profilePhoto[0].filename}`;
+  const idProofUrl = `/uploads/${req.files.idProof[0].filename}`;
 
   const skillList = await validateActiveSkillCodes(parseSkills(skills));
   const hashed = await bcrypt.hash(password, 12);

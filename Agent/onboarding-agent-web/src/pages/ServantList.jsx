@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '../lib/api'
+import { uploadUrl } from '../lib/mediaUrl'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 
@@ -67,7 +68,7 @@ export default function ServantList() {
                   <td className="p-4">
                     {s.profilePhoto ? (
                       <img
-                        src={`http://localhost:5000${s.profilePhoto}`}
+                        src={uploadUrl(s.profilePhoto)}
                         alt=""
                         className="h-10 w-10 rounded-full object-cover"
                       />

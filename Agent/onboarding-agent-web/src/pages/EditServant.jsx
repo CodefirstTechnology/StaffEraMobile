@@ -5,8 +5,7 @@ import api from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { useSkills } from '../hooks/useSkills'
-
-const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5000'
+import { uploadUrl } from '../lib/mediaUrl'
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const ID_TYPES = ['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID']
@@ -355,7 +354,7 @@ export default function EditServant() {
           <div className="space-y-1.5">
             <FieldLabel>Current ID proof</FieldLabel>
             <a
-              href={`${API_HOST}${servant.idProofUrl}`}
+              href={uploadUrl(servant.idProofUrl)}
               target="_blank"
               rel="noreferrer"
               className="text-sm text-primary underline"
@@ -376,7 +375,7 @@ export default function EditServant() {
           <div className="space-y-1.5">
             <FieldLabel>Current profile photo</FieldLabel>
             <img
-              src={`${API_HOST}${servant.profilePhoto}`}
+              src={uploadUrl(servant.profilePhoto)}
               alt=""
               className="h-20 w-20 rounded-full object-cover"
             />
