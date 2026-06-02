@@ -6,6 +6,8 @@ import * as Location from 'expo-location';
 import { Stitch } from '@/theme/stitch';
 import { mapViewProps } from '@/lib/mapsConfig';
 import { mapsDirectionsUrl } from '@/lib/locationTypes';
+import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
+import type { VisitAddressParts } from '@/lib/visitAddress';
 
 type Coord = { latitude: number; longitude: number };
 
@@ -17,6 +19,7 @@ type Props = {
   showMapInitially?: boolean;
   height?: number;
   caption?: string;
+  visitAddress?: VisitAddressParts | null;
 };
 
 function fitRegion(points: Coord[]): Region {
@@ -42,6 +45,7 @@ export function JobTrackingMap({
   showMapInitially = false,
   height = 220,
   caption,
+  visitAddress,
 }: Props) {
   const mapRef = useRef<MapView>(null);
   const [mapVisible, setMapVisible] = useState(showMapInitially);
@@ -93,6 +97,7 @@ export function JobTrackingMap({
 
   return (
     <View style={styles.wrap}>
+      {visitAddress ? <VisitAddressBanner parts={visitAddress} /> : null}
       {mapVisible ? (
         <View style={[styles.mapBox, { height }]}>
           <MapView

@@ -16,6 +16,10 @@ import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
 import { LocationPicker } from '@/components/ui/LocationPicker';
+import {
+  AddressUnitFields,
+  type AddressUnitValue,
+} from '@/components/ui/AddressUnitFields';
 import type { LocationValue } from '@/lib/locationTypes';
 
 export default function NewBookingScreen() {
@@ -32,6 +36,11 @@ export default function NewBookingScreen() {
     return d;
   });
   const [location, setLocation] = useState<LocationValue | null>(null);
+  const [addressUnit, setAddressUnit] = useState<AddressUnitValue>({
+    flatNo: '',
+    building: '',
+    area: '',
+  });
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
@@ -44,6 +53,16 @@ export default function NewBookingScreen() {
         city: ho.city,
         latitude: ho.latitude,
         longitude: ho.longitude,
+        flatNo: ho.flatNo,
+        building: ho.building,
+        area: ho.area,
+      });
+    }
+    if (ho) {
+      setAddressUnit({
+        flatNo: ho.flatNo || '',
+        building: ho.building || '',
+        area: ho.area || '',
       });
     }
   }, [user?.houseOwner]);
@@ -82,6 +101,9 @@ export default function NewBookingScreen() {
         servantId: Number(servantId),
         bookingType,
         address: location.address,
+        flatNo: addressUnit.flatNo.trim() || undefined,
+        building: addressUnit.building.trim() || undefined,
+        area: addressUnit.area.trim() || undefined,
         latitude: location.latitude,
         longitude: location.longitude,
         notes: notes.trim() || undefined,
@@ -181,6 +203,7 @@ export default function NewBookingScreen() {
         </>
       )}
 
+      <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
       <LocationPicker
         label="Visit location"
         placeholder="Search your home address or tap the map"

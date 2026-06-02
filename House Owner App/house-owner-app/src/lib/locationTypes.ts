@@ -10,6 +10,9 @@ export type GeoLocation = {
   city?: string | null;
   latitude: number;
   longitude: number;
+  flatNo?: string | null;
+  building?: string | null;
+  area?: string | null;
 };
 
 export type LocationValue = GeoLocation;

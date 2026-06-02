@@ -68,6 +68,9 @@ model HouseOwner {
   userId    Int       @unique
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   address   String?
+  flatNo    String?
+  building  String?
+  area      String?
   city      String?
   latitude  Float?
   longitude Float?
@@ -179,6 +182,9 @@ model Booking {
   sessionSlots     String?
 
   address          String?
+  flatNo           String?
+  building         String?
+  area             String?
   latitude         Float?
   longitude        Float?
   servantLatitude  Float?

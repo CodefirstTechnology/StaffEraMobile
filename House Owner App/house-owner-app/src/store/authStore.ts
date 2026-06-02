@@ -11,6 +11,9 @@ type User = {
     id: number;
     city?: string;
     address?: string;
+    flatNo?: string;
+    building?: string;
+    area?: string;
     latitude?: number;
     longitude?: number;
   };

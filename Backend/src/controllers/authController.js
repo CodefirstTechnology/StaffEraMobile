@@ -179,12 +179,15 @@ exports.updateLocation = async (req, res) => {
   });
   if (!houseOwner) throw new ApiError(404, "House owner profile not found");
 
-  const { address, city, latitude, longitude } = req.body;
+  const { address, flatNo, building, area, city, latitude, longitude } = req.body;
 
   const updated = await prisma.houseOwner.update({
     where: { id: houseOwner.id },
     data: {
       ...(address !== undefined && { address }),
+      ...(flatNo !== undefined && { flatNo: flatNo || null }),
+      ...(building !== undefined && { building: building || null }),
+      ...(area !== undefined && { area: area || null }),
       ...(city !== undefined && { city }),
       ...(latitude !== undefined && { latitude }),
       ...(longitude !== undefined && { longitude })

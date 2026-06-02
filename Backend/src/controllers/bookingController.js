@@ -103,6 +103,9 @@ exports.createBooking = async (req, res) => {
   const latitude = bookingData.latitude ?? houseOwner.latitude ?? undefined;
   const longitude = bookingData.longitude ?? houseOwner.longitude ?? undefined;
   const address = bookingData.address || houseOwner.address;
+  const flatNo = bookingData.flatNo ?? houseOwner.flatNo ?? undefined;
+  const building = bookingData.building ?? houseOwner.building ?? undefined;
+  const area = bookingData.area ?? houseOwner.area ?? undefined;
 
   if (!req.body.servantId) {
     if (
@@ -133,6 +136,9 @@ exports.createBooking = async (req, res) => {
         sessionHours: bookingData.sessionHours,
         sessionSlots: bookingData.sessionSlots,
         address,
+        flatNo,
+        building,
+        area,
         latitude,
         longitude,
         totalAmount: bookingData.totalAmount,
@@ -206,6 +212,9 @@ exports.createBooking = async (req, res) => {
         sessionHours: bookingData.sessionHours,
         sessionSlots: bookingData.sessionSlots,
         address,
+        flatNo,
+        building,
+        area,
         latitude,
         longitude,
         totalAmount: bookingData.totalAmount,

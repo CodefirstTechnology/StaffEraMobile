@@ -12,6 +12,7 @@ import { StatusPill } from '@/components/ui/StatusPill';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { LocationMapPreview } from '@/components/ui/LocationMapPreview';
 import { JobTrackingMap } from '@/components/ui/JobTrackingMap';
+import { formatVisitAddressLines } from '@/lib/visitAddress';
 import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatSessionSlotsLabel } from '@/lib/timeSlots';
@@ -22,6 +23,9 @@ type Booking = {
   status: string;
   bookingType: string;
   address?: string;
+  flatNo?: string | null;
+  building?: string | null;
+  area?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   requestedSkill?: string | null;
@@ -363,6 +367,16 @@ export default function ServantHomeScreen() {
                   showMyLocation
                   showMapInitially
                   height={220}
+                  visitAddress={
+                    activeJob
+                      ? {
+                          flatNo: activeJob.flatNo,
+                          building: activeJob.building,
+                          area: activeJob.area,
+                          address: activeJob.address,
+                        }
+                      : null
+                  }
                   caption="Sharing live location with customer"
                 />
               </View>
@@ -493,7 +507,9 @@ export default function ServantHomeScreen() {
                   <MaterialIcons name="location-on" size={18} color={Stitch.colors.secondary} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
-                    <Text style={styles.cardMeta}>{b.address || 'Address on file'}</Text>
+                    <Text style={styles.cardMeta}>
+                      {formatVisitAddressLines(b).join(' · ') || b.address || 'Address on file'}
+                    </Text>
                   </View>
                   <MaterialIcons
                     name="chevron-right"
@@ -510,6 +526,12 @@ export default function ServantHomeScreen() {
                   showMyLocation={!activeEntry}
                   showMapInitially={onWayBookingId === b.id}
                   height={160}
+                  visitAddress={{
+                    flatNo: b.flatNo,
+                    building: b.building,
+                    area: b.area,
+                    address: b.address,
+                  }}
                   caption={
                     onWayBookingId === b.id
                       ? 'Location shared with customer'

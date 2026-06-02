@@ -8,6 +8,8 @@ import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { JobTrackingMap } from '@/components/ui/JobTrackingMap';
+import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
+import { formatVisitAddressLines } from '@/lib/visitAddress';
 import { LocationMapPreview } from '@/components/ui/LocationMapPreview';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
@@ -161,7 +163,11 @@ export default function ScheduleDetailScreen() {
         {booking.workingDays ? (
           <Text style={styles.detailRow}>Days: {booking.workingDays}</Text>
         ) : null}
-        {booking.address ? <Text style={styles.address}>{booking.address}</Text> : null}
+        {formatVisitAddressLines(booking).length > 0 ? (
+          <VisitAddressBanner parts={booking} />
+        ) : booking.address ? (
+          <Text style={styles.address}>{booking.address}</Text>
+        ) : null}
         {booking.totalAmount != null && (
           <Text style={styles.amount}>
             {Stitch.copy.rupee}
@@ -179,6 +185,12 @@ export default function ScheduleDetailScreen() {
             showMyLocation
             showMapInitially={trackEnabled}
             height={220}
+            visitAddress={{
+              flatNo: booking.flatNo,
+              building: booking.building,
+              area: booking.area,
+              address: booking.address,
+            }}
             caption={
               trackEnabled
                 ? 'Sharing live location with customer'

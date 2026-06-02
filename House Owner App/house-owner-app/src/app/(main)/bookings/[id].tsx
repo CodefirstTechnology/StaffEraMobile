@@ -10,6 +10,8 @@ import { GradientButton } from '@/components/ui/GradientButton';
 import { JobTrackingMap } from '@/components/ui/JobTrackingMap';
 import { useBookingTrackingPoll } from '@/hooks/useBookingTrackingPoll';
 import { formatSessionSlotsLabel } from '@/lib/timeSlots';
+import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
+import { formatVisitAddressLines } from '@/lib/visitAddress';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -139,7 +141,11 @@ export default function BookingDetailScreen() {
         ) : slotLabel ? (
           <Text style={styles.row}>Time slot: {slotLabel}</Text>
         ) : null}
-        {booking.address ? <Text style={styles.row}>Address: {booking.address}</Text> : null}
+        {formatVisitAddressLines(booking).length > 0 ? (
+          <VisitAddressBanner parts={booking} title="Visit address" />
+        ) : booking.address ? (
+          <Text style={styles.row}>Address: {booking.address}</Text>
+        ) : null}
         {isOpenBroadcast && areaHelpers.length > 0 ? (
           <Text style={styles.helpers}>
             Helpers notified in your area: {areaHelpers.map((h) => h.user.name).join(', ')}
@@ -168,6 +174,12 @@ export default function BookingDetailScreen() {
           home={home}
           servant={servant}
           lastUpdated={tracking?.servant?.updatedAt ?? null}
+          visitAddress={{
+            flatNo: booking.flatNo,
+            building: booking.building,
+            area: booking.area,
+            address: booking.address,
+          }}
         />
       ) : trackLive && !home ? (
         <GlassCard style={styles.noMap}>

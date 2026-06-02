@@ -5,6 +5,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 import { mapViewProps } from '@/lib/mapsConfig';
 import { mapsDeepLink, mapsDirectionsUrl } from '@/lib/locationTypes';
+import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
+import type { VisitAddressParts } from '@/lib/visitAddress';
 
 type Coord = { latitude: number; longitude: number };
 
@@ -13,6 +15,7 @@ type Props = {
   servant?: Coord | null;
   height?: number;
   lastUpdated?: string | null;
+  visitAddress?: VisitAddressParts | null;
 };
 
 function fitRegion(points: Coord[]): Region {
@@ -30,7 +33,13 @@ function fitRegion(points: Coord[]): Region {
   };
 }
 
-export function JobTrackingMap({ home, servant, height = 220, lastUpdated }: Props) {
+export function JobTrackingMap({
+  home,
+  servant,
+  height = 220,
+  lastUpdated,
+  visitAddress,
+}: Props) {
   const mapRef = useRef<MapView>(null);
 
   const points: Coord[] = [];
@@ -60,6 +69,7 @@ export function JobTrackingMap({ home, servant, height = 220, lastUpdated }: Pro
   return (
     <View style={styles.wrap}>
       <Text style={styles.sectionTitle}>Live tracking</Text>
+      {visitAddress ? <VisitAddressBanner parts={visitAddress} title="Visit address" /> : null}
       <View style={[styles.mapBox, { height }]}>
         <MapView
           ref={mapRef}

@@ -16,12 +16,21 @@ import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { LocationPicker } from '@/components/ui/LocationPicker';
+import {
+  AddressUnitFields,
+  type AddressUnitValue,
+} from '@/components/ui/AddressUnitFields';
 import { updateHomeLocation } from '@/lib/geo';
 import { mapsDeepLink, type LocationValue } from '@/lib/locationTypes';
 
 export default function ProfileScreen() {
   const { user, logout, setUser } = useAuthStore();
   const [location, setLocation] = useState<LocationValue | null>(null);
+  const [addressUnit, setAddressUnit] = useState<AddressUnitValue>({
+    flatNo: '',
+    building: '',
+    area: '',
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -32,6 +41,16 @@ export default function ProfileScreen() {
         city: ho.city,
         latitude: ho.latitude,
         longitude: ho.longitude,
+        flatNo: ho.flatNo,
+        building: ho.building,
+        area: ho.area,
+      });
+    }
+    if (ho) {
+      setAddressUnit({
+        flatNo: ho.flatNo || '',
+        building: ho.building || '',
+        area: ho.area || '',
       });
     }
   }, [user?.houseOwner]);
@@ -45,6 +64,9 @@ export default function ProfileScreen() {
     try {
       const { user: updatedUser } = await updateHomeLocation({
         address: location.address,
+        flatNo: addressUnit.flatNo.trim() || undefined,
+        building: addressUnit.building.trim() || undefined,
+        area: addressUnit.area.trim() || undefined,
         city: location.city || undefined,
         latitude: location.latitude,
         longitude: location.longitude,
@@ -125,6 +147,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
         <LocationPicker
           placeholder="Search your society, street, or area"
           value={location}

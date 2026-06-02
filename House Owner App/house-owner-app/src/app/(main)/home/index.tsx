@@ -24,6 +24,7 @@ import {
   splitBookings,
   type BookingSummary,
 } from '@/components/bookings/BookingSummaryCard';
+import { formatVisitAddressLines } from '@/lib/visitAddress';
 
 const SKILL_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   CLEANING: 'cleaning-services',
@@ -95,11 +96,24 @@ export default function HomeScreen() {
   const homeRecent = recent.slice(0, 2);
   const hasBookings = homeActive.length > 0 || homeRecent.length > 0;
 
-  const headerLocation =
-    liveLocation?.address ||
-    (user?.houseOwner?.address
-      ? user.houseOwner.address.split(',').slice(0, 2).join(',').trim()
-      : user?.houseOwner?.city || 'Tap to set your home location');
+  const headerLocation = (() => {
+    const ho = user?.houseOwner;
+    const detailLines = ho
+      ? formatVisitAddressLines({
+          flatNo: ho.flatNo,
+          building: ho.building,
+          area: ho.area,
+          address: liveLocation?.address || ho.address,
+        })
+      : [];
+    if (detailLines.length > 0) return detailLines.slice(0, 2).join(' · ');
+    return (
+      liveLocation?.address ||
+      (ho?.address ? ho.address.split(',').slice(0, 2).join(',').trim() : null) ||
+      ho?.city ||
+      'Tap to set your home location'
+    );
+  })();
 
   return (
     <View style={styles.root}>

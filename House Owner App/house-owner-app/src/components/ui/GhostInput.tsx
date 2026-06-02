@@ -1,12 +1,12 @@
 import { View, TextInput, Text, StyleSheet, TextInputProps } from 'react-native';
 import { Stitch } from '@/theme/stitch';
 
-type Props = TextInputProps & { label: string };
+type Props = TextInputProps & { label?: string };
 
 export function GhostInput({ label, style, ...props }: Props) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       <TextInput
         placeholderTextColor={Stitch.colors.onSurfaceVariant + '99'}
         style={[styles.input, style]}

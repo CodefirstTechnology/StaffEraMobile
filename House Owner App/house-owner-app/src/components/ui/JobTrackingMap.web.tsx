@@ -2,6 +2,8 @@ import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 import { mapsDeepLink, mapsDirectionsUrl } from '@/lib/locationTypes';
+import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
+import type { VisitAddressParts } from '@/lib/visitAddress';
 
 type Coord = { latitude: number; longitude: number };
 
@@ -9,14 +11,16 @@ type Props = {
   home?: Coord | null;
   servant?: Coord | null;
   lastUpdated?: string | null;
+  visitAddress?: VisitAddressParts | null;
 };
 
-export function JobTrackingMap({ home, servant, lastUpdated }: Props) {
+export function JobTrackingMap({ home, servant, lastUpdated, visitAddress }: Props) {
   if (!home) return null;
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.sectionTitle}>Live tracking</Text>
+      {visitAddress ? <VisitAddressBanner parts={visitAddress} title="Visit address" /> : null}
       <Text style={styles.hint}>
         {servant
           ? `Helper location · ${lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-IN') : 'updating'}`

@@ -15,13 +15,19 @@ import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
 import { LocationPicker } from '@/components/ui/LocationPicker';
+import {
+  AddressUnitFields,
+  type AddressUnitValue,
+} from '@/components/ui/AddressUnitFields';
 import { TimeSlotPicker } from '@/components/ui/TimeSlotPicker';
 import type { LocationValue } from '@/lib/locationTypes';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
+import { useAuthStore } from '@/store/authStore';
 import { useSkills } from '@/hooks/useSkills';
 import { DEFAULT_TIME_SLOTS, formatSessionSlotsLabel, slotsToPayload, type TimeSlot } from '@/lib/timeSlots';
 
 export default function AreaBookingRequestScreen() {
+  const user = useAuthStore((s) => s.user);
   const { skill: skillParam } = useLocalSearchParams<{ skill?: string }>();
   const { data: skills = [] } = useSkills();
   const requestedSkillFromRoute = skillParam ? String(skillParam).toUpperCase() : undefined;
@@ -37,6 +43,11 @@ export default function AreaBookingRequestScreen() {
     return d;
   });
   const [location, setLocation] = useState<LocationValue | null>(null);
+  const [addressUnit, setAddressUnit] = useState<AddressUnitValue>({
+    flatNo: '',
+    building: '',
+    area: '',
+  });
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
@@ -48,6 +59,16 @@ export default function AreaBookingRequestScreen() {
   useEffect(() => {
     if (liveLocation) setLocation(liveLocation);
   }, [liveLocation]);
+
+  useEffect(() => {
+    const ho = user?.houseOwner;
+    if (!ho) return;
+    setAddressUnit({
+      flatNo: ho.flatNo || '',
+      building: ho.building || '',
+      area: ho.area || '',
+    });
+  }, [user?.houseOwner]);
 
   const skillLabel =
     skills.find((s) => s.code === selectedSkill)?.label ||
@@ -100,6 +121,9 @@ export default function AreaBookingRequestScreen() {
       const payload: Record<string, unknown> = {
         bookingType,
         address: location.address,
+        flatNo: addressUnit.flatNo.trim() || undefined,
+        building: addressUnit.building.trim() || undefined,
+        area: addressUnit.area.trim() || undefined,
         latitude: location.latitude,
         longitude: location.longitude,
         notes: notes.trim() || undefined,
@@ -250,8 +274,9 @@ export default function AreaBookingRequestScreen() {
         </Text>
       )}
 
+      <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
       <LocationPicker
-        label="Your live location"
+        label="Your live location (GPS / map)"
         placeholder={locLoading ? 'Getting location…' : 'Search or use current location'}
         value={location}
         onChange={setLocation}
