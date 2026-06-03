@@ -12,6 +12,7 @@ import { GradientButton } from '@/components/ui/GradientButton';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import { translateVerification } from '@/lib/i18n';
 import { formatCurrency } from '@/lib/i18n/format';
+import { formatSkillLabel } from '@/lib/skills';
 
 type Zone = { id: number; name: string; city?: string | null };
 type Skill = { skillName: string };
@@ -145,7 +146,7 @@ export default function ProfileScreen() {
           <View style={styles.skillChips}>
             {skills.map((s) => (
               <View key={s.skillName} style={styles.skillChip}>
-                <Text style={styles.skillChipText}>{s.skillName}</Text>
+                <Text style={styles.skillChipText}>{formatSkillLabel(s.skillName, [])}</Text>
               </View>
             ))}
           </View>

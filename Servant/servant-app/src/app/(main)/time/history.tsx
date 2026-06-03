@@ -1,9 +1,12 @@
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { Brand } from '@/constants/theme';
+import { formatDate, formatTime } from '@/lib/i18n/format';
 
 export default function TimeHistoryScreen() {
+  const { t } = useTranslation();
   const { data } = useQuery({
     queryKey: ['time-history'],
     queryFn: async () => {
@@ -14,15 +17,15 @@ export default function TimeHistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Time History</Text>
+      <Text style={styles.title}>{t('time.historyTitle')}</Text>
       <FlatList
         data={data || []}
         keyExtractor={(item: { id: number }) => String(item.id)}
         renderItem={({ item }: { item: { date: string; hoursWorked?: number; clockIn: string } }) => (
           <View style={styles.card}>
-            <Text style={styles.date}>{new Date(item.date).toLocaleDateString()}</Text>
-            <Text>{new Date(item.clockIn).toLocaleTimeString()}</Text>
-            <Text style={styles.hours}>{item.hoursWorked?.toFixed(1) || '—'} hrs</Text>
+            <Text style={styles.date}>{formatDate(item.date)}</Text>
+            <Text>{formatTime(item.clockIn)}</Text>
+            <Text style={styles.hours}>{t('time.hoursShort', { hours: item.hoursWorked?.toFixed(1) ?? '—' })}</Text>
           </View>
         )}
       />

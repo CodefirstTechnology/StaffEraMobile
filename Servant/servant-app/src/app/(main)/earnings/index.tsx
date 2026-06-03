@@ -85,8 +85,10 @@ export default function EarningsScreen() {
         </Text>
         <Text style={styles.hint}>
           {monthlyCount > 0
-            ? `${monthlyCount} completed job${monthlyCount === 1 ? '' : 's'} in ${monthLabel}`
-            : 'Completed visits in this calendar month'}
+            ? monthlyCount === 1
+              ? t('earnings.oneJobInMonth', { month: monthLabel })
+              : t('earnings.jobsInMonth', { count: monthlyCount, month: monthLabel })
+            : t('earnings.monthVisitsHint')}
         </Text>
       </GlassCard>
 
@@ -98,10 +100,15 @@ export default function EarningsScreen() {
         </Text>
         <Text style={styles.hint}>
           {todayStats.completedCount > 0
-            ? `${todayStats.completedCount} completed job${todayStats.completedCount === 1 ? '' : 's'} today`
+            ? todayStats.completedCount === 1
+              ? t('earnings.oneJobToday')
+              : t('earnings.jobsTodayCount', { count: todayStats.completedCount })
             : todayStats.hoursToday > 0
-              ? `${todayStats.hoursToday.toFixed(1)} hours × ${Stitch.copy.rupee}${hourlyRate}/hr`
-              : 'Updates when you clock out or visit slots end'}
+              ? t('earnings.hoursRateHint', {
+                  hours: todayStats.hoursToday.toFixed(1),
+                  rate: `${Stitch.copy.rupee}${hourlyRate}`,
+                })
+              : t('earnings.updatesHint')}
         </Text>
       </GlassCard>
 
@@ -115,7 +122,7 @@ export default function EarningsScreen() {
 
       <Text style={styles.section}>{t('earnings.completedJobs')}</Text>
       {completedMonth.length === 0 ? (
-        <Text style={styles.empty}>No completed jobs this month yet</Text>
+        <Text style={styles.empty}>{t('earnings.noMonthJobs')}</Text>
       ) : (
         completedMonth.map(
           (b: {
@@ -138,9 +145,9 @@ export default function EarningsScreen() {
         )
       )}
 
-      <Text style={styles.section}>Today&apos;s completed jobs</Text>
+      <Text style={styles.section}>{t('earnings.todaySection')}</Text>
       {completed.length === 0 ? (
-        <Text style={styles.empty}>Complete a visit to see earnings here</Text>
+        <Text style={styles.empty}>{t('earnings.noTodayJobs')}</Text>
       ) : (
         completed.map(
           (b: {
@@ -152,7 +159,7 @@ export default function EarningsScreen() {
             <GlassCard key={b.id} style={styles.row}>
               <View>
                 <Text style={styles.rowName}>{b.houseOwner.user.name}</Text>
-                <Text style={styles.rowMeta}>Completed today</Text>
+                <Text style={styles.rowMeta}>{t('earnings.completedToday')}</Text>
               </View>
               <Text style={styles.amt}>
                 {t('common.rupee')}

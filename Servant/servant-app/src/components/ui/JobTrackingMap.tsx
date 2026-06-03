@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -39,7 +40,7 @@ function fitRegion(points: Coord[]): Region {
 
 export function JobTrackingMap({
   home,
-  homeLabel = 'Home',
+  homeLabel,
   servant,
   showMyLocation = false,
   showMapInitially = false,
@@ -47,6 +48,8 @@ export function JobTrackingMap({
   caption,
   visitAddress,
 }: Props) {
+  const { t } = useTranslation();
+  const resolvedHomeLabel = homeLabel ?? t('bookings.customerHome');
   const mapRef = useRef<MapView>(null);
   const [mapVisible, setMapVisible] = useState(showMapInitially);
   const [myLocation, setMyLocation] = useState<Coord | null>(null);
@@ -108,9 +111,9 @@ export function JobTrackingMap({
             showsUserLocation={showMyLocation}
             {...mapViewProps()}
           >
-            <Marker coordinate={home} title={homeLabel} pinColor={Stitch.colors.primary} />
+            <Marker coordinate={home} title={resolvedHomeLabel} pinColor={Stitch.colors.primary} />
             {servant ? (
-              <Marker coordinate={servant} title="Helper" pinColor={Stitch.colors.secondary} />
+              <Marker coordinate={servant} title={t('bookings.helperMarker')} pinColor={Stitch.colors.secondary} />
             ) : null}
           </MapView>
           {caption ? <Text style={styles.caption}>{caption}</Text> : null}
@@ -121,12 +124,12 @@ export function JobTrackingMap({
       {mapVisible ? (
         <TouchableOpacity style={styles.dirBtn} onPress={openExternalDirections}>
           <MaterialIcons name="navigation" size={20} color="#fff" />
-          <Text style={styles.dirText}>Open in Google Maps</Text>
+          <Text style={styles.dirText}>{t('bookings.openInGoogleMaps')}</Text>
         </TouchableOpacity>
       ) : (
         <TouchableOpacity style={styles.dirBtn} onPress={showMap}>
           <MaterialIcons name="directions" size={20} color="#fff" />
-          <Text style={styles.dirText}>Directions to home</Text>
+          <Text style={styles.dirText}>{t('bookings.directionsToHome')}</Text>
         </TouchableOpacity>
       )}
     </View>

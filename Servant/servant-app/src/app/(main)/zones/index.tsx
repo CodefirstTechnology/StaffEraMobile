@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
@@ -32,6 +33,7 @@ type Zone = {
 };
 
 export default function ZonesScreen() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Zone | null>(null);
@@ -101,7 +103,7 @@ export default function ZonesScreen() {
       resetForm();
     },
     onError: (e: { response?: { data?: { message?: string } } }) => {
-      Alert.alert('Error', e.response?.data?.message || 'Could not save zone');
+      Alert.alert(t('errors.generic'), e.response?.data?.message || t('zones.couldNotSaveZone'));
     },
   });
 
@@ -114,10 +116,10 @@ export default function ZonesScreen() {
   });
 
   const confirmDelete = (zone: Zone) => {
-    Alert.alert('Delete zone', `Remove "${zone.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('zones.deleteZoneTitle'), t('zones.removeZone', { name: zone.name }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => deleteMutation.mutate(zone.id),
       },
@@ -129,12 +131,10 @@ export default function ZonesScreen() {
       <TouchableOpacity onPress={() => router.back()} style={styles.back}>
         <MaterialIcons name="arrow-back" size={28} color={Stitch.colors.primary} />
       </TouchableOpacity>
-      <Text style={styles.title}>Servant Zone</Text>
-      <Text style={styles.sub}>
-        Add areas where you are available to work. House owners can find you by zone.
-      </Text>
+      <Text style={styles.title}>{t('zones.screenTitle')}</Text>
+      <Text style={styles.sub}>{t('zones.screenSub')}</Text>
 
-      <GradientButton title="Add zone" onPress={openCreate} style={{ marginBottom: 16 }} />
+      <GradientButton title={t('zones.addZone')} onPress={openCreate} style={{ marginBottom: 16 }} />
 
       <FlatList
         data={zones}
@@ -142,7 +142,7 @@ export default function ZonesScreen() {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            {isLoading ? 'Loading…' : 'No zones yet. Add your first service area.'}
+            {isLoading ? t('common.loading') : t('zones.noZonesList')}
           </Text>
         }
         renderItem={({ item }) => (
@@ -170,16 +170,16 @@ export default function ZonesScreen() {
       <Modal visible={modalOpen} transparent animationType="slide">
         <Pressable style={styles.overlay} onPress={() => setModalOpen(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.sheetTitle}>{editing ? 'Edit zone' : 'New zone'}</Text>
+            <Text style={styles.sheetTitle}>{editing ? t('zones.editZone') : t('zones.newZone')}</Text>
             <GhostInput
-              label="Zone name"
-              placeholder="e.g. Bandra West"
+              label={t('zones.zoneName')}
+              placeholder={t('zones.zoneNamePlaceholder')}
               value={name}
               onChangeText={setName}
             />
             <LocationPicker
-              label="Zone on map"
-              placeholder="Search area or landmark"
+              label={t('zones.zoneOnMap')}
+              placeholder={t('location.placeholder')}
               value={zoneLocation}
               onChange={(location) => {
                 setZoneLocation(location);
@@ -191,24 +191,24 @@ export default function ZonesScreen() {
               height={180}
             />
             <GhostInput
-              label="City"
-              placeholder="Mumbai"
+              label={t('zones.cityLabel')}
+              placeholder={t('zones.cityPlaceholder')}
               value={city}
               onChangeText={setCity}
             />
             <GhostInput
-              label="Description"
-              placeholder="Optional details"
+              label={t('zones.description')}
+              placeholder={t('zones.descriptionPlaceholder')}
               value={description}
               onChangeText={setDescription}
               multiline
               style={{ minHeight: 72 }}
             />
             <GradientButton
-              title={saveMutation.isPending ? 'Saving…' : 'Save'}
+              title={saveMutation.isPending ? t('common.saving') : t('common.save')}
               onPress={() => {
                 if (!name.trim() && !zoneLocation) {
-                  Alert.alert('Zone required', 'Add a zone name or pick a location on the map.');
+                  Alert.alert(t('zones.zoneRequired'), t('zones.zoneRequiredSub'));
                   return;
                 }
                 saveMutation.mutate();
@@ -216,7 +216,7 @@ export default function ZonesScreen() {
               style={{ marginTop: 20 }}
             />
             <GradientButton
-              title="Cancel"
+              title={t('common.cancel')}
               variant="outline"
               onPress={() => {
                 setModalOpen(false);

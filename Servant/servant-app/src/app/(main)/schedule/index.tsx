@@ -42,7 +42,8 @@ export default function ScheduleScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{b.houseOwner.user.name}</Text>
                   <Text style={styles.meta}>
-                    {b.bookingType} · {b.address || t('schedule.addressTbd')}
+                    {b.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly')} ·{' '}
+                    {b.address || t('schedule.addressTbd')}
                   </Text>
                   <StatusPill status={b.status} />
                 </View>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
@@ -13,23 +14,11 @@ import { formatVisitAddressLines } from '@/lib/visitAddress';
 import { LocationMapPreview } from '@/components/ui/LocationMapPreview';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
-
-function formatDate(iso?: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleDateString('en-IN', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function formatSkill(skill?: string | null) {
-  if (!skill) return null;
-  return skill.replace(/_/g, ' ');
-}
+import { localizedSkillLabel } from '@/lib/skills';
+import { formatDate, formatCurrency } from '@/lib/i18n/format';
 
 export default function ScheduleDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const bookingId = id ? parseInt(id, 10) : null;
   const qc = useQueryClient();
@@ -56,8 +45,7 @@ export default function ScheduleDetailScreen() {
   const openEntry = today?.entries?.find((e: { clockOut: string | null }) => !e.clockOut);
   const clockedInHere = openEntry?.bookingId === bookingId;
   const trackEnabled =
-    bookingId != null &&
-    (clockedInHere || (sharingLocation && booking?.status === 'CONFIRMED'));
+    bookingId != null && (clockedInHere || (sharingLocation && booking?.status === 'CONFIRMED'));
 
   useServantLocationReporter(bookingId, trackEnabled);
 
@@ -77,9 +65,9 @@ export default function ScheduleDetailScreen() {
         qc.invalidateQueries({ queryKey: ['open-requests'] }),
         qc.invalidateQueries({ queryKey: ['schedule'] }),
       ]);
-      Alert.alert('Accepted', 'The customer has been notified.');
+      Alert.alert(t('servantHome.acceptedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
-      Alert.alert('Could not accept', apiError(e, 'Try again'));
+      Alert.alert(t('servantHome.couldNotAccept'), apiError(e, t('auth.tryAgain')));
     } finally {
       setActing(false);
     }
@@ -89,16 +77,16 @@ export default function ScheduleDetailScreen() {
     if (acting) return;
     setActing(true);
     try {
-      await api.patch(`/bookings/${id}/reject`, { reason: 'Unavailable at this time' });
+      await api.patch(`/bookings/${id}/reject`, { reason: t('servantHome.rejectReason') });
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['booking', id] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
         qc.invalidateQueries({ queryKey: ['open-requests'] }),
         qc.invalidateQueries({ queryKey: ['schedule'] }),
       ]);
-      Alert.alert('Declined', 'The customer has been notified.');
+      Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
-      Alert.alert('Could not decline', apiError(e, 'Try again'));
+      Alert.alert(t('servantHome.couldNotDecline'), apiError(e, t('auth.tryAgain')));
     } finally {
       setActing(false);
     }
@@ -113,16 +101,16 @@ export default function ScheduleDetailScreen() {
         qc.invalidateQueries({ queryKey: ['booking', id] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
       ]);
-      Alert.alert('Work started', 'You are on duty at the customer location.');
+      Alert.alert(t('servantHome.workStarted'), t('servantHome.onDutyAtCustomer'));
     } catch (e: unknown) {
-      Alert.alert('Could not start', apiError(e, 'Check booking is confirmed'));
+      Alert.alert(t('servantHome.couldNotStart'), apiError(e, t('servantHome.checkConfirmed')));
     }
   };
 
   if (isLoading || !booking) {
     return (
       <View style={styles.center}>
-        <Text style={styles.muted}>Loading…</Text>
+        <Text style={styles.muted}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -132,8 +120,12 @@ export default function ScheduleDetailScreen() {
       ? { latitude: booking.latitude, longitude: booking.longitude }
       : null;
 
-  const sessionDate = formatDate(booking.sessionDate);
-  const skill = formatSkill(booking.requestedSkill);
+  const sessionDate = booking.sessionDate ? formatDate(booking.sessionDate) : null;
+  const skill = booking.requestedSkill
+    ? localizedSkillLabel(booking.requestedSkill, [])
+    : null;
+  const visitType =
+    booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
@@ -141,27 +133,37 @@ export default function ScheduleDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <MaterialIcons name="arrow-back" size={24} color={Stitch.colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Job details</Text>
+        <Text style={styles.headerTitle}>{t('schedule.jobDetails')}</Text>
         <View style={styles.backBtn} />
       </View>
 
       <GlassCard>
         <Text style={styles.title}>{booking.houseOwner.user.name}</Text>
         <StatusPill status={booking.status} />
-        <Text style={styles.meta}>{booking.bookingType}</Text>
-        {skill ? <Text style={styles.detailRow}>Skill: {skill}</Text> : null}
-        {sessionDate ? <Text style={styles.detailRow}>Date: {sessionDate}</Text> : null}
+        <Text style={styles.meta}>{visitType}</Text>
+        {skill ? <Text style={styles.detailRow}>{t('servantHome.skillLabel', { skill })}</Text> : null}
+        {sessionDate ? (
+          <Text style={styles.detailRow}>{t('servantHome.dateLabel', { date: sessionDate })}</Text>
+        ) : null}
         {booking.sessionStartTime ? (
           <Text style={styles.detailRow}>
-            Time: {booking.sessionStartTime}
-            {booking.sessionEndTime ? ` – ${booking.sessionEndTime}` : ''}
+            {t('servantHome.timeLabel', {
+              start: booking.sessionStartTime,
+              end: booking.sessionEndTime
+                ? t('servantHome.timeEnd', { end: booking.sessionEndTime })
+                : '',
+            })}
           </Text>
         ) : null}
         {booking.hoursPerDay ? (
-          <Text style={styles.detailRow}>{booking.hoursPerDay} hrs/day</Text>
+          <Text style={styles.detailRow}>
+            {t('servantHome.hoursPerDay', { hours: booking.hoursPerDay })}
+          </Text>
         ) : null}
         {booking.workingDays ? (
-          <Text style={styles.detailRow}>Days: {booking.workingDays}</Text>
+          <Text style={styles.detailRow}>
+            {t('servantHome.workingDays', { days: booking.workingDays })}
+          </Text>
         ) : null}
         {formatVisitAddressLines(booking).length > 0 ? (
           <VisitAddressBanner parts={booking} />
@@ -171,10 +173,12 @@ export default function ScheduleDetailScreen() {
         {booking.totalAmount != null && (
           <Text style={styles.amount}>
             {Stitch.copy.rupee}
-            {booking.totalAmount.toLocaleString('en-IN')}
+            {formatCurrency(booking.totalAmount)}
           </Text>
         )}
-        {booking.notes ? <Text style={styles.notes}>Notes: {booking.notes}</Text> : null}
+        {booking.notes ? (
+          <Text style={styles.notes}>{t('servantHome.notesLabel', { notes: booking.notes })}</Text>
+        ) : null}
       </GlassCard>
 
       {home && ['CONFIRMED', 'ACTIVE'].includes(booking.status) ? (
@@ -193,8 +197,8 @@ export default function ScheduleDetailScreen() {
             }}
             caption={
               trackEnabled
-                ? 'Sharing live location with customer'
-                : 'Tap directions to navigate to the home'
+                ? t('servantHome.sharingLocation')
+                : t('servantHome.tapDirectionsNavigate')
             }
           />
           {booking.status === 'CONFIRMED' && !clockedInHere && (
@@ -205,21 +209,19 @@ export default function ScheduleDetailScreen() {
               >
                 <Text style={styles.onWayText}>
                   {sharingLocation
-                    ? 'Stop sharing location'
-                    : "I'm on my way — share location"}
+                    ? t('servantHome.stopSharingLocation')
+                    : t('servantHome.onMyWayShare')}
                 </Text>
               </TouchableOpacity>
               <GradientButton
-                title="I arrived — start work"
+                title={t('servantHome.arrivedStartWork')}
                 onPress={clockIn}
                 style={{ marginTop: 12 }}
               />
             </>
           )}
           {clockedInHere && (
-            <Text style={styles.onDuty}>
-              You are clocked in — location is shared with the customer
-            </Text>
+            <Text style={styles.onDuty}>{t('servantHome.clockedInSharing')}</Text>
           )}
         </>
       ) : home ? (
@@ -238,14 +240,16 @@ export default function ScheduleDetailScreen() {
             onPress={confirm}
             disabled={acting}
           >
-            <Text style={styles.btnText}>{acting ? 'Please wait…' : 'Accept'}</Text>
+            <Text style={styles.btnText}>
+              {acting ? t('servantHome.pleaseWait') : t('schedule.accept')}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.reject, acting && styles.btnDisabled]}
             onPress={reject}
             disabled={acting}
           >
-            <Text style={styles.rejectText}>Decline</Text>
+            <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -255,66 +259,50 @@ export default function ScheduleDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Stitch.colors.background },
-  scroll: { padding: 20, paddingTop: 52, paddingBottom: 40 },
+  scroll: { paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   muted: { color: Stitch.colors.onSurfaceVariant },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    paddingTop: 52,
+    paddingHorizontal: Stitch.spacing.padding,
+    paddingBottom: 16,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  backBtn: { width: 40 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: Stitch.colors.primary },
-  title: { fontSize: 22, fontWeight: '700', color: Stitch.colors.primary, marginBottom: 8 },
-  meta: { color: Stitch.colors.onSurfaceVariant, marginTop: 8, fontWeight: '600' },
-  detailRow: { marginTop: 8, color: Stitch.colors.onBackground },
-  address: { marginTop: 12, color: Stitch.colors.onBackground, lineHeight: 20 },
-  amount: {
-    marginTop: 12,
-    fontSize: 20,
-    fontWeight: '700',
-    color: Stitch.colors.secondary,
-  },
+  title: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
+  meta: { marginTop: 8, color: Stitch.colors.onSurfaceVariant },
+  detailRow: { marginTop: 6, color: Stitch.colors.onBackground },
+  address: { marginTop: 10, color: Stitch.colors.onBackground, lineHeight: 20 },
+  amount: { marginTop: 12, fontSize: 20, fontWeight: '700', color: Stitch.colors.secondary },
+  notes: { marginTop: 10, fontStyle: 'italic', color: Stitch.colors.onSurfaceVariant },
   onWayBtn: {
     marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    padding: 14,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Stitch.colors.secondary,
+    backgroundColor: Stitch.colors.primaryFixed,
     alignItems: 'center',
   },
-  onWayText: { color: Stitch.colors.secondary, fontWeight: '700', fontSize: 14 },
-  onDuty: {
-    marginTop: 12,
-    fontSize: 13,
-    color: Stitch.colors.primary,
-    fontWeight: '600',
-  },
-  notes: { marginTop: 12, color: Stitch.colors.onSurfaceVariant, lineHeight: 20 },
-  actions: { flexDirection: 'row', gap: 12, marginTop: 24 },
+  onWayText: { fontWeight: '700', color: Stitch.colors.primary },
+  onDuty: { marginTop: 12, textAlign: 'center', color: Stitch.colors.success, fontWeight: '600' },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 20, paddingHorizontal: Stitch.spacing.padding },
   accept: {
     flex: 1,
-    backgroundColor: Stitch.colors.primary,
-    borderRadius: 12,
+    backgroundColor: Stitch.colors.success,
     padding: 14,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  btnText: { color: '#fff', fontWeight: '600' },
   reject: {
     flex: 1,
-    borderWidth: 2,
-    borderColor: Stitch.colors.error,
-    borderRadius: 12,
+    backgroundColor: Stitch.colors.surfaceContainer,
     padding: 14,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  rejectText: { color: Stitch.colors.error, fontWeight: '600' },
-  btnDisabled: { opacity: 0.55 },
+  btnDisabled: { opacity: 0.6 },
+  btnText: { color: '#fff', fontWeight: '700' },
+  rejectText: { color: Stitch.colors.error, fontWeight: '700' },
 });

@@ -18,6 +18,8 @@ import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatSessionSlotsLabel } from '@/lib/timeSlots';
 import { computeTodayEarnings, computeMonthlyEarnings } from '@/lib/earnings';
+import { localizedSkillLabel } from '@/lib/skills';
+import { formatDate, formatCurrency } from '@/lib/i18n/format';
 
 type Booking = {
   id: number;
@@ -225,7 +227,7 @@ export default function ServantHomeScreen() {
     if (actingId != null) return;
     setActingId(id);
     try {
-      await api.patch(`/bookings/${id}/reject`, { reason: 'Unavailable at this time' });
+      await api.patch(`/bookings/${id}/reject`, { reason: t('servantHome.rejectReason') });
       await refreshBookings();
       Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
@@ -265,13 +267,15 @@ export default function ServantHomeScreen() {
             <Text style={styles.proAvatarText}>{user?.name?.[0]}</Text>
           </View>
           <View>
-            <Text style={styles.proBrand}>StaffEra Pro</Text>
-            <Text style={styles.proName}>Namaste, {user?.name?.split(' ')[0]}</Text>
+            <Text style={styles.proBrand}>{t('common.appNamePro')}</Text>
+            <Text style={styles.proName}>
+              {t('servantHome.namaste', { name: user?.name?.split(' ')[0] || '' })}
+            </Text>
           </View>
         </View>
         <View style={styles.online}>
           <View style={styles.dot} />
-          <Text style={styles.onlineText}>ONLINE</Text>
+          <Text style={styles.onlineText}>{t('servantHome.online')}</Text>
           <Pressable
             onPress={() => router.push('/(main)/notifications')}
             style={styles.notifBtn}
@@ -292,7 +296,7 @@ export default function ServantHomeScreen() {
           <GlassCard style={styles.notifBanner}>
             <MaterialIcons name="notifications-active" size={20} color={Stitch.colors.secondary} />
             <Text style={styles.notifText}>
-              {unread} new notification{unread > 1 ? 's' : ''} — tap to view
+              {t('servantHome.newNotifications', { count: unread })}
             </Text>
             <MaterialIcons name="chevron-right" size={20} color={Stitch.colors.onSurfaceVariant} />
           </GlassCard>
@@ -301,22 +305,22 @@ export default function ServantHomeScreen() {
 
       <View style={styles.earnRow}>
         <View>
-          <Text style={styles.earnLabel}>TODAY&apos;S EARNINGS</Text>
+          <Text style={styles.earnLabel}>{t('servantHome.todayEarningsLabel')}</Text>
           <Text style={styles.earnValue}>
             {Stitch.copy.rupee}
-            {todayStats.amount.toLocaleString('en-IN')}
+            {formatCurrency(todayStats.amount)}
           </Text>
           <Text style={styles.earnSub}>
             {todayStats.completedCount > 0
-              ? `${todayStats.completedCount} job${todayStats.completedCount === 1 ? '' : 's'} completed today`
+              ? t('servantHome.jobsCompletedToday', { count: todayStats.completedCount })
               : todayStats.hoursToday > 0
-                ? `${todayStats.hoursToday.toFixed(1)} hrs logged today`
-                : 'Earnings update when slots end or you clock out'}
+                ? t('servantHome.hoursLoggedToday', { hours: todayStats.hoursToday.toFixed(1) })
+                : t('servantHome.earningsUpdateHint')}
           </Text>
         </View>
         <View style={styles.jobsBadge}>
           <Text style={styles.jobsNum}>{todayJobs.length}</Text>
-          <Text style={styles.jobsLbl}>JOBS</Text>
+          <Text style={styles.jobsLbl}>{t('servantHome.jobsLabel')}</Text>
         </View>
       </View>
 
@@ -326,15 +330,17 @@ export default function ServantHomeScreen() {
             <MaterialIcons name="calendar-month" size={22} color={Stitch.colors.secondary} />
           </View>
           <View style={styles.monthBody}>
-            <Text style={styles.monthLabel}>THIS MONTH · {monthLabel.toUpperCase()}</Text>
+            <Text style={styles.monthLabel}>
+              {t('servantHome.monthCardLabel', { month: monthLabel.toUpperCase() })}
+            </Text>
             <Text style={styles.monthValue}>
               {Stitch.copy.rupee}
-              {monthlyAmount.toLocaleString('en-IN')}
+              {formatCurrency(monthlyAmount)}
             </Text>
             <Text style={styles.monthSub}>
               {monthlyCount > 0
-                ? `${monthlyCount} completed job${monthlyCount === 1 ? '' : 's'} this month`
-                : 'Completed visits count toward monthly total'}
+                ? t('servantHome.monthJobsSub', { count: monthlyCount })
+                : t('servantHome.monthEmptySub')}
             </Text>
           </View>
           <Pressable onPress={() => router.push('/(main)/earnings')} hitSlop={8}>
@@ -347,11 +353,11 @@ export default function ServantHomeScreen() {
         <>
           <Pressable onPress={() => activeBookingId && openJobDetail(activeBookingId)}>
             <LinearGradient colors={[Stitch.colors.error, '#c62828']} style={styles.clockCard}>
-              <Text style={styles.clockLabel}>Work in progress</Text>
+              <Text style={styles.clockLabel}>{t('servantHome.workInProgress')}</Text>
               <Text style={styles.clockTime}>{formatElapsed(elapsed)}</Text>
-              <Text style={styles.viewDetail}>Tap for job details</Text>
+              <Text style={styles.viewDetail}>{t('servantHome.tapJobDetails')}</Text>
               <TouchableOpacity style={styles.clockBtn} onPress={clockOut}>
-                <Text style={styles.clockBtnText}>End work & clock out</Text>
+                <Text style={styles.clockBtnText}>{t('servantHome.endWorkClockOut')}</Text>
               </TouchableOpacity>
             </LinearGradient>
           </Pressable>
@@ -365,7 +371,7 @@ export default function ServantHomeScreen() {
               <View style={styles.liveMap}>
                 <JobTrackingMap
                   home={home}
-                  homeLabel={activeJob?.houseOwner.user.name || 'Customer'}
+                  homeLabel={activeJob?.houseOwner.user.name || t('schedule.customer')}
                   showMyLocation
                   showMapInitially
                   height={220}
@@ -379,7 +385,7 @@ export default function ServantHomeScreen() {
                         }
                       : null
                   }
-                  caption="Sharing live location with customer"
+                  caption={t('servantHome.sharingLocation')}
                 />
               </View>
             );
@@ -389,28 +395,24 @@ export default function ServantHomeScreen() {
 
       {openRequests && openRequests.length > 0 && (
         <>
-          <Text style={styles.section}>Open requests in your service area</Text>
-          <Text style={styles.sectionSub}>
-            Only customers near your zones appear here — helpers outside your area cannot see these.
-          </Text>
+          <Text style={styles.section}>{t('servantHome.openRequestsTitle')}</Text>
+          <Text style={styles.sectionSub}>{t('servantHome.openRequestsSub')}</Text>
           {openRequests.map((b) => {
             const slotLabel = formatSessionSlotsLabel(
               b.sessionSlots,
               b.sessionStartTime,
               b.sessionEndTime,
             );
-            const visitDate = b.sessionDate
-              ? new Date(b.sessionDate).toLocaleDateString('en-IN')
-              : null;
+            const visitDate = b.sessionDate ? formatDate(b.sessionDate) : null;
             return (
             <GlassCard key={`open-${b.id}`} style={styles.mb}>
               <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
                   <Text style={styles.cardMeta}>
-                    {b.requestedSkill ? b.requestedSkill.replace(/_/g, ' ') : 'General help'}
+                    {localizedSkillLabel(b.requestedSkill || '', []) || t('servantHome.generalHelp')}
                     {' · '}
-                    {b.bookingType === 'SESSION' ? 'One visit' : 'Monthly'}
+                    {b.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly')}
                   </Text>
                   {visitDate && slotLabel ? (
                     <Text style={styles.slotText}>
@@ -439,7 +441,7 @@ export default function ServantHomeScreen() {
                 disabled={actingId != null}
               >
                 <Text style={styles.acceptText}>
-                  {actingId === b.id ? 'Accepting…' : 'Accept job (first wins)'}
+                  {actingId === b.id ? t('servantHome.accepting') : t('servantHome.acceptJobFirstWins')}
                 </Text>
               </TouchableOpacity>
             </GlassCard>
@@ -450,7 +452,7 @@ export default function ServantHomeScreen() {
 
       {pending.length > 0 && (
         <>
-          <Text style={styles.section}>New requests — accept or decline</Text>
+          <Text style={styles.section}>{t('servantHome.newRequestsSection')}</Text>
           {pending.map((b) => (
             <GlassCard key={b.id} style={styles.mb}>
               <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
@@ -478,7 +480,7 @@ export default function ServantHomeScreen() {
                   disabled={actingId != null}
                 >
                   <Text style={styles.acceptText}>
-                    {actingId === b.id ? 'Please wait…' : 'Accept'}
+                    {actingId === b.id ? t('servantHome.pleaseWait') : t('schedule.accept')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -486,7 +488,7 @@ export default function ServantHomeScreen() {
                   onPress={() => reject(b.id)}
                   disabled={actingId != null}
                 >
-                  <Text style={styles.rejectText}>Decline</Text>
+                  <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
                 </TouchableOpacity>
               </View>
             </GlassCard>
@@ -494,10 +496,10 @@ export default function ServantHomeScreen() {
         </>
       )}
 
-      <Text style={styles.section}>Today&apos;s jobs</Text>
+      <Text style={styles.section}>{t('servantHome.todayJobsSection')}</Text>
       {todayJobs.length === 0 ? (
         <GlassCard>
-          <Text style={styles.empty}>No confirmed jobs — stay online for new requests</Text>
+          <Text style={styles.empty}>{t('servantHome.noConfirmedJobs')}</Text>
         </GlassCard>
       ) : (
         todayJobs.map((b) => {
@@ -510,7 +512,7 @@ export default function ServantHomeScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
                     <Text style={styles.cardMeta}>
-                      {formatVisitAddressLines(b).join(' · ') || b.address || 'Address on file'}
+                      {formatVisitAddressLines(b).join(' · ') || b.address || t('servantHome.addressOnFile')}
                     </Text>
                   </View>
                   <MaterialIcons
@@ -536,8 +538,8 @@ export default function ServantHomeScreen() {
                   }}
                   caption={
                     onWayBookingId === b.id
-                      ? 'Location shared with customer'
-                      : 'Tap directions to navigate'
+                      ? t('servantHome.locationShared')
+                      : t('servantHome.tapDirections')
                   }
                 />
               ) : (
@@ -558,8 +560,8 @@ export default function ServantHomeScreen() {
                   >
                     <Text style={styles.onWayText}>
                       {onWayBookingId === b.id
-                        ? 'Stop sharing location'
-                        : "I'm on my way — share location"}
+                        ? t('servantHome.stopSharingLocation')
+                        : t('servantHome.onMyWayShare')}
                     </Text>
                   </TouchableOpacity>
                   <GradientButton
@@ -570,7 +572,7 @@ export default function ServantHomeScreen() {
                 </>
               )}
               {isActive && activeEntry && (
-                <Text style={styles.onDuty}>You are clocked in at this home</Text>
+                <Text style={styles.onDuty}>{t('servantHome.clockedInAtHome')}</Text>
               )}
             </GlassCard>
           );

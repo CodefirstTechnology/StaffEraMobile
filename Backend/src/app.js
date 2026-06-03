@@ -39,10 +39,21 @@ app.use(compression());
 app.use(cookieParser());
 app.use(morgan("combined"));
 
+const isProduction = process.env.NODE_ENV === "production";
+const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+const rateLimitMax = Number(process.env.RATE_LIMIT_MAX) || (isProduction ? 800 : 3000);
+
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200
+    windowMs: rateLimitWindowMs,
+    max: rateLimitMax,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      message: "Too many requests. Please wait a moment and try again."
+    },
+    skip: (req) => req.method === "OPTIONS"
   })
 );
 
