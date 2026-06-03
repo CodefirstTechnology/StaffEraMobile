@@ -42,7 +42,7 @@ const issueTokens = async (user) => {
 };
 
 exports.registerOwner = async (req, res) => {
-  const { name, password, address, city, latitude, longitude } = req.body;
+  const { name, password, address, city, latitude, longitude, preferredLanguage } = req.body;
   const email = normalizeEmail(req.body.email);
   const phone = normalizePhone(req.body.phone);
 
@@ -60,6 +60,7 @@ exports.registerOwner = async (req, res) => {
       phone,
       password: hashed,
       role: "HOUSE_OWNER",
+      preferredLanguage: preferredLanguage || "en",
       houseOwner: {
         create: {
           address,
@@ -200,6 +201,22 @@ exports.updateLocation = async (req, res) => {
   });
 
   sendSuccess(res, { houseOwner: updated, user: sanitizeUser(user) });
+};
+
+exports.updatePreferences = async (req, res) => {
+  const { preferredLanguage } = req.body;
+
+  const user = await prisma.user.update({
+    where: { id: req.user.id },
+    data: { preferredLanguage },
+    include: {
+      houseOwner: true,
+      servant: { include: { skills: true, zones: true } },
+      agent: true
+    }
+  });
+
+  sendSuccess(res, { user: sanitizeUser(user) });
 };
 
 const resetTokens = new Map();

@@ -6,16 +6,30 @@ const prisma = new PrismaClient();
 async function main() {
   const password = await bcrypt.hash("StaffEra@123", 12);
 
-  const admin = await prisma.user.upsert({
+  const adminUser = await prisma.user.upsert({
     where: { email: "admin@staffera.com" },
     update: {},
     create: {
       name: "Admin User",
       email: "admin@staffera.com",
       password,
-      role: "ADMIN"
-    }
+      role: "ADMIN",
+      agent: {
+        create: { agencyName: "StaffEra Admin", city: "Mumbai" }
+      }
+    },
+    include: { agent: true }
   });
+
+  if (!adminUser.agent) {
+    await prisma.agent.create({
+      data: {
+        userId: adminUser.id,
+        agencyName: "StaffEra Admin",
+        city: "Mumbai"
+      }
+    });
+  }
 
   const agentUser = await prisma.user.upsert({
     where: { email: "agent@staffera.com" },

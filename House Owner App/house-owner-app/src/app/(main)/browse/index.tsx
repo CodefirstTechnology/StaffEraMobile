@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
@@ -17,11 +18,13 @@ import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { useSkills } from '@/hooks/useSkills';
+import { localizedSkillLabel } from '@/lib/skills';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useAuthStore } from '@/store/authStore';
 import type { LocationValue } from '@/lib/locationTypes';
 
 export default function BrowseScreen() {
+  const { t } = useTranslation();
   const { skill: skillParam } = useLocalSearchParams<{ skill?: string }>();
   const user = useAuthStore((s) => s.user);
   const { data: skills = [] } = useSkills();
@@ -48,7 +51,7 @@ export default function BrowseScreen() {
       !Number.isNaN(ho.longitude)
     ) {
       return {
-        address: ho.address || ho.city || 'Your saved home',
+        address: ho.address || ho.city || t('common.savedHome'),
         city: ho.city,
         latitude: ho.latitude,
         longitude: ho.longitude,
@@ -82,19 +85,19 @@ export default function BrowseScreen() {
   });
 
   const nearbyCount = data?.length ?? 0;
-  const skillLabel = skill ? skills.find((s) => s.code === skill)?.label : null;
+  const skillLabel = skill ? localizedSkillLabel(skill, skills) : null;
 
   const broadcastMessage = (() => {
     if (!searchLocation) {
-      return 'Enable location or set your home address to broadcast a request';
+      return t('browse.enableLocationBroadcast');
     }
     if (nearbyCount > 0) {
-      return `Send to ${nearbyCount} verified helper${nearbyCount === 1 ? '' : 's'} in your area — only they will see this on their dashboard. First to accept gets the job.`;
+      return t('browse.broadcastToArea', { count: nearbyCount });
     }
     if (skillLabel) {
-      return `No ${skillLabel.toLowerCase()} helpers nearby yet — your request will wait until one is available in your area.`;
+      return t('browse.noSkillInArea', { skill: skillLabel });
     }
-    return 'No verified helpers in your area yet — your request will wait until one is available nearby.';
+    return t('browse.noHelpersInArea');
   })();
 
   return (
@@ -107,14 +110,14 @@ export default function BrowseScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.title} numberOfLines={2}>
-          {skillLabel ? `${skillLabel} helpers` : 'Find verified help'}
+          {skillLabel ? t('browse.skillHelpers', { skill: skillLabel }) : t('browse.findHelp')}
         </Text>
         <Text style={styles.sub}>
           {skillLabel
             ? nearbyCount > 0
-              ? `${nearbyCount} verified ${skillLabel.toLowerCase()} helper${nearbyCount === 1 ? '' : 's'} near you`
-              : `No ${skillLabel.toLowerCase()} helpers nearby yet — try a request`
-            : 'Helpers near your live location'}
+              ? t('browse.skillNearYou', { count: nearbyCount, skill: skillLabel.toLowerCase() })
+              : t('browse.noSkillNearby', { skill: skillLabel.toLowerCase() })
+            : t('browse.helpersNearLive')}
         </Text>
         {skillLabel ? (
           <View style={styles.activeFilterRow}>
@@ -148,7 +151,7 @@ export default function BrowseScreen() {
         >
           <MaterialIcons name="location-off" size={18} color={Stitch.colors.error} />
           <Text style={styles.locError}>
-            {locError || 'Tap to set your home location in Profile'}
+            {locError || t('browse.tapSetHomeProfile')}
           </Text>
           <MaterialIcons name="chevron-right" size={20} color={Stitch.colors.error} />
         </TouchableOpacity>
@@ -164,7 +167,7 @@ export default function BrowseScreen() {
         }
       >
         <Text style={styles.broadcastTitle}>
-          {skillLabel ? `Request ${skillLabel.toLowerCase()} help` : 'Request help in my area'}
+          {skillLabel ? t('browse.requestSkillHelp', { skill: skillLabel }) : t('bookings.requestHelpArea')}
         </Text>
         <Text style={styles.broadcastSub}>{broadcastMessage}</Text>
         {skillLabel && searchLocation ? (
@@ -177,7 +180,7 @@ export default function BrowseScreen() {
         <MaterialIcons name="location-city" size={20} color={Stitch.colors.onSurfaceVariant} />
         <TextInput
           style={styles.search}
-          placeholder="City — Mumbai, Pune, Delhi…"
+          placeholder={t('browse.cityPlaceholder')}
           placeholderTextColor={Stitch.colors.onSurfaceVariant + '99'}
           value={city}
           onChangeText={setCity}
@@ -187,14 +190,14 @@ export default function BrowseScreen() {
         <MaterialIcons name="place" size={20} color={Stitch.colors.onSurfaceVariant} />
         <TextInput
           style={styles.search}
-          placeholder="Zone — Bandra, Andheri, Koramangala…"
+          placeholder={t('browse.zonePlaceholder')}
           placeholderTextColor={Stitch.colors.onSurfaceVariant + '99'}
           value={zone}
           onChangeText={setZone}
         />
       </View>
       <View style={styles.chipsSection}>
-        <Text style={styles.chipsLabel}>Category</Text>
+        <Text style={styles.chipsLabel}>{t('browse.category')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -215,7 +218,7 @@ export default function BrowseScreen() {
                   numberOfLines={1}
                   {...(Platform.OS === 'android' ? { includeFontPadding: false } : {})}
                 >
-                  {s.label}
+                  {localizedSkillLabel(s.code, skills)}
                 </Text>
               </TouchableOpacity>
             );
@@ -234,23 +237,23 @@ export default function BrowseScreen() {
             </Text>
             <Text style={styles.countLabel}>
               {skillLabel
-                ? `${skillLabel} helper${nearbyCount === 1 ? '' : 's'} available`
-                : `Verified helper${nearbyCount === 1 ? '' : 's'} available`}
+                ? t('browse.helpersAvailableSkill', { skill: skillLabel })
+                : t('browse.helpersAvailable')}
             </Text>
           </View>
         </View>
         <Text style={styles.countHint}>
           {nearbyCount > 0
-            ? 'Helper profiles are private. Send a request — only nearby helpers see it, and the first to accept is assigned to you.'
+            ? t('browse.countHintActive')
             : skillLabel
-              ? `No ${skillLabel.toLowerCase()} helpers in your area right now. You can still send a request — it will notify helpers when they come online.`
-              : 'No verified helpers in your area right now. Send a request and it will stay open until one accepts.'}
+              ? t('browse.countHintNoSkill', { skill: skillLabel })
+              : t('browse.countHintNoHelpers')}
         </Text>
         <GradientButton
           title={
             skillLabel
-              ? `Request ${skillLabel.toLowerCase()} help`
-              : 'Send area request'
+              ? t('browse.requestSkillHelp', { skill: skillLabel })
+              : t('browse.sendAreaRequestBtn')
           }
           onPress={() =>
             router.push({

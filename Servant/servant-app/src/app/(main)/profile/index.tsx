@@ -3,23 +3,21 @@ import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
 import { Stitch, StatusColors } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { LanguageSelector } from '@/components/ui/LanguageSelector';
+import { translateVerification } from '@/lib/i18n';
+import { formatCurrency } from '@/lib/i18n/format';
 
 type Zone = { id: number; name: string; city?: string | null };
 type Skill = { skillName: string };
 
-const verificationLabel: Record<string, string> = {
-  VERIFIED: 'Verified helper',
-  PENDING: 'Verification pending',
-  UNDER_REVIEW: 'Under review',
-  REJECTED: 'Verification rejected',
-};
-
 export default function ProfileScreen() {
+  const { t } = useTranslation();
   const { user, logout } = useAuthStore();
 
   const { data: profile } = useQuery({
@@ -45,7 +43,7 @@ export default function ProfileScreen() {
   const skills = profile?.skills || [];
   const verification = profile?.verificationStatus || user?.servant?.verificationStatus || 'PENDING';
   const verifyStyle = StatusColors[verification] || StatusColors.PENDING;
-  const displayName = profile?.user?.name || user?.name || 'Helper';
+  const displayName = profile?.user?.name || user?.name || t('verification.verifiedHelper');
   const email = profile?.user?.email || user?.email;
   const phone = profile?.user?.phone;
   const initial = displayName.trim()[0]?.toUpperCase() || '?';
@@ -57,7 +55,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Text style={styles.screenTitle}>Profile</Text>
+      <Text style={styles.screenTitle}>{t('profile.title')}</Text>
 
       <LinearGradient
         colors={[Stitch.colors.primary, Stitch.colors.secondary]}
@@ -79,11 +77,11 @@ export default function ProfileScreen() {
         <Text style={styles.heroName} numberOfLines={2}>
           {displayName}
         </Text>
-        <Text style={styles.heroBrand}>StaffEra Pro</Text>
+        <Text style={styles.heroBrand}>{t('common.appNamePro')}</Text>
 
         <View style={[styles.verifyPill, { backgroundColor: verifyStyle.bg }]}>
           <Text style={[styles.verifyText, { color: verifyStyle.text }]}>
-            {verificationLabel[verification] || verification}
+            {translateVerification(verification)}
           </Text>
         </View>
 
@@ -112,24 +110,24 @@ export default function ProfileScreen() {
               <View style={styles.stat}>
                 <MaterialIcons name="star" size={20} color={Stitch.colors.secondary} />
                 <Text style={styles.statValue}>{profile.rating.toFixed(1)}</Text>
-                <Text style={styles.statLabel}>Rating</Text>
+                <Text style={styles.statLabel}>{t('servantProfile.rating')}</Text>
               </View>
             ) : null}
             {profile?.hourlyRate != null ? (
               <View style={styles.stat}>
                 <MaterialIcons name="schedule" size={20} color={Stitch.colors.secondary} />
                 <Text style={styles.statValue}>
-                  {Stitch.copy.rupee}
-                  {profile.hourlyRate}
+                  {t('common.rupee')}
+                  {formatCurrency(profile.hourlyRate)}
                 </Text>
-                <Text style={styles.statLabel}>Per hour</Text>
+                <Text style={styles.statLabel}>{t('servantProfile.perHour')}</Text>
               </View>
             ) : null}
             {profile?.experience != null ? (
               <View style={styles.stat}>
                 <MaterialIcons name="work-outline" size={20} color={Stitch.colors.secondary} />
                 <Text style={styles.statValue}>{profile.experience}y</Text>
-                <Text style={styles.statLabel}>Experience</Text>
+                <Text style={styles.statLabel}>{t('servantProfile.experience')}</Text>
               </View>
             ) : null}
           </View>
@@ -142,7 +140,7 @@ export default function ProfileScreen() {
             <View style={styles.sectionIcon}>
               <MaterialIcons name="handyman" size={20} color={Stitch.colors.secondary} />
             </View>
-            <Text style={styles.sectionTitle}>Your skills</Text>
+            <Text style={styles.sectionTitle}>{t('servantProfile.yourSkills')}</Text>
           </View>
           <View style={styles.skillChips}>
             {skills.map((s) => (
@@ -160,11 +158,15 @@ export default function ProfileScreen() {
             <View style={styles.sectionIcon}>
               <MaterialIcons name="info-outline" size={20} color={Stitch.colors.secondary} />
             </View>
-            <Text style={styles.sectionTitle}>About you</Text>
+            <Text style={styles.sectionTitle}>{t('servantProfile.aboutYou')}</Text>
           </View>
           <Text style={styles.bio}>{profile.bio}</Text>
         </GlassCard>
       ) : null}
+
+      <GlassCard style={styles.languageCard}>
+        <LanguageSelector showTitle />
+      </GlassCard>
 
       <GlassCard style={styles.sectionCard}>
         <View style={styles.sectionHead}>
@@ -172,17 +174,13 @@ export default function ProfileScreen() {
             <MaterialIcons name="map" size={20} color={Stitch.colors.secondary} />
           </View>
           <View style={styles.sectionHeadText}>
-            <Text style={styles.sectionTitle}>Service zones</Text>
-            <Text style={styles.sectionSub}>
-              Customers near these areas see your open requests
-            </Text>
+            <Text style={styles.sectionTitle}>{t('zones.title')}</Text>
+            <Text style={styles.sectionSub}>{t('servantProfile.serviceZonesSub')}</Text>
           </View>
         </View>
 
         {zones.length === 0 ? (
-          <Text style={styles.zoneEmpty}>
-            No zones yet — add where you work so nearby jobs reach you.
-          </Text>
+          <Text style={styles.zoneEmpty}>{t('zones.empty')}</Text>
         ) : (
           <View style={styles.zoneChips}>
             {zones.map((z) => (
@@ -204,14 +202,14 @@ export default function ProfileScreen() {
         >
           <MaterialIcons name="add-location-alt" size={22} color={Stitch.colors.primary} />
           <View style={styles.zoneBtnTextWrap}>
-            <Text style={styles.zoneBtnTitle}>Manage service zones</Text>
-            <Text style={styles.zoneBtnSub}>Add or edit areas on the map</Text>
+            <Text style={styles.zoneBtnTitle}>{t('zones.manage')}</Text>
+            <Text style={styles.zoneBtnSub}>{t('zones.manageSub')}</Text>
           </View>
           <MaterialIcons name="chevron-right" size={22} color={Stitch.colors.onSurfaceVariant} />
         </TouchableOpacity>
       </GlassCard>
 
-      <GradientButton title="Sign out" variant="outline" onPress={signOut} style={styles.signOutBtn} />
+      <GradientButton title={t('auth.signOut')} variant="outline" onPress={signOut} style={styles.signOutBtn} />
     </ScrollView>
   );
 }
@@ -290,6 +288,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   metaText: { color: 'rgba(255,255,255,0.9)', fontSize: 14, flexShrink: 1 },
+  languageCard: { marginBottom: 12 },
   statsCard: { marginBottom: 12 },
   statsRow: { flexDirection: 'row', justifyContent: 'space-around' },
   stat: { alignItems: 'center', gap: 4, flex: 1 },

@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -9,6 +10,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 
 export default function ScheduleScreen() {
+  const { t } = useTranslation();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { data } = useQuery({
     queryKey: ['schedule'],
@@ -27,10 +29,10 @@ export default function ScheduleScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Text style={styles.title}>Schedule</Text>
+      <Text style={styles.title}>{t('schedule.title')}</Text>
       {(data || []).length === 0 ? (
         <GlassCard>
-          <Text style={styles.empty}>No upcoming jobs on your calendar</Text>
+          <Text style={styles.empty}>{t('schedule.emptyCalendar')}</Text>
         </GlassCard>
       ) : (
         (data || []).map((b) => (
@@ -39,7 +41,9 @@ export default function ScheduleScreen() {
               <View style={styles.cardRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name}>{b.houseOwner.user.name}</Text>
-                  <Text style={styles.meta}>{b.bookingType} · {b.address || 'Address TBD'}</Text>
+                  <Text style={styles.meta}>
+                    {b.bookingType} · {b.address || t('schedule.addressTbd')}
+                  </Text>
                   <StatusPill status={b.status} />
                 </View>
                 <MaterialIcons

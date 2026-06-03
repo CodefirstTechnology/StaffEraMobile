@@ -11,11 +11,13 @@ import {
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { LocationPicker } from '@/components/ui/LocationPicker';
+import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import {
   AddressUnitFields,
   type AddressUnitValue,
@@ -24,6 +26,7 @@ import { updateHomeLocation } from '@/lib/geo';
 import { mapsDeepLink, type LocationValue } from '@/lib/locationTypes';
 
 export default function ProfileScreen() {
+  const { t } = useTranslation();
   const { user, logout, setUser } = useAuthStore();
   const [location, setLocation] = useState<LocationValue | null>(null);
   const [addressUnit, setAddressUnit] = useState<AddressUnitValue>({
@@ -57,7 +60,7 @@ export default function ProfileScreen() {
 
   const saveLocation = async () => {
     if (!location) {
-      Alert.alert('Location required', 'Pick your home location first.');
+      Alert.alert(t('validation.locationRequired'), t('validation.pickHomeFirst'));
       return;
     }
     setSaving(true);
@@ -72,10 +75,10 @@ export default function ProfileScreen() {
         longitude: location.longitude,
       });
       setUser(updatedUser as typeof user);
-      Alert.alert('Saved', 'Your home location was updated.');
+      Alert.alert(t('success.saved'), t('success.homeLocationUpdated'));
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Error', err.response?.data?.message || 'Could not save location');
+      Alert.alert(t('errors.generic'), err.response?.data?.message || t('errors.couldNotSave'));
     } finally {
       setSaving(false);
     }
@@ -98,7 +101,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Text style={styles.screenTitle}>Profile</Text>
+      <Text style={styles.screenTitle}>{t('profile.title')}</Text>
 
       <LinearGradient
         colors={[Stitch.colors.primary, Stitch.colors.secondary]}
@@ -115,10 +118,10 @@ export default function ProfileScreen() {
           </View>
         </View>
         <Text style={styles.heroName} numberOfLines={2}>
-          {user?.name || 'House owner'}
+          {user?.name || t('profile.houseOwner')}
         </Text>
         <View style={styles.rolePill}>
-          <Text style={styles.roleText}>House owner</Text>
+          <Text style={styles.roleText}>{t('profile.houseOwner')}</Text>
         </View>
         <View style={styles.metaRow}>
           <MaterialIcons name="mail-outline" size={16} color="rgba(255,255,255,0.85)" />
@@ -134,22 +137,24 @@ export default function ProfileScreen() {
         ) : null}
       </LinearGradient>
 
+      <GlassCard style={styles.languageCard}>
+        <LanguageSelector showTitle />
+      </GlassCard>
+
       <GlassCard style={styles.locationCard}>
         <View style={styles.sectionHead}>
           <View style={styles.sectionIcon}>
             <MaterialIcons name="home" size={22} color={Stitch.colors.secondary} />
           </View>
           <View style={styles.sectionHeadText}>
-            <Text style={styles.sectionTitle}>Home location</Text>
-            <Text style={styles.sectionSub}>
-              Search, tap the map, or use GPS — helpers see jobs near this address
-            </Text>
+            <Text style={styles.sectionTitle}>{t('profile.homeLocation')}</Text>
+            <Text style={styles.sectionSub}>{t('profile.homeLocationSub')}</Text>
           </View>
         </View>
 
         <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
         <LocationPicker
-          placeholder="Search your society, street, or area"
+          placeholder={t('auth.searchPlaceholder')}
           value={location}
           onChange={setLocation}
           height={200}
@@ -158,21 +163,21 @@ export default function ProfileScreen() {
         {location ? (
           <TouchableOpacity style={styles.mapsLink} onPress={openMaps} activeOpacity={0.85}>
             <MaterialIcons name="map" size={18} color={Stitch.colors.primary} />
-            <Text style={styles.mapsLinkText}>Open in Google Maps</Text>
+            <Text style={styles.mapsLinkText}>{t('common.openMaps')}</Text>
             <MaterialIcons name="open-in-new" size={16} color={Stitch.colors.onSurfaceVariant} />
           </TouchableOpacity>
         ) : null}
       </GlassCard>
 
       <GradientButton
-        title={saving ? 'Saving…' : 'Save home location'}
+        title={saving ? t('common.saving') : t('profile.saveHomeLocation')}
         onPress={saveLocation}
         loading={saving}
         style={styles.saveBtn}
       />
 
       <GradientButton
-        title="Sign out"
+        title={t('auth.signOut')}
         variant="outline"
         onPress={signOut}
         style={styles.signOutBtn}
@@ -261,6 +266,7 @@ const styles = StyleSheet.create({
     borderRadius: Stitch.radius.pill,
   },
   cityPillText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  languageCard: { marginBottom: 16 },
   locationCard: { marginBottom: 16 },
   sectionHead: {
     flexDirection: 'row',

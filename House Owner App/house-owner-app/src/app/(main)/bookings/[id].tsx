@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
@@ -12,8 +13,13 @@ import { useBookingTrackingPoll } from '@/hooks/useBookingTrackingPoll';
 import { formatSessionSlotsLabel } from '@/lib/timeSlots';
 import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
 import { formatVisitAddressLines } from '@/lib/visitAddress';
+import { localizedSkillLabel } from '@/lib/skills';
+import { useSkills } from '@/hooks/useSkills';
+import { formatDate, formatCurrency } from '@/lib/i18n/format';
 
 export default function BookingDetailScreen() {
+  const { t } = useTranslation();
+  const { data: skills = [] } = useSkills();
   const { id } = useLocalSearchParams<{ id: string }>();
   const bookingId = id ? parseInt(id, 10) : null;
   const qc = useQueryClient();
@@ -75,37 +81,37 @@ export default function BookingDetailScreen() {
       await api.patch(`/bookings/${id}/cancel`);
       qc.invalidateQueries({ queryKey: ['bookings'] });
       qc.invalidateQueries({ queryKey: ['booking', id] });
-      Alert.alert('Cancelled', 'Booking was cancelled');
+      Alert.alert(t('bookings.cancelledTitle'), t('bookings.bookingCancelled'));
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Error', err.response?.data?.message || 'Could not cancel');
+      Alert.alert(t('bookings.requestFailed'), err.response?.data?.message || t('bookings.couldNotCancel'));
     }
   };
 
   if (isLoading || !booking) {
     return (
       <View style={styles.center}>
-        <Text style={styles.muted}>Loading…</Text>
+        <Text style={styles.muted}>{t('common.loading')}</Text>
       </View>
     );
   }
 
   const statusHint: Record<string, string> = {
     PENDING: booking.servant
-      ? 'Waiting for helper to accept'
+      ? t('bookings.hintPendingServant')
       : areaHelpers.length > 0
-        ? `Sent to ${areaHelpers.length} verified helper${areaHelpers.length === 1 ? '' : 's'} in your area — only they can see this on their dashboard. First to accept gets the job.`
-        : 'Waiting for a verified helper in your area — only nearby helpers will see this on their dashboard',
+        ? t('bookings.hintPendingBroadcast', { count: areaHelpers.length })
+        : t('bookings.hintPendingOpen'),
     CONFIRMED: helperSharing
-      ? `${booking.servant?.user?.name || 'Helper'} is on the way — live map updates every few seconds below`
-      : 'Helper accepted — live map appears when they tap "I\'m on my way — share location" in their app',
-    ACTIVE: helperSharing
-      ? 'Work in progress — helper location updates on the map below'
-      : 'Work in progress — waiting for helper to share location',
-    REJECTED: 'Helper declined this request',
-    CANCELLED: 'You cancelled this booking',
-    EXPIRED: 'Visit time passed — no helper accepted or work was not completed',
-    COMPLETED: 'Visit completed',
+      ? t('bookings.hintConfirmedSharing', {
+          name: booking.servant?.user?.name || t('common.helper'),
+        })
+      : t('bookings.hintConfirmedNoShare'),
+    ACTIVE: helperSharing ? t('bookings.hintActiveSharing') : t('bookings.hintActiveNoShare'),
+    REJECTED: t('bookings.hintRejected'),
+    CANCELLED: t('bookings.hintCancelled'),
+    EXPIRED: t('bookings.hintExpired'),
+    COMPLETED: t('bookings.hintCompleted'),
   };
 
   const slotLabel = formatSessionSlotsLabel(
@@ -113,48 +119,54 @@ export default function BookingDetailScreen() {
     booking.sessionStartTime,
     booking.sessionEndTime,
   );
-  const visitDate = booking.sessionDate
-    ? new Date(booking.sessionDate).toLocaleDateString('en-IN')
-    : null;
+  const visitDate = booking.sessionDate ? formatDate(booking.sessionDate) : null;
+  const visitType =
+    booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <Text style={styles.back} onPress={() => router.back()}>
-        ← Back
+        ← {t('common.back')}
       </Text>
       <GlassCard>
         <Text style={styles.name}>
-          {booking.servant?.user?.name || 'Finding nearby helper…'}
+          {booking.servant?.user?.name || t('bookings.findingHelper')}
         </Text>
         <StatusPill status={booking.status} />
         <Text style={styles.hint}>{statusHint[booking.status] || ''}</Text>
-        <Text style={styles.row}>
-          Type: {booking.bookingType === 'SESSION' ? 'One visit' : 'Monthly'}
-        </Text>
+        <Text style={styles.row}>{t('bookings.typeLabel', { type: visitType })}</Text>
         {booking.requestedSkill ? (
-          <Text style={styles.row}>Category: {booking.requestedSkill.replace(/_/g, ' ')}</Text>
+          <Text style={styles.row}>
+            {t('bookings.categoryRow', {
+              category: localizedSkillLabel(booking.requestedSkill, skills),
+            })}
+          </Text>
         ) : null}
         {visitDate && slotLabel ? (
           <Text style={styles.row}>
-            Time slot{slotLabel?.includes(',') ? 's' : ''}: {visitDate} · {slotLabel}
+            {t('bookings.timeSlotsRow', { date: visitDate, slots: slotLabel })}
           </Text>
         ) : slotLabel ? (
-          <Text style={styles.row}>Time slot: {slotLabel}</Text>
+          <Text style={styles.row}>{t('bookings.timeSlotRow', { slots: slotLabel })}</Text>
         ) : null}
         {formatVisitAddressLines(booking).length > 0 ? (
-          <VisitAddressBanner parts={booking} title="Visit address" />
+          <VisitAddressBanner parts={booking} />
         ) : booking.address ? (
-          <Text style={styles.row}>Address: {booking.address}</Text>
+          <Text style={styles.row}>
+            {t('bookings.addressRow', { address: booking.address })}
+          </Text>
         ) : null}
         {isOpenBroadcast && areaHelpers.length > 0 ? (
           <Text style={styles.helpers}>
-            Helpers notified in your area: {areaHelpers.map((h) => h.user.name).join(', ')}
+            {t('bookings.helpersNotified', {
+              names: areaHelpers.map((h) => h.user.name).join(', '),
+            })}
           </Text>
         ) : null}
         {booking.totalAmount != null && (
           <Text style={styles.amount}>
             {Stitch.copy.rupee}
-            {booking.totalAmount.toLocaleString('en-IN')}
+            {formatCurrency(booking.totalAmount)}
           </Text>
         )}
       </GlassCard>
@@ -163,8 +175,8 @@ export default function BookingDetailScreen() {
         <View style={styles.onWayBanner}>
           <MaterialIcons name="directions-car" size={22} color={Stitch.colors.success} />
           <View style={styles.onWayTextWrap}>
-            <Text style={styles.onWayTitle}>Helper is on the way</Text>
-            <Text style={styles.onWaySub}>Live GPS — purple pin is helper, blue pin is your home</Text>
+            <Text style={styles.onWayTitle}>{t('bookings.helperOnWay')}</Text>
+            <Text style={styles.onWaySub}>{t('bookings.helperOnWaySub')}</Text>
           </View>
         </View>
       ) : null}
@@ -183,15 +195,13 @@ export default function BookingDetailScreen() {
         />
       ) : trackLive && !home ? (
         <GlassCard style={styles.noMap}>
-          <Text style={styles.noMapText}>
-            Add your visit address on this booking to see the live map when the helper shares location.
-          </Text>
+          <Text style={styles.noMapText}>{t('bookings.addAddressForMap')}</Text>
         </GlassCard>
       ) : null}
 
       {['PENDING', 'CONFIRMED'].includes(booking.status) && (
         <GradientButton
-          title="Cancel booking"
+          title={t('bookings.cancelBooking')}
           variant="outline"
           onPress={cancel}
           style={{ marginTop: 20 }}

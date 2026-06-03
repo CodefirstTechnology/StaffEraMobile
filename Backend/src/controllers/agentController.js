@@ -38,6 +38,20 @@ const getAgent = async (userId) => {
   return agent;
 };
 
+/** AGENT: scoped to own servants. ADMIN: full access (no agent profile required). */
+const resolveAgentScope = async (user) => {
+  if (user.role === "ADMIN") {
+    return { isAdmin: true, agent: null, agentId: null };
+  }
+  const agent = await getAgent(user.id);
+  return { isAdmin: false, agent, agentId: agent.id };
+};
+
+const servantWhereForScope = (scope, extra = {}) => {
+  if (scope.isAdmin) return { ...extra };
+  return { agentId: scope.agentId, ...extra };
+};
+
 const servantInclude = {
   user: { select: { id: true, name: true, email: true, phone: true, isActive: true } },
   skills: true,
@@ -45,7 +59,12 @@ const servantInclude = {
 };
 
 exports.createServant = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
+  const assignAgentId = scope.isAdmin
+    ? req.body.agentId
+      ? parseInt(req.body.agentId, 10)
+      : null
+    : scope.agentId;
   const {
     name,
     email: rawEmail,
@@ -103,7 +122,7 @@ exports.createServant = async (req, res) => {
       role: "SERVANT",
       servant: {
         create: {
-          agentId: agent.id,
+          agentId: assignAgentId,
           bio,
           experience: experience ? parseInt(experience, 10) : null,
           hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
@@ -133,13 +152,12 @@ exports.createServant = async (req, res) => {
 };
 
 exports.listServants = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
   const { status, search } = req.query;
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, parseInt(req.query.limit, 10) || 20);
 
-  const where = {
-    agentId: agent.id,
+  const where = servantWhereForScope(scope, {
     ...(status ? { verificationStatus: status } : {}),
     ...(search
       ? {
@@ -151,7 +169,7 @@ exports.listServants = async (req, res) => {
           }
         }
       : {})
-  };
+  });
 
   const [servants, total] = await Promise.all([
     prisma.servant.findMany({
@@ -168,11 +186,11 @@ exports.listServants = async (req, res) => {
 };
 
 exports.getServant = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
   const id = parseInt(req.params.id, 10);
 
   const servant = await prisma.servant.findFirst({
-    where: { id, agentId: agent.id },
+    where: servantWhereForScope(scope, { id }),
     include: {
       ...servantInclude,
       bookings: {
@@ -190,11 +208,11 @@ exports.getServant = async (req, res) => {
 };
 
 exports.updateServant = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
   const id = parseInt(req.params.id, 10);
 
   const existing = await prisma.servant.findFirst({
-    where: { id, agentId: agent.id },
+    where: servantWhereForScope(scope, { id }),
     include: { user: true }
   });
   if (!existing) throw new ApiError(404, "Servant not found");
@@ -293,12 +311,12 @@ exports.updateServant = async (req, res) => {
 };
 
 exports.verifyServant = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
   const id = parseInt(req.params.id, 10);
   const { status, reason } = req.body;
 
   const existing = await prisma.servant.findFirst({
-    where: { id, agentId: agent.id },
+    where: servantWhereForScope(scope, { id }),
     include: { user: true }
   });
   if (!existing) throw new ApiError(404, "Servant not found");
@@ -327,13 +345,13 @@ exports.verifyServant = async (req, res) => {
 };
 
 exports.uploadIdProof = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
   const id = parseInt(req.params.id, 10);
 
   if (!req.file) throw new ApiError(400, "No file uploaded");
 
   const existing = await prisma.servant.findFirst({
-    where: { id, agentId: agent.id }
+    where: servantWhereForScope(scope, { id })
   });
   if (!existing) throw new ApiError(404, "Servant not found");
 

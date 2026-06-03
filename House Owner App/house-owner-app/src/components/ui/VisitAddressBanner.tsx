@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 import {
@@ -12,7 +13,9 @@ type Props = {
   title?: string;
 };
 
-export function VisitAddressBanner({ parts, title = 'Visit address' }: Props) {
+export function VisitAddressBanner({ parts, title }: Props) {
+  const { t } = useTranslation();
+  const bannerTitle = title ?? t('bookings.visitAddress');
   const lines = formatVisitAddressLines(parts);
   if (!hasVisitAddressDetail(parts)) return null;
 
@@ -20,7 +23,7 @@ export function VisitAddressBanner({ parts, title = 'Visit address' }: Props) {
     <View style={styles.wrap}>
       <View style={styles.head}>
         <MaterialIcons name="home" size={18} color={Stitch.colors.primary} />
-        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.title}>{bannerTitle}</Text>
       </View>
       {lines.map((line, i) => (
         <Text key={i} style={[styles.line, i === 0 && styles.linePrimary]}>

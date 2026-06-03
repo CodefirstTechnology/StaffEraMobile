@@ -8,6 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/lib/api';
@@ -21,8 +22,10 @@ import {
   type AddressUnitValue,
 } from '@/components/ui/AddressUnitFields';
 import type { LocationValue } from '@/lib/locationTypes';
+import { formatDate, formatCurrency } from '@/lib/i18n/format';
 
 export default function NewBookingScreen() {
+  const { t } = useTranslation();
   const { servantId } = useLocalSearchParams<{ servantId: string }>();
   const user = useAuthStore((s) => s.user);
   const [bookingType, setBookingType] = useState<'SESSION' | 'MONTHLY'>('SESSION');
@@ -88,11 +91,11 @@ export default function NewBookingScreen() {
 
   const submit = async () => {
     if (!servantId) {
-      Alert.alert('Error', 'Select a helper from Browse first');
+      Alert.alert(t('bookings.requestFailed'), t('bookings.selectHelperFirst'));
       return;
     }
     if (!location?.address) {
-      Alert.alert('Location required', 'Please set the visit location on the map.');
+      Alert.alert(t('validation.locationRequired'), t('bookings.visitLocationRequired'));
       return;
     }
     setLoading(true);
@@ -129,26 +132,25 @@ export default function NewBookingScreen() {
       }
 
       const res = await api.post('/bookings', payload);
-      Alert.alert(
-        'Request sent',
-        'The helper will accept or decline. You will be notified.',
-      );
+      Alert.alert(t('bookings.requestSent'), t('bookings.requestSentSub'));
       router.replace(`/(main)/bookings/${res.data.data.booking.id}`);
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { message?: string } } };
-      const message = err.response?.data?.message || 'Please try again';
+      const message = err.response?.data?.message || t('auth.tryAgain');
       const title =
-        err.response?.status === 409 ? 'Time not available' : 'Booking failed';
+        err.response?.status === 409
+          ? t('bookings.timeNotAvailable')
+          : t('bookings.bookingFailed');
       const buttons =
         err.response?.status === 409
           ? [
-              { text: 'Change time', style: 'cancel' as const },
+              { text: t('bookings.changeTime'), style: 'cancel' as const },
               {
-                text: 'My bookings',
+                text: t('bookings.myBookings'),
                 onPress: () => router.push('/(main)/bookings'),
               },
             ]
-          : [{ text: 'OK' }];
+          : [{ text: t('common.confirm') }];
       Alert.alert(title, message, buttons);
     } finally {
       setLoading(false);
@@ -158,19 +160,21 @@ export default function NewBookingScreen() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>← Back</Text>
+        <Text style={styles.back}>← {t('common.back')}</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Book {servant?.user?.name || 'helper'}</Text>
+      <Text style={styles.title}>
+        {t('bookings.bookHelperTitle', { name: servant?.user?.name || t('common.helper') })}
+      </Text>
 
       <View style={styles.toggle}>
-        {(['SESSION', 'MONTHLY'] as const).map((t) => (
+        {(['SESSION', 'MONTHLY'] as const).map((bt) => (
           <TouchableOpacity
-            key={t}
-            style={[styles.toggleBtn, bookingType === t && styles.toggleOn]}
-            onPress={() => setBookingType(t)}
+            key={bt}
+            style={[styles.toggleBtn, bookingType === bt && styles.toggleOn]}
+            onPress={() => setBookingType(bt)}
           >
-            <Text style={[styles.toggleText, bookingType === t && styles.toggleTextOn]}>
-              {t === 'SESSION' ? 'One visit' : 'Monthly'}
+            <Text style={[styles.toggleText, bookingType === bt && styles.toggleTextOn]}>
+              {bt === 'SESSION' ? t('common.oneVisit') : t('common.monthly')}
             </Text>
           </TouchableOpacity>
         ))}
@@ -179,8 +183,8 @@ export default function NewBookingScreen() {
       {bookingType === 'SESSION' ? (
         <>
           <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDate(true)}>
-            <Text style={styles.dateLabel}>Visit date</Text>
-            <Text style={styles.dateValue}>{sessionDate.toLocaleDateString('en-IN')}</Text>
+            <Text style={styles.dateLabel}>{t('bookings.visitDate')}</Text>
+            <Text style={styles.dateValue}>{formatDate(sessionDate)}</Text>
           </TouchableOpacity>
           {showDate && (
             <DateTimePicker
@@ -192,32 +196,36 @@ export default function NewBookingScreen() {
               }}
             />
           )}
-          <GhostInput label="Start time (HH:MM)" value={sessionStart} onChangeText={setSessionStart} />
-          <GhostInput label="End time (HH:MM)" value={sessionEnd} onChangeText={setSessionEnd} />
+          <GhostInput label={t('bookings.startTime')} value={sessionStart} onChangeText={setSessionStart} />
+          <GhostInput label={t('bookings.endTime')} value={sessionEnd} onChangeText={setSessionEnd} />
         </>
       ) : (
         <>
           <Text style={styles.hint}>
-            Monthly: {monthlyStart.toLocaleDateString('en-IN')} → {monthlyEnd.toLocaleDateString('en-IN')}
+            {t('bookings.monthlyRange', {
+              start: formatDate(monthlyStart),
+              end: formatDate(monthlyEnd),
+            })}
           </Text>
         </>
       )}
 
       <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
       <LocationPicker
-        label="Visit location"
-        placeholder="Search your home address or tap the map"
+        label={t('bookings.visitLocation')}
+        placeholder={t('bookings.visitLocationPlaceholder')}
         value={location}
         onChange={setLocation}
       />
-      <GhostInput label="Notes (optional)" value={notes} onChangeText={setNotes} />
+      <GhostInput label={t('bookings.notesOptional')} value={notes} onChangeText={setNotes} />
 
       <Text style={styles.estimate}>
-        Estimated: {Stitch.copy.rupee}
-        {totalAmount.toLocaleString('en-IN')}
+        {t('bookings.estimated', {
+          amount: `${Stitch.copy.rupee}${formatCurrency(totalAmount)}`,
+        })}
       </Text>
 
-      <GradientButton title="Send booking request" onPress={submit} loading={loading} />
+      <GradientButton title={t('bookings.sendBookingRequest')} onPress={submit} loading={loading} />
     </ScrollView>
   );
 }

@@ -1,3 +1,6 @@
+import i18n from '@/lib/i18n';
+import { getIntlLocale } from '@/lib/i18n';
+
 export type TimeSlot = {
   id: string;
   start: string;
@@ -16,6 +19,28 @@ const formatHour12 = (hour24: number) => {
   if (hour24 < 12) return `${hour24} AM`;
   return `${hour24 - 12} PM`;
 };
+
+const formatHour12Locale = (hour24: number) => {
+  const d = new Date(2000, 0, 1, hour24, 0, 0, 0);
+  return d.toLocaleTimeString(getIntlLocale(i18n.language), {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
+export const localizedTimeSlotLabel = (start: string, end: string) => {
+  const startHour = parseInt(start.split(':')[0], 10);
+  const endHour = parseInt(end.split(':')[0], 10);
+  if (Number.isNaN(startHour) || Number.isNaN(endHour)) return `${start} – ${end}`;
+  return i18n.t('timeSlots.range', {
+    start: formatHour12Locale(startHour),
+    end: formatHour12Locale(endHour),
+  });
+};
+
+export const localizedSlotLabels = (slots: TimeSlot[]) =>
+  slots.map((s) => localizedTimeSlotLabel(s.start, s.end)).join(' · ');
 
 const timeToMinutes = (time: string) => {
   const [h, m] = time.split(':').map(Number);
@@ -50,12 +75,10 @@ export const slotsToPayload = (slots: TimeSlot[]): SessionSlot[] =>
 
 export const formatTimeSlotLabel = (start?: string | null, end?: string | null) => {
   if (!start || !end) return null;
-  const slot = HOURLY_TIME_SLOTS.find((s) => s.start === start && s.end === end);
-  if (slot) return slot.label;
   const startHour = parseInt(start.split(':')[0], 10);
   const endHour = parseInt(end.split(':')[0], 10);
   if (Number.isNaN(startHour) || Number.isNaN(endHour)) return `${start} – ${end}`;
-  return `${formatHour12(startHour)} to ${formatHour12(endHour)}`;
+  return localizedTimeSlotLabel(start, end);
 };
 
 export const parseSessionSlots = (raw?: string | null): SessionSlot[] => {

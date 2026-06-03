@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
@@ -14,6 +15,7 @@ import {
 } from '@/components/bookings/BookingSummaryCard';
 
 export default function BookingsListScreen() {
+  const { t } = useTranslation();
   const { data: skills = [] } = useSkills();
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['bookings'],
@@ -53,8 +55,8 @@ export default function BookingsListScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.title}>My bookings</Text>
-        <Text style={styles.sub}>Active requests and recent visits</Text>
+        <Text style={styles.title}>{t('bookings.myBookings')}</Text>
+        <Text style={styles.sub}>{t('bookings.activeAndRecent')}</Text>
       </View>
 
       <FlatList
@@ -67,13 +69,10 @@ export default function BookingsListScreen() {
           bookings.length === 0 && !isLoading ? (
             <GlassCard style={styles.emptyCard}>
               <MaterialIcons name="event-busy" size={40} color={Stitch.colors.onSurfaceVariant} />
-              <Text style={styles.emptyTitle}>No bookings yet</Text>
-              <Text style={styles.emptySub}>
-                Send a request from Home — nearby helpers will see it and the first to accept is
-                assigned to you.
-              </Text>
+              <Text style={styles.emptyTitle}>{t('bookings.noBookingsTitle')}</Text>
+              <Text style={styles.emptySub}>{t('bookings.noBookingsSub')}</Text>
               <GradientButton
-                title="Send a request"
+                title={t('bookings.sendRequest')}
                 onPress={() => router.push('/(main)/bookings/request')}
                 style={styles.emptyBtn}
               />
@@ -82,16 +81,8 @@ export default function BookingsListScreen() {
         }
         renderItem={() => (
           <>
-            {renderSection(
-              'Active',
-              active,
-              'No active bookings — send a new request from Home',
-            )}
-            {renderSection(
-              'Recent',
-              recent,
-              'No past bookings yet — completed visits appear here',
-            )}
+            {renderSection(t('common.active'), active, t('bookings.noActive'))}
+            {renderSection(t('common.recent'), recent, t('bookings.noRecent'))}
           </>
         )}
       />

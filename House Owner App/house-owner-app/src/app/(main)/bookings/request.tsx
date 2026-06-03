@@ -8,6 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/lib/api';
@@ -25,8 +26,11 @@ import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useAuthStore } from '@/store/authStore';
 import { useSkills } from '@/hooks/useSkills';
 import { DEFAULT_TIME_SLOTS, formatSessionSlotsLabel, slotsToPayload, type TimeSlot } from '@/lib/timeSlots';
+import { localizedSkillLabel } from '@/lib/skills';
+import { formatDate } from '@/lib/i18n/format';
 
 export default function AreaBookingRequestScreen() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const { skill: skillParam } = useLocalSearchParams<{ skill?: string }>();
   const { data: skills = [] } = useSkills();
@@ -70,9 +74,9 @@ export default function AreaBookingRequestScreen() {
     });
   }, [user?.houseOwner]);
 
-  const skillLabel =
-    skills.find((s) => s.code === selectedSkill)?.label ||
-    selectedSkill.replace(/_/g, ' ');
+  const skillLabel = selectedSkill
+    ? localizedSkillLabel(selectedSkill, skills)
+    : '';
 
   const { data: nearbyHelpers = [] } = useQuery({
     queryKey: ['servants', selectedSkill, location?.latitude, location?.longitude],
@@ -95,7 +99,7 @@ export default function AreaBookingRequestScreen() {
   });
 
   const nearbyCount = nearbyHelpers.length;
-  const requestTypeLabel = bookingType === 'SESSION' ? 'One visit' : 'Monthly';
+  const requestTypeLabel = bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
 
   const slotsSummary = formatSessionSlotsLabel(
     JSON.stringify(slotsToPayload(timeSlots)),
@@ -105,15 +109,15 @@ export default function AreaBookingRequestScreen() {
 
   const submit = async () => {
     if (!selectedSkill) {
-      Alert.alert('Category required', 'Select what type of help you need.');
+      Alert.alert(t('bookings.categoryRequired'), t('bookings.whatHelpNeed'));
       return;
     }
     if (bookingType === 'SESSION' && timeSlots.length === 0) {
-      Alert.alert('Time slot required', 'Select at least one time slot.');
+      Alert.alert(t('bookings.timeSlotRequired'), t('bookings.timeSlotRequired'));
       return;
     }
     if (!location?.address || location.latitude == null || location.longitude == null) {
-      Alert.alert('Location required', 'Allow live location or pick your address on the map.');
+      Alert.alert(t('validation.locationRequired'), t('bookings.locationRequiredShort'));
       return;
     }
     setLoading(true);
@@ -151,22 +155,30 @@ export default function AreaBookingRequestScreen() {
       const helperNames = (res.data.data.broadcast?.helperNames as string[] | undefined) ?? [];
       const namesPreview =
         helperNames.length > 0
-          ? `\n\nNotified: ${helperNames.slice(0, 3).join(', ')}${helperNames.length > 3 ? ` +${helperNames.length - 3} more` : ''}`
+          ? t('bookings.notifiedNames', {
+              names: `${helperNames.slice(0, 3).join(', ')}${
+                helperNames.length > 3
+                  ? t('bookings.notifiedMore', { count: helperNames.length - 3 })
+                  : ''
+              }`,
+            })
           : '';
       const timePreview =
-        bookingType === 'SESSION' && slotsSummary ? `\nTime slots: ${slotsSummary}` : '';
+        bookingType === 'SESSION' && slotsSummary
+          ? `\n${t('bookings.timeSlotsPreview', { slots: slotsSummary })}`
+          : '';
       Alert.alert(
-        'Request sent to your area',
+        t('bookings.requestSentTitle'),
         `${skillLabel} · ${requestTypeLabel}${timePreview}\n\n${
           notified > 0
-            ? `${notified} verified helper${notified === 1 ? '' : 's'} in your area will see this on their dashboard. The first to accept gets your job.${namesPreview}`
-            : 'Your request is saved. Only helpers who serve your area will see it on their dashboard when they come online.'
+            ? t('bookings.notifiedHelpers', { count: notified, names: namesPreview })
+            : t('bookings.requestSavedOffline')
         }`,
       );
       router.replace(`/(main)/bookings/${res.data.data.booking.id}`);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Request failed', err.response?.data?.message || 'Please try again');
+      Alert.alert(t('bookings.requestFailed'), err.response?.data?.message || t('auth.tryAgain'));
     } finally {
       setLoading(false);
     }
@@ -175,17 +187,14 @@ export default function AreaBookingRequestScreen() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>← Back</Text>
+        <Text style={styles.back}>← {t('common.back')}</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Request help in my area</Text>
-      <Text style={styles.sub}>
-        Only verified helpers who serve your location will see this request on their dashboard.
-        Whoever accepts first is assigned to you.
-      </Text>
+      <Text style={styles.title}>{t('bookings.requestHelpArea')}</Text>
+      <Text style={styles.sub}>{t('bookings.requestHelpSub')}</Text>
 
       <View style={styles.categoryBox}>
-        <Text style={styles.categoryTitle}>Request category</Text>
-        <Text style={styles.categoryHint}>What type of help do you need?</Text>
+        <Text style={styles.categoryTitle}>{t('bookings.requestCategory')}</Text>
+        <Text style={styles.categoryHint}>{t('bookings.whatHelpNeed')}</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -199,15 +208,19 @@ export default function AreaBookingRequestScreen() {
               onPress={() => setSelectedSkill(s.code)}
             >
               <Text style={[styles.skillChipText, selectedSkill === s.code && styles.skillChipTextOn]}>
-                {s.label}
+                {localizedSkillLabel(s.code, skills)}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
         {selectedSkill ? (
           <Text style={styles.categorySelected}>
-            Sending request for: {skillLabel} · {requestTypeLabel}
-            {bookingType === 'SESSION' && slotsSummary ? ` · ${slotsSummary}` : ''}
+            {t('bookings.sendingRequestFor', {
+              skill: skillLabel,
+              type: requestTypeLabel,
+              slots:
+                bookingType === 'SESSION' && slotsSummary ? ` · ${slotsSummary}` : '',
+            })}
           </Text>
         ) : null}
       </View>
@@ -216,8 +229,8 @@ export default function AreaBookingRequestScreen() {
         <View style={styles.areaBox}>
           <Text style={styles.areaTitle}>
             {nearbyCount > 0
-              ? `${nearbyCount} ${skillLabel} helper${nearbyCount === 1 ? '' : 's'} in your area will be notified`
-              : `No ${skillLabel.toLowerCase()} helpers in your area right now`}
+              ? t('bookings.nearbyHelpersNotify', { count: nearbyCount, skill: skillLabel })
+              : t('bookings.noHelpersInAreaNow', { skill: skillLabel })}
           </Text>
           {nearbyCount > 0 ? (
             <Text style={styles.areaNames}>
@@ -225,22 +238,21 @@ export default function AreaBookingRequestScreen() {
             </Text>
           ) : (
             <Text style={styles.areaNames}>
-              Your {skillLabel.toLowerCase()} request stays open until a verified helper in this area comes
-              online.
+              {t('bookings.requestStaysOpen', { skill: skillLabel })}
             </Text>
           )}
         </View>
       ) : null}
 
       <View style={styles.toggle}>
-        {(['SESSION', 'MONTHLY'] as const).map((t) => (
+        {(['SESSION', 'MONTHLY'] as const).map((bt) => (
           <TouchableOpacity
-            key={t}
-            style={[styles.toggleBtn, bookingType === t && styles.toggleOn]}
-            onPress={() => setBookingType(t)}
+            key={bt}
+            style={[styles.toggleBtn, bookingType === bt && styles.toggleOn]}
+            onPress={() => setBookingType(bt)}
           >
-            <Text style={[styles.toggleText, bookingType === t && styles.toggleTextOn]}>
-              {t === 'SESSION' ? 'One visit' : 'Monthly'}
+            <Text style={[styles.toggleText, bookingType === bt && styles.toggleTextOn]}>
+              {bt === 'SESSION' ? t('common.oneVisit') : t('common.monthly')}
             </Text>
           </TouchableOpacity>
         ))}
@@ -249,8 +261,8 @@ export default function AreaBookingRequestScreen() {
       {bookingType === 'SESSION' ? (
         <>
           <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDate(true)}>
-            <Text style={styles.dateLabel}>Visit date</Text>
-            <Text style={styles.dateValue}>{sessionDate.toLocaleDateString('en-IN')}</Text>
+            <Text style={styles.dateLabel}>{t('bookings.visitDate')}</Text>
+            <Text style={styles.dateValue}>{formatDate(sessionDate)}</Text>
           </TouchableOpacity>
           {showDate && (
             <DateTimePicker
@@ -263,33 +275,41 @@ export default function AreaBookingRequestScreen() {
             />
           )}
           <TimeSlotPicker
-            label="Pick time slots (select multiple)"
+            label={t('bookings.pickTimeSlots')}
             value={timeSlots}
             onChange={setTimeSlots}
           />
         </>
       ) : (
         <Text style={styles.hint}>
-          Monthly: {monthlyStart.toLocaleDateString('en-IN')} → {monthlyEnd.toLocaleDateString('en-IN')}
+          {t('bookings.monthlyRange', {
+            start: formatDate(monthlyStart),
+            end: formatDate(monthlyEnd),
+          })}
         </Text>
       )}
 
       <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
       <LocationPicker
-        label="Your live location (GPS / map)"
-        placeholder={locLoading ? 'Getting location…' : 'Search or use current location'}
+        label={t('bookings.liveLocationLabel')}
+        placeholder={
+          locLoading ? t('bookings.gettingLocation') : t('bookings.liveLocationPlaceholder')
+        }
         value={location}
         onChange={setLocation}
       />
-      <GhostInput label="Notes (optional)" value={notes} onChangeText={setNotes} />
+      <GhostInput label={t('bookings.notesOptional')} value={notes} onChangeText={setNotes} />
 
       <GradientButton
         title={
           nearbyCount > 0
-            ? `Send ${skillLabel || 'area'} request to ${nearbyCount} helper${nearbyCount === 1 ? '' : 's'}`
+            ? t('bookings.sendRequestToHelpers', {
+                skill: skillLabel || t('bookings.areaRequest'),
+                count: nearbyCount,
+              })
             : selectedSkill
-              ? `Send ${skillLabel} request`
-              : 'Select category to send request'
+              ? t('bookings.sendSkillRequest', { skill: skillLabel })
+              : t('bookings.selectCategoryToSend')
         }
         onPress={submit}
         loading={loading || locLoading}

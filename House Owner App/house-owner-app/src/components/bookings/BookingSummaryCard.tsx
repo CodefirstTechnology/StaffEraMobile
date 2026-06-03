@@ -1,10 +1,13 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { formatSessionSlotsLabel } from '@/lib/timeSlots';
-import { formatSkillLabel } from '@/lib/skills';
+import { localizedSkillLabel } from '@/lib/skills';
+import { formatDate, formatDateShort, formatCurrency } from '@/lib/i18n/format';
+import i18n from '@/lib/i18n';
 
 export type BookingSummary = {
   id: number;
@@ -30,18 +33,11 @@ export function formatBookingWhen(booking: BookingSummary) {
     booking.sessionEndTime,
   );
   if (booking.sessionDate && slotLabel) {
-    const date = new Date(booking.sessionDate).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    const date = formatDate(booking.sessionDate);
     return `${date} · ${slotLabel}`;
   }
   if (booking.createdAt) {
-    return `Requested ${new Date(booking.createdAt).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-    })}`;
+    return i18n.t('common.requested', { date: formatDateShort(booking.createdAt) });
   }
   return null;
 }
@@ -55,12 +51,14 @@ export function BookingSummaryCard({
   skills?: Skill[];
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   const helperName = booking.servant?.user?.name;
   const category = booking.requestedSkill
-    ? formatSkillLabel(booking.requestedSkill, skills)
+    ? localizedSkillLabel(booking.requestedSkill, skills)
     : null;
   const when = formatBookingWhen(booking);
-  const visitType = booking.bookingType === 'SESSION' ? 'One visit' : 'Monthly';
+  const visitType =
+    booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
   const canTrack = ['CONFIRMED', 'ACTIVE'].includes(booking.status);
 
   return (
@@ -76,7 +74,7 @@ export function BookingSummaryCard({
           </View>
           <View style={styles.body}>
             <Text style={styles.helperName} numberOfLines={1}>
-              {helperName || 'Waiting for helper…'}
+              {helperName || t('common.waitingHelper')}
             </Text>
             <Text style={styles.meta}>
               {[category, visitType].filter(Boolean).join(' · ')}
@@ -103,15 +101,15 @@ export function BookingSummaryCard({
 
         {booking.totalAmount != null ? (
           <Text style={styles.amount}>
-            {Stitch.copy.rupee}
-            {booking.totalAmount.toLocaleString('en-IN')}
+            {t('common.rupee')}
+            {formatCurrency(booking.totalAmount)}
           </Text>
         ) : null}
 
         {canTrack ? (
           <View style={styles.trackRow}>
             <MaterialIcons name="my-location" size={16} color={Stitch.colors.secondary} />
-            <Text style={styles.trackText}>Tap to open live map when helper is on the way</Text>
+            <Text style={styles.trackText}>{t('bookings.tapTrack')}</Text>
             <MaterialIcons name="chevron-right" size={18} color={Stitch.colors.secondary} />
           </View>
         ) : null}

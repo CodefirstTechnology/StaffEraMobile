@@ -11,12 +11,14 @@ import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useSkills } from '@/hooks/useSkills';
+import { localizedSkillLabel } from '@/lib/skills';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
 import {
@@ -37,6 +39,7 @@ const SKILL_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
 };
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const { data: skills = [] } = useSkills();
   const { data: notifications = [] } = useNotifications();
@@ -111,7 +114,7 @@ export default function HomeScreen() {
       liveLocation?.address ||
       (ho?.address ? ho.address.split(',').slice(0, 2).join(',').trim() : null) ||
       ho?.city ||
-      'Tap to set your home location'
+      t('common.tapSetHome')
     );
   })();
 
@@ -143,7 +146,7 @@ export default function HomeScreen() {
           onPress={() => openRequest()}
         >
           <MaterialIcons name="search" size={22} color={Stitch.colors.onSurfaceVariant} />
-          <Text style={styles.searchPlaceholder}>Request verified help — cooking, cleaning…</Text>
+          <Text style={styles.searchPlaceholder}>{t('home.searchPlaceholder')}</Text>
         </TouchableOpacity>
 
         <LinearGradient
@@ -153,22 +156,22 @@ export default function HomeScreen() {
           style={styles.hero}
         >
           <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>Fast booking</Text>
+            <Text style={styles.heroBadgeText}>{t('home.fastBooking')}</Text>
           </View>
-          <Text style={styles.heroTitle}>Request help in your area</Text>
+          <Text style={styles.heroTitle}>{t('home.requestInArea')}</Text>
           <Text style={styles.heroSub}>
             {searchLocation
               ? nearbyCount > 0
-                ? `${nearbyCount} verified helper${nearbyCount === 1 ? '' : 's'} nearby — first to accept gets your job`
-                : 'No helpers nearby right now — your request stays open until one is available'
-              : 'Enable location or set your home address to send a request'}
+                ? t('home.helpersNearby', { count: nearbyCount })
+                : t('home.noHelpersNearby')
+              : t('home.enableLocation')}
           </Text>
           <TouchableOpacity
             style={[styles.heroBtn, !searchLocation && styles.heroBtnDisabled]}
             disabled={!searchLocation}
             onPress={() => openRequest()}
           >
-            <Text style={styles.heroBtnText}>Send request now</Text>
+            <Text style={styles.heroBtnText}>{t('home.sendRequestNow')}</Text>
           </TouchableOpacity>
         </LinearGradient>
 
@@ -183,18 +186,15 @@ export default function HomeScreen() {
                   {helpersLoading ? '…' : nearbyCount}
                 </Text>
                 <Text style={styles.countLabel}>
-                  Verified helper{nearbyCount === 1 ? '' : 's'} available near you
+                  {t('home.verifiedNearYou', { count: nearbyCount })}
                 </Text>
               </View>
             </View>
-            <Text style={styles.countHint}>
-              Helper names are private — send a request and the first available helper in your area
-              will accept.
-            </Text>
+            <Text style={styles.countHint}>{t('home.privacyHint')}</Text>
           </GlassCard>
         ) : null}
 
-        <Text style={[styles.sectionTitle, styles.sectionTitleSpacing]}>What do you need?</Text>
+        <Text style={[styles.sectionTitle, styles.sectionTitleSpacing]}>{t('home.whatNeed')}</Text>
         <View style={styles.grid}>
           {skills.map((c) => (
             <TouchableOpacity
@@ -209,29 +209,29 @@ export default function HomeScreen() {
                   color={Stitch.colors.primary}
                 />
               </View>
-              <Text style={styles.catLabel}>{c.label}</Text>
+              <Text style={styles.catLabel}>{localizedSkillLabel(c.code, skills)}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         <View style={styles.bookingsHeader}>
-          <Text style={styles.sectionTitle}>Your bookings</Text>
+          <Text style={styles.sectionTitle}>{t('home.yourBookings')}</Text>
           {hasBookings ? (
             <TouchableOpacity onPress={() => router.push('/(main)/bookings')} hitSlop={8}>
-              <Text style={styles.seeAll}>See all</Text>
+              <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
         {!hasBookings ? (
           <GlassCard>
-            <Text style={styles.empty}>No bookings yet — tap Send request now above</Text>
+            <Text style={styles.empty}>{t('home.noBookingsYet')}</Text>
           </GlassCard>
         ) : (
           <>
             {homeActive.length > 0 ? (
               <>
-                <Text style={styles.bookingsSub}>Active</Text>
+                <Text style={styles.bookingsSub}>{t('common.active')}</Text>
                 {homeActive.map((b) => (
                   <BookingSummaryCard
                     key={b.id}
@@ -245,7 +245,7 @@ export default function HomeScreen() {
             {homeRecent.length > 0 ? (
               <>
                 <Text style={[styles.bookingsSub, homeActive.length > 0 && styles.bookingsSubGap]}>
-                  Recent
+                  {t('common.recent')}
                 </Text>
                 {homeRecent.map((b) => (
                   <BookingSummaryCard

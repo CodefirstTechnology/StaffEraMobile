@@ -1,6 +1,12 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { Stitch } from '@/theme/stitch';
-import { HOURLY_TIME_SLOTS, type TimeSlot } from '@/lib/timeSlots';
+import {
+  HOURLY_TIME_SLOTS,
+  localizedSlotLabels,
+  localizedTimeSlotLabel,
+  type TimeSlot,
+} from '@/lib/timeSlots';
 
 type Props = {
   label?: string;
@@ -8,11 +14,9 @@ type Props = {
   onChange: (slots: TimeSlot[]) => void;
 };
 
-export function TimeSlotPicker({
-  label = 'Time slots',
-  value,
-  onChange,
-}: Props) {
+export function TimeSlotPicker({ label, value, onChange }: Props) {
+  const { t } = useTranslation();
+  const pickerLabel = label ?? t('bookings.timeSlotLabel');
   const toggle = (slot: TimeSlot) => {
     const exists = value.some((s) => s.id === slot.id);
     const next = exists
@@ -26,8 +30,8 @@ export function TimeSlotPicker({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.hint}>Tap to select multiple slots (1 hour each)</Text>
+      <Text style={styles.label}>{pickerLabel}</Text>
+      <Text style={styles.hint}>{t('timeSlots.hint')}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -42,17 +46,22 @@ export function TimeSlotPicker({
               style={[styles.chip, selected && styles.chipOn]}
               onPress={() => toggle(slot)}
             >
-              <Text style={[styles.chipText, selected && styles.chipTextOn]}>{slot.label}</Text>
+              <Text style={[styles.chipText, selected && styles.chipTextOn]}>
+                {localizedTimeSlotLabel(slot.start, slot.end)}
+              </Text>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
       {value.length > 0 ? (
         <Text style={styles.selected}>
-          Selected ({value.length}): {value.map((s) => s.label).join(' · ')}
+          {t('timeSlots.selected', {
+            count: value.length,
+            labels: localizedSlotLabels(value),
+          })}
         </Text>
       ) : (
-        <Text style={styles.empty}>Pick at least one time slot</Text>
+        <Text style={styles.empty}>{t('timeSlots.pickAtLeastOne')}</Text>
       )}
     </View>
   );

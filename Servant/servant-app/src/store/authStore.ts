@@ -2,12 +2,15 @@ import { create } from 'zustand';
 import api from '@/lib/api';
 import { setSessionExpiredHandler } from '@/lib/authSession';
 import { clearAuthTokens, getToken, setToken } from '@/lib/tokenStorage';
+import { useLanguageStore } from '@/store/languageStore';
+import i18n, { isSupportedLanguage } from '@/lib/i18n';
 
 type User = {
   id: number;
   name: string;
   email: string;
   role: string;
+  preferredLanguage?: string;
   servant?: { id: number; verificationStatus: string };
 };
 
@@ -30,7 +33,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       const token = await getToken('accessToken');
       if (!token) return set({ isLoading: false });
       const { data } = await api.get('/auth/me');
-      set({ user: data.data.user, isAuthenticated: true, isLoading: false });
+      const user = data.data.user;
+      set({ user, isAuthenticated: true, isLoading: false });
+      if (isSupportedLanguage(user?.preferredLanguage)) {
+        await useLanguageStore.getState().syncFromUser(user.preferredLanguage);
+      }
     } catch {
       await clearAuthTokens();
       set({ user: null, isAuthenticated: false, isLoading: false });
@@ -46,14 +53,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       throw {
         response: {
           data: {
-            message: 'This account is not a servant. Use the House Owner or Agent app.',
+            message: i18n.t('auth.wrongRoleServant'),
           },
         },
       };
     }
     await setToken('accessToken', data.data.accessToken);
     await setToken('refreshToken', data.data.refreshToken);
-    set({ user: data.data.user, isAuthenticated: true });
+    const user = data.data.user;
+    set({ user, isAuthenticated: true });
+    const lang = useLanguageStore.getState().language;
+    void useLanguageStore.getState().setLanguage(lang, { syncProfile: true });
   },
 
   logout: async () => {

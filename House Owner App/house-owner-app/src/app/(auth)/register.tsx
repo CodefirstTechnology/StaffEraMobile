@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
 import { LocationPicker } from '@/components/ui/LocationPicker';
+import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import type { LocationValue } from '@/lib/locationTypes';
 
 export default function RegisterScreen() {
+  const { t } = useTranslation();
   const register = useAuthStore((s) => s.register);
   const [form, setForm] = useState({
     name: '',
@@ -23,7 +26,7 @@ export default function RegisterScreen() {
 
   const submit = async () => {
     if (form.password !== form.confirmPassword) {
-      Alert.alert('Passwords do not match');
+      Alert.alert(t('auth.passwordMismatch'));
       return;
     }
     setLoading(true);
@@ -41,24 +44,25 @@ export default function RegisterScreen() {
       router.replace('/(main)/home');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Registration failed', err.response?.data?.message || 'Try again');
+      Alert.alert(t('auth.registrationFailed'), err.response?.data?.message || t('auth.tryAgain'));
     } finally {
       setLoading(false);
     }
   };
 
   const fields = [
-    { key: 'name' as const, label: 'Full name', secure: false },
-    { key: 'email' as const, label: 'Email', secure: false },
-    { key: 'phone' as const, label: 'Phone (+91)', secure: false, keyboard: 'phone-pad' as const },
-    { key: 'password' as const, label: 'Password', secure: true },
-    { key: 'confirmPassword' as const, label: 'Confirm password', secure: true },
+    { key: 'name' as const, label: t('auth.fullName'), secure: false },
+    { key: 'email' as const, label: t('auth.email'), secure: false },
+    { key: 'phone' as const, label: t('auth.phone'), secure: false, keyboard: 'phone-pad' as const },
+    { key: 'password' as const, label: t('auth.password'), secure: true },
+    { key: 'confirmPassword' as const, label: t('auth.confirmPassword'), secure: true },
   ];
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Text style={styles.logo}>Join StaffEra</Text>
-      <Text style={styles.sub}>Book verified help for your home</Text>
+      <LanguageSelector compact showTitle />
+      <Text style={styles.logo}>{t('auth.joinTitle')}</Text>
+      <Text style={styles.sub}>{t('auth.joinSubtitle')}</Text>
       {fields.map((f) => (
         <GhostInput
           key={f.key}
@@ -72,8 +76,8 @@ export default function RegisterScreen() {
       ))}
 
       <LocationPicker
-        label="Home location (optional)"
-        placeholder="Search your society, street, or area"
+        label={t('auth.homeLocationOptional')}
+        placeholder={t('auth.searchPlaceholder')}
         value={homeLocation}
         onChange={(location) => {
           setHomeLocation(location);
@@ -85,13 +89,13 @@ export default function RegisterScreen() {
 
       {!homeLocation ? (
         <GhostInput
-          label="City (if location not set)"
+          label={t('auth.cityIfNoLocation')}
           value={form.city}
           onChangeText={(v) => setForm((prev) => ({ ...prev, city: v }))}
         />
       ) : null}
 
-      <GradientButton title="Create account" onPress={submit} loading={loading} />
+      <GradientButton title={t('auth.createAccount')} onPress={submit} loading={loading} />
     </ScrollView>
   );
 }

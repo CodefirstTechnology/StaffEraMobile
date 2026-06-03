@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
+import { formatTime } from '@/lib/i18n/format';
 import { mapViewProps } from '@/lib/mapsConfig';
 import { mapsDeepLink, mapsDirectionsUrl } from '@/lib/locationTypes';
 import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
@@ -40,6 +42,7 @@ export function JobTrackingMap({
   lastUpdated,
   visitAddress,
 }: Props) {
+  const { t } = useTranslation();
   const mapRef = useRef<MapView>(null);
 
   const points: Coord[] = [];
@@ -60,16 +63,19 @@ export function JobTrackingMap({
     Linking.openURL(mapsDirectionsUrl(servant, home));
   };
 
-  const openHome = () => Linking.openURL(mapsDeepLink(home.latitude, home.longitude, 'Your home'));
+  const openHome = () =>
+    Linking.openURL(mapsDeepLink(home.latitude, home.longitude, t('bookings.mapPinHome')));
 
   const caption = servant
-    ? `Helper is on the way · updated ${lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '…'}`
-    : 'Waiting for helper location…';
+    ? t('bookings.trackingCaption', {
+        time: lastUpdated ? formatTime(lastUpdated) : '…',
+      })
+    : t('bookings.waitingHelperLocation');
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.sectionTitle}>Live tracking</Text>
-      {visitAddress ? <VisitAddressBanner parts={visitAddress} title="Visit address" /> : null}
+      <Text style={styles.sectionTitle}>{t('bookings.liveTracking')}</Text>
+      {visitAddress ? <VisitAddressBanner parts={visitAddress} /> : null}
       <View style={[styles.mapBox, { height }]}>
         <MapView
           ref={mapRef}
@@ -78,9 +84,9 @@ export function JobTrackingMap({
           initialRegion={initial}
           {...mapViewProps()}
         >
-          <Marker coordinate={home} title="Your home" pinColor={Stitch.colors.primary} />
+          <Marker coordinate={home} title={t('bookings.mapPinHome')} pinColor={Stitch.colors.primary} />
           {servant ? (
-            <Marker coordinate={servant} title="Helper" pinColor={Stitch.colors.secondary} />
+            <Marker coordinate={servant} title={t('bookings.mapPinHelper')} pinColor={Stitch.colors.secondary} />
           ) : null}
         </MapView>
         <Text style={styles.caption}>{caption}</Text>
@@ -92,11 +98,11 @@ export function JobTrackingMap({
           disabled={!servant}
         >
           <MaterialIcons name="directions" size={18} color="#fff" />
-          <Text style={styles.btnText}>Route to helper</Text>
+          <Text style={styles.btnText}>{t('bookings.routeToHelper')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.btn, styles.btnOutline]} onPress={openHome}>
           <MaterialIcons name="home" size={18} color={Stitch.colors.primary} />
-          <Text style={[styles.btnText, styles.btnTextOutline]}>Your home</Text>
+          <Text style={[styles.btnText, styles.btnTextOutline]}>{t('bookings.yourHomeBtn')}</Text>
         </TouchableOpacity>
       </View>
     </View>

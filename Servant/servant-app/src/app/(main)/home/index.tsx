@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -41,6 +42,7 @@ type Booking = {
 };
 
 export default function ServantHomeScreen() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const qc = useQueryClient();
@@ -177,9 +179,9 @@ export default function ServantHomeScreen() {
         qc.invalidateQueries({ queryKey: ['time-month'] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
       ]);
-      Alert.alert('Work started', 'You are on duty at the customer location.');
+      Alert.alert(t('servantHome.workStarted'), t('servantHome.onDutyAtCustomer'));
     } catch (e: unknown) {
-      Alert.alert('Could not start', apiError(e, 'Check booking is confirmed'));
+      Alert.alert(t('servantHome.couldNotStart'), apiError(e, t('servantHome.checkConfirmed')));
     }
   };
 
@@ -193,9 +195,9 @@ export default function ServantHomeScreen() {
         qc.invalidateQueries({ queryKey: ['time-month'] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
       ]);
-      Alert.alert('Clocked out', 'Hours saved for payout.');
+      Alert.alert(t('servantHome.clockedOutTitle'), t('servantHome.hoursSaved'));
     } catch (e: unknown) {
-      Alert.alert('Error', apiError(e, 'Could not clock out'));
+      Alert.alert(t('errors.generic'), apiError(e, t('servantHome.couldNotClockOut')));
     }
   };
 
@@ -205,14 +207,14 @@ export default function ServantHomeScreen() {
     try {
       await api.patch(`/bookings/${id}/confirm`);
       await refreshBookings();
-      Alert.alert('Accepted', 'The customer has been notified.');
+      Alert.alert(t('servantHome.acceptedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
       const message = apiError(e, 'Try again');
       if (message.toLowerCase().includes('not pending')) {
         await refreshBookings();
-        Alert.alert('Already handled', 'This request was already accepted or declined.');
+        Alert.alert(t('servantHome.alreadyHandled'), t('servantHome.requestHandled'));
       } else {
-        Alert.alert('Could not accept', message);
+        Alert.alert(t('servantHome.couldNotAccept'), message);
       }
     } finally {
       setActingId(null);
@@ -225,14 +227,14 @@ export default function ServantHomeScreen() {
     try {
       await api.patch(`/bookings/${id}/reject`, { reason: 'Unavailable at this time' });
       await refreshBookings();
-      Alert.alert('Declined', 'The customer has been notified.');
+      Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
       const message = apiError(e, 'Try again');
       if (message.toLowerCase().includes('not pending')) {
         await refreshBookings();
-        Alert.alert('Already handled', 'This request was already accepted or declined.');
+        Alert.alert(t('servantHome.alreadyHandled'), t('servantHome.requestHandled'));
       } else {
-        Alert.alert('Could not decline', message);
+        Alert.alert(t('servantHome.couldNotDecline'), message);
       }
     } finally {
       setActingId(null);
@@ -561,7 +563,7 @@ export default function ServantHomeScreen() {
                     </Text>
                   </TouchableOpacity>
                   <GradientButton
-                    title="I arrived — start work"
+                    title={t('servantHome.arrivedStartWork')}
                     onPress={() => clockIn(b.id)}
                     style={{ marginTop: 12 }}
                   />

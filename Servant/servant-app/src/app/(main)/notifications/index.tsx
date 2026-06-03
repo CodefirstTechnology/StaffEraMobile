@@ -9,21 +9,14 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useNotifications, type AppNotification } from '@/hooks/useNotifications';
-
-function formatWhen(iso: string) {
-  const d = new Date(iso);
-  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return d.toLocaleDateString();
-}
+import { localizeNotification } from '@/lib/i18n/notifications';
+import { formatRelativeTime } from '@/lib/i18n/format';
 
 function getBookingId(n: AppNotification) {
   const id = n.data?.bookingId;
@@ -31,6 +24,7 @@ function getBookingId(n: AppNotification) {
 }
 
 export default function NotificationsScreen() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: notifications = [], isLoading, refetch, isRefetching } = useNotifications();
   const unread = notifications.filter((n) => !n.isRead).length;
@@ -58,10 +52,10 @@ export default function NotificationsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <MaterialIcons name="arrow-back" size={24} color={Stitch.colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.title}>Notifications</Text>
+        <Text style={styles.title}>{t('notifications.title')}</Text>
         {unread > 0 ? (
           <TouchableOpacity onPress={markAllRead}>
-            <Text style={styles.markAll}>Mark all read</Text>
+            <Text style={styles.markAll}>{t('notifications.markAllRead')}</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.backBtn} />
@@ -80,38 +74,41 @@ export default function NotificationsScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <MaterialIcons name="notifications-none" size={48} color={Stitch.colors.onSurfaceVariant} />
-              <Text style={styles.emptyTitle}>No notifications yet</Text>
-              <Text style={styles.emptySub}>Booking updates will appear here</Text>
+              <Text style={styles.emptyTitle}>{t('notifications.emptyTitle')}</Text>
+              <Text style={styles.emptySub}>{t('notifications.emptySub')}</Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <Pressable onPress={() => openNotification(item)}>
-              <GlassCard style={[styles.card, !item.isRead && styles.unreadCard]}>
-                <View style={styles.cardRow}>
-                  <View style={[styles.iconWrap, !item.isRead && styles.iconUnread]}>
-                    <MaterialIcons
-                      name="notifications"
-                      size={20}
-                      color={item.isRead ? Stitch.colors.onSurfaceVariant : Stitch.colors.secondary}
-                    />
-                  </View>
-                  <View style={styles.cardBody}>
-                    <View style={styles.titleRow}>
-                      <Text style={[styles.cardTitle, !item.isRead && styles.unreadTitle]} numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                      {!item.isRead && <View style={styles.dot} />}
+          renderItem={({ item }) => {
+            const localized = localizeNotification(item);
+            return (
+              <Pressable onPress={() => openNotification(item)}>
+                <GlassCard style={[styles.card, !item.isRead && styles.unreadCard]}>
+                  <View style={styles.cardRow}>
+                    <View style={[styles.iconWrap, !item.isRead && styles.iconUnread]}>
+                      <MaterialIcons
+                        name="notifications"
+                        size={20}
+                        color={item.isRead ? Stitch.colors.onSurfaceVariant : Stitch.colors.secondary}
+                      />
                     </View>
-                    <Text style={styles.cardBodyText}>{item.body}</Text>
-                    <Text style={styles.when}>{formatWhen(item.createdAt)}</Text>
+                    <View style={styles.cardBody}>
+                      <View style={styles.titleRow}>
+                        <Text style={[styles.cardTitle, !item.isRead && styles.unreadTitle]} numberOfLines={1}>
+                          {localized.title}
+                        </Text>
+                        {!item.isRead && <View style={styles.dot} />}
+                      </View>
+                      <Text style={styles.cardBodyText}>{localized.body}</Text>
+                      <Text style={styles.when}>{formatRelativeTime(item.createdAt)}</Text>
+                    </View>
+                    {getBookingId(item) ? (
+                      <MaterialIcons name="chevron-right" size={22} color={Stitch.colors.onSurfaceVariant} />
+                    ) : null}
                   </View>
-                  {getBookingId(item) ? (
-                    <MaterialIcons name="chevron-right" size={22} color={Stitch.colors.onSurfaceVariant} />
-                  ) : null}
-                </View>
-              </GlassCard>
-            </Pressable>
-          )}
+                </GlassCard>
+              </Pressable>
+            );
+          }}
         />
       )}
     </View>

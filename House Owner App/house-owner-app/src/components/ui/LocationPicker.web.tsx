@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 import { DEFAULT_MAP_REGION, type LocationValue } from '@/lib/locationTypes';
@@ -27,10 +28,13 @@ type Props = {
 export function LocationPicker({
   value,
   onChange,
-  label = 'Location',
-  placeholder = 'Search area, street, or landmark',
+  label,
+  placeholder,
   height = 220,
 }: Props) {
+  const { t } = useTranslation();
+  const pickerLabel = label ?? t('location.label');
+  const pickerPlaceholder = placeholder ?? t('location.placeholder');
   const [query, setQuery] = useState(value?.address || '');
   const [predictions, setPredictions] = useState<
     Awaited<ReturnType<typeof searchPlaces>>
@@ -75,7 +79,10 @@ export function LocationPicker({
       applyLocation(location);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Location error', err.response?.data?.message || 'Could not load place');
+      Alert.alert(
+        t('location.errorTitle'),
+        err.response?.data?.message || t('location.couldNotLoadPlace'),
+      );
     } finally {
       setResolving(false);
     }
@@ -86,7 +93,7 @@ export function LocationPicker({
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Allow location access to use your current position.');
+        Alert.alert(t('location.permissionTitle'), t('location.permissionBody'));
         return;
       }
       const pos = await Location.getCurrentPositionAsync({
@@ -96,7 +103,10 @@ export function LocationPicker({
       applyLocation(location);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Location error', err.response?.data?.message || 'Could not read GPS location.');
+      Alert.alert(
+        t('location.errorTitle'),
+        err.response?.data?.message || t('location.couldNotReadGps'),
+      );
     } finally {
       setResolving(false);
     }
@@ -104,13 +114,13 @@ export function LocationPicker({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{pickerLabel}</Text>
       <View style={styles.searchRow}>
         <MaterialIcons name="search" size={20} color={Stitch.colors.onSurfaceVariant} />
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder={placeholder}
+          placeholder={pickerPlaceholder}
           placeholderTextColor={Stitch.colors.onSurfaceVariant + '99'}
           style={styles.input}
         />
@@ -143,15 +153,12 @@ export function LocationPicker({
 
       <View style={[styles.webHint, { minHeight: height / 2 }]}>
         <MaterialIcons name="map" size={28} color={Stitch.colors.secondary} />
-        <Text style={styles.webHintText}>
-          Search for an address above or use your current location. Interactive map is available in
-          the Android/iOS app.
-        </Text>
+        <Text style={styles.webHintText}>{t('location.webMapHint')}</Text>
       </View>
 
       <TouchableOpacity style={styles.gpsBtn} onPress={useCurrentLocation} disabled={resolving}>
         <MaterialIcons name="my-location" size={18} color={Stitch.colors.primary} />
-        <Text style={styles.gpsText}>Use current location</Text>
+        <Text style={styles.gpsText}>{t('location.useCurrentLocation')}</Text>
       </TouchableOpacity>
 
       {value ? (
@@ -160,7 +167,7 @@ export function LocationPicker({
           {value.city ? ` · ${value.city}` : ''}
         </Text>
       ) : (
-        <Text style={styles.hint}>Search for a place or use GPS to set location.</Text>
+        <Text style={styles.hint}>{t('location.webGpsHint')}</Text>
       )}
     </View>
   );

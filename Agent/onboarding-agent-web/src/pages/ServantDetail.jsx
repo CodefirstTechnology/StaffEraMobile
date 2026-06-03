@@ -3,6 +3,11 @@ import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
 import { uploadUrl } from '../lib/mediaUrl'
+import {
+  buildReportFromServant,
+  downloadOnboardingReport,
+  printOnboardingReport,
+} from '../lib/onboardingReport'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 
@@ -381,8 +386,25 @@ export default function ServantDetail() {
               )}
             </div>
 
+            <div className="mt-6 space-y-2 border-t border-outline-variant/30 pt-6">
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => downloadOnboardingReport(buildReportFromServant(servant))}
+              >
+                ↓ Download onboarding report
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => printOnboardingReport(buildReportFromServant(servant))}
+              >
+                Print / Save as PDF
+              </Button>
+            </div>
+
             {canReview && (
-              <div className="mt-6 space-y-2 border-t border-outline-variant/30 pt-6">
+              <div className="space-y-2">
                 <Button
                   variant="success"
                   className="w-full"

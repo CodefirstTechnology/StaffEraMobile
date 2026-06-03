@@ -33,6 +33,7 @@ enum BookingStatus {
   COMPLETED
   CANCELLED
   REJECTED
+  EXPIRED
 }
 
 model User {
@@ -43,8 +44,9 @@ model User {
   password      String
   role          Role           @default(HOUSE_OWNER)
   isActive      Boolean        @default(true)
-  fcmToken      String?
-  createdAt     DateTime       @default(now())
+  fcmToken           String?
+  preferredLanguage  String         @default("en")
+  createdAt          DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   houseOwner    HouseOwner?

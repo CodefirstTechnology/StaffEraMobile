@@ -1,4 +1,5 @@
 import { View, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { GhostInput } from '@/components/ui/GhostInput';
 
 export type AddressUnitValue = {
@@ -13,25 +14,26 @@ type Props = {
 };
 
 export function AddressUnitFields({ value, onChange }: Props) {
+  const { t } = useTranslation();
   const set = (key: keyof AddressUnitValue, text: string) =>
     onChange({ ...value, [key]: text });
 
   return (
     <View style={styles.wrap}>
       <GhostInput
-        label="Flat / house no."
+        label={t('profile.flatNo')}
         value={value.flatNo}
-        onChangeText={(t) => set('flatNo', t)}
+        onChangeText={(txt) => set('flatNo', txt)}
       />
       <GhostInput
-        label="Building / society name"
+        label={t('profile.building')}
         value={value.building}
-        onChangeText={(t) => set('building', t)}
+        onChangeText={(txt) => set('building', txt)}
       />
       <GhostInput
-        label="Area / locality"
+        label={t('profile.area')}
         value={value.area}
-        onChangeText={(t) => set('area', t)}
+        onChangeText={(txt) => set('area', txt)}
       />
     </View>
   );

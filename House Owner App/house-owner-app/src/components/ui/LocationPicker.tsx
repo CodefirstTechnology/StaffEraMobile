@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 import { DEFAULT_MAP_REGION, type LocationValue } from '@/lib/locationTypes';
@@ -30,10 +31,13 @@ type Props = {
 export function LocationPicker({
   value,
   onChange,
-  label = 'Location',
-  placeholder = 'Search area, street, or landmark',
+  label,
+  placeholder,
   height = 220,
 }: Props) {
+  const { t } = useTranslation();
+  const pickerLabel = label ?? t('location.label');
+  const pickerPlaceholder = placeholder ?? t('location.placeholder');
   const mapRef = useRef<MapView>(null);
   const [query, setQuery] = useState(value?.address || '');
   const [predictions, setPredictions] = useState<
@@ -95,7 +99,10 @@ export function LocationPicker({
       await applyLocation(location);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Location error', err.response?.data?.message || 'Could not resolve address');
+      Alert.alert(
+        t('location.errorTitle'),
+        err.response?.data?.message || t('location.couldNotResolve'),
+      );
     } finally {
       setResolving(false);
     }
@@ -108,7 +115,10 @@ export function LocationPicker({
       await applyLocation(location);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Location error', err.response?.data?.message || 'Could not load place');
+      Alert.alert(
+        t('location.errorTitle'),
+        err.response?.data?.message || t('location.couldNotLoadPlace'),
+      );
     } finally {
       setResolving(false);
     }
@@ -119,7 +129,7 @@ export function LocationPicker({
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Allow location access to use your current position.');
+        Alert.alert(t('location.permissionTitle'), t('location.permissionBody'));
         return;
       }
       const pos = await Location.getCurrentPositionAsync({
@@ -127,7 +137,7 @@ export function LocationPicker({
       });
       await resolveCoords(pos.coords.latitude, pos.coords.longitude);
     } catch {
-      Alert.alert('Location error', 'Could not read GPS location.');
+      Alert.alert(t('location.errorTitle'), t('location.couldNotReadGps'));
     } finally {
       setResolving(false);
     }
@@ -139,13 +149,13 @@ export function LocationPicker({
 
   return (
     <View style={styles.wrap}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {pickerLabel ? <Text style={styles.label}>{pickerLabel}</Text> : null}
       <View style={styles.searchRow}>
         <MaterialIcons name="search" size={20} color={Stitch.colors.onSurfaceVariant} />
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder={placeholder}
+          placeholder={pickerPlaceholder}
           placeholderTextColor={Stitch.colors.onSurfaceVariant + '99'}
           style={styles.input}
         />
@@ -205,7 +215,7 @@ export function LocationPicker({
 
       <TouchableOpacity style={styles.gpsBtn} onPress={useCurrentLocation} disabled={resolving}>
         <MaterialIcons name="my-location" size={18} color={Stitch.colors.primary} />
-        <Text style={styles.gpsText}>Use current location</Text>
+        <Text style={styles.gpsText}>{t('location.useCurrentLocation')}</Text>
       </TouchableOpacity>
 
       {value ? (
@@ -214,7 +224,7 @@ export function LocationPicker({
           {value.city ? ` · ${value.city}` : ''}
         </Text>
       ) : (
-        <Text style={styles.hint}>Pick a place from search, tap the map, or use GPS.</Text>
+        <Text style={styles.hint}>{t('location.pickHint')}</Text>
       )}
     </View>
   );

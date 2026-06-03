@@ -3,7 +3,22 @@ import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { useSkills } from '../hooks/useSkills'
+import {
+  buildReportFromForm,
+  buildReportFromFormSubmitted,
+  downloadOnboardingReport,
+  printOnboardingReport,
+} from '../lib/onboardingReport'
+
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+
+const STEPS = [
+  { id: 1, label: 'Personal' },
+  { id: 2, label: 'Skills' },
+  { id: 3, label: 'Availability' },
+  { id: 4, label: 'Documents' },
+  { id: 5, label: 'Review & submit' },
+]
 
 const PERSONAL_FIELDS = [
   { key: 'name', label: 'Full name', placeholder: 'Enter full name', type: 'text' },
@@ -68,6 +83,7 @@ export default function OnboardServant() {
   const { data: skills = [], isLoading: skillsLoading } = useSkills()
   const [step, setStep] = useState(1)
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -106,6 +122,30 @@ export default function OnboardServant() {
         : [...f.workingDays, d],
     }))
 
+  const validatePersonal = () => {
+    if (!form.name?.trim()) {
+      setError('Full name is required')
+      return false
+    }
+    if (!form.email?.trim()) {
+      setError('Email is required')
+      return false
+    }
+    if (!form.password || form.password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return false
+    }
+    return true
+  }
+
+  const validateAvailability = () => {
+    if (!form.offersSession && !form.offersMonthly) {
+      setError('Select at least one booking type: Session or Monthly')
+      return false
+    }
+    return true
+  }
+
   const validateDocuments = () => {
     if (!idProof) {
       setError('ID proof document is required (JPEG, PNG, or WebP, max 5 MB)')
@@ -118,19 +158,52 @@ export default function OnboardServant() {
     return true
   }
 
+  const validateForReview = () => {
+    if (!validatePersonal()) return false
+    if (!validateAvailability()) return false
+    if (!validateDocuments()) return false
+    return true
+  }
+
+  const reportDraft = () => buildReportFromForm(form, skills, { idProof, profilePhoto })
+
+  const handleDownloadReport = () => {
+    setError('')
+    downloadOnboardingReport(reportDraft(), 'onboarding-draft')
+  }
+
+  const handlePrintReport = () => {
+    setError('')
+    printOnboardingReport(reportDraft())
+  }
+
   const goNext = () => {
     setError('')
-    if (step === 4 && !validateDocuments()) return
+    if (step === 1 && !validatePersonal()) return
+    if (step === 3 && !validateAvailability()) return
+    if (step === 4) {
+      if (!validateDocuments()) return
+      if (!validatePersonal()) {
+        setStep(1)
+        return
+      }
+      if (!validateAvailability()) {
+        setStep(3)
+        return
+      }
+    }
     setStep((s) => s + 1)
   }
 
   const submit = async () => {
     setError('')
-    if (!form.offersSession && !form.offersMonthly) {
-      setError('Select at least one booking type: Session or Monthly')
+    if (!validateForReview()) {
+      if (!validatePersonal()) setStep(1)
+      else if (!validateAvailability()) setStep(3)
+      else if (!validateDocuments()) setStep(4)
       return
     }
-    if (!validateDocuments()) return
+
     const fd = new FormData()
     Object.entries(form).forEach(([k, v]) => {
       if (k === 'skills' || k === 'workingDays') {
@@ -144,31 +217,52 @@ export default function OnboardServant() {
     if (profilePhoto) fd.append('profilePhoto', profilePhoto)
     if (idProof) fd.append('idProof', idProof)
 
+    setSubmitting(true)
     try {
       const res = await api.post('/agent/servants', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      navigate(`/servants/${res.data.data.servant.id}`)
+      const servant = res.data.data.servant
+      downloadOnboardingReport(
+        buildReportFromFormSubmitted(form, skills, { idProof, profilePhoto }, servant),
+        `servant-${servant.id}`,
+      )
+      navigate(`/servants/${servant.id}`)
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to create servant')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h2 className="text-2xl font-bold">Onboard New Servant</h2>
-      <div className="flex gap-2">
-        {[1, 2, 3, 4, 5].map((s) => (
-          <div
-            key={s}
-            className={`h-2 flex-1 rounded ${step >= s ? 'bg-primary' : 'bg-gray-200'}`}
-          />
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-2xl font-bold">Onboard New Servant</h2>
+        <span className="text-sm text-subtext">
+          Step {step} of {STEPS.length}
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          {STEPS.map((s) => (
+            <div
+              key={s.id}
+              className={`h-2 flex-1 rounded ${step >= s.id ? 'bg-primary' : 'bg-gray-200'}`}
+              title={s.label}
+            />
+          ))}
+        </div>
+        <p className="text-center text-sm font-medium text-primary">
+          {STEPS.find((s) => s.id === step)?.label}
+        </p>
       </div>
 
       {step === 1 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Personal Info</h3>
+          {error && <p className="text-error text-sm">{error}</p>}
           {PERSONAL_FIELDS.map((f) => (
             <Field key={f.key} label={f.label}>
               <input
@@ -254,6 +348,7 @@ export default function OnboardServant() {
           <p className="text-sm text-subtext">
             Choose which booking types this servant accepts and set the schedule for each.
           </p>
+          {error && <p className="text-error text-sm">{error}</p>}
 
           <div className="space-y-2">
             <FieldLabel>Booking types offered</FieldLabel>
@@ -350,8 +445,7 @@ export default function OnboardServant() {
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">ID Verification</h3>
           <p className="text-sm text-subtext">
-            Images are stored on the server; only the file path is saved in the
-            database.
+            Images are stored on the server; only the file path is saved in the database.
           </p>
           {error && <p className="text-error text-sm">{error}</p>}
           <Field label="ID proof type">
@@ -371,7 +465,6 @@ export default function OnboardServant() {
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              required
               onChange={(e) => setIdProof(e.target.files?.[0] || null)}
               className="w-full text-sm"
             />
@@ -380,7 +473,6 @@ export default function OnboardServant() {
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              required
               onChange={(e) => setProfilePhoto(e.target.files?.[0] || null)}
               className="w-full text-sm"
             />
@@ -390,9 +482,10 @@ export default function OnboardServant() {
 
       {step === 5 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
-          <h3 className="font-semibold">Review & Submit</h3>
+          <h3 className="font-semibold">Review &amp; submit</h3>
           <p className="text-sm text-subtext">
-            Please confirm the details below before submitting.
+            Confirm all details below. You can download or print a report for your records,
+            then submit to create the profile (status: Pending verification).
           </p>
 
           <ReviewSection title="Personal Info">
@@ -470,19 +563,53 @@ export default function OnboardServant() {
           </ReviewSection>
 
           {error && <p className="text-error text-sm">{error}</p>}
-          <Button onClick={submit}>Submit</Button>
+
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <p className="mb-3 text-sm font-medium text-primary">Before you submit</p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button
+                variant="secondary"
+                onClick={handleDownloadReport}
+                disabled={submitting}
+              >
+                ↓ Download report
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handlePrintReport}
+                disabled={submitting}
+              >
+                Print / Save as PDF
+              </Button>
+              <Button
+                variant="gradient"
+                className="flex-1 sm:min-w-[12rem]"
+                onClick={submit}
+                disabled={submitting}
+              >
+                {submitting ? 'Submitting…' : 'Submit for verification'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
-      <div className="flex justify-between">
+      <div className="flex flex-wrap justify-between gap-2">
         <Button
           variant="secondary"
-          disabled={step === 1}
-          onClick={() => setStep((s) => s - 1)}
+          disabled={step === 1 || submitting}
+          onClick={() => {
+            setError('')
+            setStep((s) => s - 1)
+          }}
         >
           Back
         </Button>
-        {step < 5 && <Button onClick={goNext}>Next</Button>}
+        {step < 5 && (
+          <Button onClick={goNext} disabled={submitting}>
+            {step === 4 ? 'Review & submit' : 'Next'}
+          </Button>
+        )}
       </div>
     </div>
   )

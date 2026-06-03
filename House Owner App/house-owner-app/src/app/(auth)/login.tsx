@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,19 +12,27 @@ import { Link, router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
-
-const schema = z.object({
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(1, 'Password required'),
-});
+import { LanguageSelector } from '@/components/ui/LanguageSelector';
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const login = useAuthStore((s) => s.login);
   const [loading, setLoading] = useState(false);
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        email: z.string().email(t('validation.emailInvalid')),
+        password: z.string().min(1, t('validation.passwordRequired')),
+      }),
+    [t],
+  );
+
   const { control, handleSubmit } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
@@ -37,7 +45,7 @@ export default function LoginScreen() {
       router.replace('/(main)/home');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Login failed', err.response?.data?.message || 'Please try again');
+      Alert.alert(t('auth.loginFailed'), err.response?.data?.message || t('auth.tryAgain'));
     } finally {
       setLoading(false);
     }
@@ -51,16 +59,17 @@ export default function LoginScreen() {
       <View style={styles.blob1} />
       <View style={styles.blob2} />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.logo}>StaffEra</Text>
-        <Text style={styles.subtitle}>Trusted home help for your family</Text>
-        <Text style={styles.trust}>{Stitch.copy.trustLine}</Text>
+        <LanguageSelector compact showTitle />
+        <Text style={styles.logo}>{t('common.appName')}</Text>
+        <Text style={styles.subtitle}>{t('auth.trustedSubtitle')}</Text>
+        <Text style={styles.trust}>{t('auth.trustLine')}</Text>
 
         <Controller
           control={control}
           name="email"
           render={({ field: { onChange, value } }) => (
             <GhostInput
-              label="Email"
+              label={t('auth.email')}
               autoCapitalize="none"
               keyboardType="email-address"
               value={value}
@@ -73,7 +82,7 @@ export default function LoginScreen() {
           name="password"
           render={({ field: { onChange, value } }) => (
             <GhostInput
-              label="Password"
+              label={t('auth.password')}
               secureTextEntry
               value={value}
               onChangeText={onChange}
@@ -81,13 +90,13 @@ export default function LoginScreen() {
           )}
         />
 
-        <GradientButton title="Sign in" onPress={handleSubmit(onSubmit)} loading={loading} />
+        <GradientButton title={t('auth.signIn')} onPress={handleSubmit(onSubmit)} loading={loading} />
 
         <Link href="/(auth)/register" asChild>
-          <Text style={styles.link}>New here? Create your account</Text>
+          <Text style={styles.link}>{t('auth.newAccount')}</Text>
         </Link>
 
-        <Text style={styles.safe}>{Stitch.copy.safeData}</Text>
+        <Text style={styles.safe}>{t('auth.safeData')}</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

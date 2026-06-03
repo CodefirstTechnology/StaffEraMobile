@@ -1,7 +1,9 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
+import { formatCurrency } from '@/lib/i18n/format';
 import { GlassCard } from '@/components/ui/GlassCard';
 import {
   bookingEarningAmount,
@@ -12,6 +14,7 @@ import {
 } from '@/lib/earnings';
 
 export default function EarningsScreen() {
+  const { t } = useTranslation();
   const { data: bookings } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
@@ -72,13 +75,13 @@ export default function EarningsScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Text style={styles.title}>Earnings</Text>
+      <Text style={styles.title}>{t('earnings.title')}</Text>
 
       <GlassCard style={styles.card}>
-        <Text style={styles.label}>This month · {monthLabel}</Text>
+        <Text style={styles.label}>{t('earnings.thisMonthLabel', { month: monthLabel })}</Text>
         <Text style={styles.total}>
-          {Stitch.copy.rupee}
-          {monthlyAmount.toLocaleString('en-IN')}
+          {t('common.rupee')}
+          {formatCurrency(monthlyAmount)}
         </Text>
         <Text style={styles.hint}>
           {monthlyCount > 0
@@ -88,10 +91,10 @@ export default function EarningsScreen() {
       </GlassCard>
 
       <GlassCard style={styles.card}>
-        <Text style={styles.label}>Today&apos;s earnings</Text>
+        <Text style={styles.label}>{t('earnings.todayEarnings')}</Text>
         <Text style={styles.total}>
-          {Stitch.copy.rupee}
-          {todayStats.amount.toLocaleString('en-IN')}
+          {t('common.rupee')}
+          {formatCurrency(todayStats.amount)}
         </Text>
         <Text style={styles.hint}>
           {todayStats.completedCount > 0
@@ -103,14 +106,14 @@ export default function EarningsScreen() {
       </GlassCard>
 
       <GlassCard style={styles.card}>
-        <Text style={styles.label}>All-time from completed jobs</Text>
+        <Text style={styles.label}>{t('earnings.allTime')}</Text>
         <Text style={styles.totalSm}>
-          {Stitch.copy.rupee}
-          {totalAll.toLocaleString('en-IN')}
+          {t('common.rupee')}
+          {formatCurrency(totalAll)}
         </Text>
       </GlassCard>
 
-      <Text style={styles.section}>This month&apos;s completed jobs</Text>
+      <Text style={styles.section}>{t('earnings.completedJobs')}</Text>
       {completedMonth.length === 0 ? (
         <Text style={styles.empty}>No completed jobs this month yet</Text>
       ) : (
@@ -127,8 +130,8 @@ export default function EarningsScreen() {
                 <Text style={styles.rowMeta}>{monthLabel}</Text>
               </View>
               <Text style={styles.amt}>
-                {Stitch.copy.rupee}
-                {bookingEarningAmount(b, hourlyRate).toLocaleString('en-IN')}
+                {t('common.rupee')}
+                {formatCurrency(bookingEarningAmount(b, hourlyRate))}
               </Text>
             </GlassCard>
           ),
@@ -152,8 +155,8 @@ export default function EarningsScreen() {
                 <Text style={styles.rowMeta}>Completed today</Text>
               </View>
               <Text style={styles.amt}>
-                {Stitch.copy.rupee}
-                {bookingEarningAmount(b, hourlyRate).toLocaleString('en-IN')}
+                {t('common.rupee')}
+                {formatCurrency(bookingEarningAmount(b, hourlyRate))}
               </Text>
             </GlassCard>
           ),

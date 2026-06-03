@@ -3,6 +3,8 @@ const { z } = require("zod");
 const emptyToUndefined = (val) =>
   val === undefined || val === null || String(val).trim() === "" ? undefined : val;
 
+const SUPPORTED_LANGUAGES = ["en", "hi", "mr"];
+
 const registerOwnerSchema = z.object({
   body: z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -12,7 +14,8 @@ const registerOwnerSchema = z.object({
     address: z.preprocess(emptyToUndefined, z.string().optional()),
     city: z.preprocess(emptyToUndefined, z.string().optional()),
     latitude: z.coerce.number().min(-90).max(90).optional(),
-    longitude: z.coerce.number().min(-180).max(180).optional()
+    longitude: z.coerce.number().min(-180).max(180).optional(),
+    preferredLanguage: z.enum(SUPPORTED_LANGUAGES).optional()
   })
 });
 
@@ -54,11 +57,19 @@ const updateLocationSchema = z.object({
   })
 });
 
+const updatePreferencesSchema = z.object({
+  body: z.object({
+    preferredLanguage: z.enum(SUPPORTED_LANGUAGES)
+  })
+});
+
 module.exports = {
   registerOwnerSchema,
   loginSchema,
   refreshSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-  updateLocationSchema
+  updateLocationSchema,
+  updatePreferencesSchema,
+  SUPPORTED_LANGUAGES
 };

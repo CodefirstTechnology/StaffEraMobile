@@ -10,7 +10,8 @@ const {
   refreshSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-  updateLocationSchema
+  updateLocationSchema,
+  updatePreferencesSchema
 } = require("../validators/authValidator");
 
 router.post(
@@ -27,6 +28,12 @@ router.patch(
   authenticate,
   validate(updateLocationSchema),
   asyncHandler(authController.updateLocation)
+);
+router.patch(
+  "/me/preferences",
+  authenticate,
+  validate(updatePreferencesSchema),
+  asyncHandler(authController.updatePreferences)
 );
 router.post(
   "/forgot-password",

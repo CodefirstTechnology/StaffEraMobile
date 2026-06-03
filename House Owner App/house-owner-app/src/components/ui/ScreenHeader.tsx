@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 
@@ -13,7 +14,7 @@ type Props = {
 };
 
 export function ScreenHeader({
-  locationLabel = 'Your area',
+  locationLabel,
   location = 'Mumbai, India',
   title,
   onProfile,
@@ -21,11 +22,13 @@ export function ScreenHeader({
   unreadNotifications = 0,
   onNotifications,
 }: Props) {
+  const { t } = useTranslation();
+  const resolvedLocationLabel = locationLabel ?? t('common.yourArea');
   const locationContent = (
     <>
       <MaterialIcons name="location-on" size={22} color={Stitch.colors.primary} />
       <View style={styles.locTextWrap}>
-        <Text style={styles.locLabel}>{locationLabel}</Text>
+        <Text style={styles.locLabel}>{resolvedLocationLabel}</Text>
         <Text style={styles.locValue} numberOfLines={2}>
           {location}
         </Text>
