@@ -6,7 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 import { formatTime } from '@/lib/i18n/format';
 import { mapViewProps } from '@/lib/mapsConfig';
-import { mapsDeepLink, mapsDirectionsUrl } from '@/lib/locationTypes';
+import { mapsDeepLink } from '@/lib/locationTypes';
 import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
 import type { VisitAddressParts } from '@/lib/visitAddress';
 
@@ -58,11 +58,6 @@ export function JobTrackingMap({
 
   const initial = points.length > 0 ? fitRegion(points) : { ...home, latitudeDelta: 0.02, longitudeDelta: 0.02 };
 
-  const openDirectionsToHelper = () => {
-    if (!servant) return;
-    Linking.openURL(mapsDirectionsUrl(servant, home));
-  };
-
   const openHome = () =>
     Linking.openURL(mapsDeepLink(home.latitude, home.longitude, t('bookings.mapPinHome')));
 
@@ -91,20 +86,10 @@ export function JobTrackingMap({
         </MapView>
         <Text style={styles.caption}>{caption}</Text>
       </View>
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={[styles.btn, !servant && styles.btnDisabled]}
-          onPress={openDirectionsToHelper}
-          disabled={!servant}
-        >
-          <MaterialIcons name="directions" size={18} color="#fff" />
-          <Text style={styles.btnText}>{t('bookings.routeToHelper')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.btn, styles.btnOutline]} onPress={openHome}>
-          <MaterialIcons name="home" size={18} color={Stitch.colors.primary} />
-          <Text style={[styles.btnText, styles.btnTextOutline]}>{t('bookings.yourHomeBtn')}</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.btn} onPress={openHome}>
+        <MaterialIcons name="home" size={18} color={Stitch.colors.primary} />
+        <Text style={styles.btnText}>{t('bookings.yourHomeBtn')}</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -130,23 +115,17 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 8,
   },
-  row: { flexDirection: 'row', gap: 10, marginTop: 10 },
   btn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: Stitch.colors.primary,
+    marginTop: 10,
     paddingVertical: 11,
     borderRadius: 12,
-  },
-  btnOutline: {
     backgroundColor: 'transparent',
     borderWidth: 2,
     borderColor: Stitch.colors.primary,
   },
-  btnDisabled: { opacity: 0.45 },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  btnTextOutline: { color: Stitch.colors.primary },
+  btnText: { color: Stitch.colors.primary, fontWeight: '700', fontSize: 13 },
 });
