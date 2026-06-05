@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   LineChart,
@@ -21,6 +22,14 @@ export default function AdminDashboard() {
     },
   })
 
+  const { data: agents } = useQuery({
+    queryKey: ['admin-agents-dashboard'],
+    queryFn: async () => {
+      const res = await api.get('/admin/agents', { params: { limit: 10 } })
+      return res.data.data.agents
+    },
+  })
+
   const { data: bookings } = useQuery({
     queryKey: ['admin-bookings-recent'],
     queryFn: async () => {
@@ -33,6 +42,7 @@ export default function AdminDashboard() {
 
   const cards = [
     { label: 'Total Owners', value: stats.totalOwners },
+    { label: 'Field Agents', value: stats.totalAgents },
     { label: 'Total Servants', value: stats.totalServants },
     { label: 'Verified Servants', value: stats.verifiedServants },
     { label: 'Total Bookings', value: stats.totalBookings },
@@ -65,6 +75,53 @@ export default function AdminDashboard() {
             <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#f5a623" name="Revenue" />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+
+      <div className="rounded-xl bg-surface p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h3 className="font-semibold">Field agents by area</h3>
+          <Link to="/admin/agents" className="text-sm text-primary underline">
+            Manage agents
+          </Link>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-subtext">
+              <th className="pb-2">Agent</th>
+              <th className="pb-2">Agency</th>
+              <th className="pb-2">Area</th>
+              <th className="pb-2">Servants</th>
+              <th className="pb-2">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(agents || []).length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-4 text-subtext">
+                  No agents yet.{' '}
+                  <Link to="/admin/agents" className="text-primary underline">
+                    Add the first agent
+                  </Link>
+                </td>
+              </tr>
+            ) : (
+              (agents || []).map((a) => (
+                <tr key={a.id} className="border-b">
+                  <td className="py-2">
+                    <p>{a.user.name}</p>
+                    <p className="text-xs text-subtext">{a.user.email}</p>
+                  </td>
+                  <td>{a.agencyName || '—'}</td>
+                  <td>
+                    <p>{a.city || a.address || '—'}</p>
+                  </td>
+                  <td>{a._count?.servants ?? 0}</td>
+                  <td>{a.user.isActive ? 'Active' : 'Inactive'}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       <div className="rounded-xl bg-surface p-6 shadow-sm">

@@ -7,13 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  HOUSE_OWNER
-  SERVANT
-  AGENT
-  ADMIN
-}
-
 enum VerificationStatus {
   PENDING
   UNDER_REVIEW
@@ -41,13 +34,25 @@ enum BookingStatus {
   EXPIRED
 }
 
+model Role {
+  id        Int      @id
+  code      String   @unique
+  label     String
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
 model User {
   id            Int            @id @default(autoincrement())
   name          String
   email         String         @unique
   phone         String?        @unique
   password      String
-  role          Role           @default(HOUSE_OWNER)
+  roleId        Int            @default(4)
+  role          Role           @relation(fields: [roleId], references: [id])
   isActive           Boolean        @default(true)
   agentSetPassword   Boolean        @default(false)
   fcmToken           String?
@@ -60,6 +65,8 @@ model User {
   agent         Agent?
   refreshTokens RefreshToken[]
   notifications Notification[]
+
+  @@index([roleId])
 }
 
 model RefreshToken {

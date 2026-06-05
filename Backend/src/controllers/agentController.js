@@ -6,6 +6,12 @@ const { sendSuccess } = require("../utils/response");
 const { createNotification } = require("../services/notificationService");
 const { normalizeEmail, normalizePhone } = require("../utils/normalize");
 const { validateActiveSkillCodes } = require("../services/skillService");
+const {
+  ROLE_IDS,
+  getRoleCode,
+  serializeUser,
+  userWithRoleInclude
+} = require("../services/roleService");
 
 const parseSkills = (skills) => {
   if (!skills) return [];
@@ -46,7 +52,7 @@ const getAgent = async (userId) => {
 
 /** AGENT: scoped to own servants. ADMIN: full access (no agent profile required). */
 const resolveAgentScope = async (user) => {
-  if (user.role === "ADMIN") {
+  if (getRoleCode(user) === "ADMIN") {
     return { isAdmin: true, agent: null, agentId: null };
   }
   const agent = await getAgent(user.id);
@@ -193,7 +199,7 @@ exports.createServant = async (req, res) => {
       email,
       phone,
       password: hashed,
-      role: "SERVANT",
+      roleId: ROLE_IDS.SERVANT,
       servant: {
         create: {
           agentId: assignAgentId,
@@ -603,10 +609,10 @@ exports.updateProfile = async (req, res) => {
     include: {
       houseOwner: true,
       servant: { include: { skills: true, zones: true } },
-      agent: true
+      agent: true,
+      ...userWithRoleInclude
     }
   });
 
-  const { password, ...safeUser } = user;
-  sendSuccess(res, { agent: updated, user: safeUser });
+  sendSuccess(res, { agent: updated, user: serializeUser(user) });
 };

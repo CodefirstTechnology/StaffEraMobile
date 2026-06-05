@@ -1,6 +1,7 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { verifyAccessToken } = require("../utils/jwt");
+const { userWithRoleInclude, getRoleCode } = require("../services/roleService");
 
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -15,6 +16,7 @@ const authenticate = async (req, res, next) => {
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       include: {
+        ...userWithRoleInclude,
         houseOwner: true,
         servant: true,
         agent: true
@@ -28,7 +30,8 @@ const authenticate = async (req, res, next) => {
     req.user = {
       id: user.id,
       email: user.email,
-      role: user.role,
+      role: getRoleCode(user),
+      roleId: user.roleId,
       name: user.name,
       houseOwner: user.houseOwner,
       servant: user.servant,

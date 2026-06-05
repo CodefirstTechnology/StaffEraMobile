@@ -16,6 +16,7 @@ import AdminUsers from './pages/admin/AdminUsers'
 import AdminBookings from './pages/admin/AdminBookings'
 import AdminServants from './pages/admin/AdminServants'
 import AdminSkills from './pages/admin/AdminSkills'
+import AdminAgents from './pages/admin/AdminAgents'
 
 const qc = new QueryClient()
 
@@ -51,6 +52,7 @@ export default function App() {
               }
             >
               <Route index element={<AdminDashboard />} />
+              <Route path="agents" element={<AdminAgents />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="bookings" element={<AdminBookings />} />
               <Route path="servants" element={<AdminServants />} />

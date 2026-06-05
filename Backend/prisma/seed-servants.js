@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
+const { seedRoles, ROLE_IDS } = require("../src/services/roleService");
 
 const prisma = new PrismaClient();
 
@@ -136,7 +137,12 @@ async function upsertServant(agentId, data, passwordHash) {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: existing.id },
-        data: { name: data.name, phone: data.phone, password: passwordHash, role: "SERVANT" }
+        data: {
+          name: data.name,
+          phone: data.phone,
+          password: passwordHash,
+          roleId: ROLE_IDS.SERVANT
+        }
       }),
       prisma.servant.update({
         where: { id: existing.servant.id },
@@ -178,7 +184,7 @@ async function upsertServant(agentId, data, passwordHash) {
       email: data.email,
       phone: data.phone,
       password: passwordHash,
-      role: "SERVANT",
+      roleId: ROLE_IDS.SERVANT,
       servant: {
         create: {
           agentId,
@@ -208,6 +214,8 @@ async function upsertServant(agentId, data, passwordHash) {
 }
 
 async function main() {
+  await seedRoles(prisma);
+
   const passwordHash = await bcrypt.hash("123456", 12);
 
   let agent = await prisma.agent.findFirst({
@@ -224,7 +232,7 @@ async function main() {
         email: "agent@staffera.com",
         phone: "9000000001",
         password: adminPassword,
-        role: "AGENT",
+        roleId: ROLE_IDS.AGENT,
         agent: { create: { agencyName: "StaffEra Agency", city: "Mumbai" } }
       }
     });

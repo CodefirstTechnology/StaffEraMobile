@@ -1,6 +1,20 @@
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
+const { normalizeEmail, normalizePhone } = require("../utils/normalize");
+const {
+  ROLE_IDS,
+  roleWhereByCode,
+  serializeUser,
+  userWithRoleInclude
+} = require("../services/roleService");
+
+const generateAgentPassword = () => {
+  const part = crypto.randomBytes(4).toString("hex");
+  return `Ag${part}1`;
+};
 
 exports.getStats = async (req, res) => {
   const now = new Date();
@@ -8,6 +22,7 @@ exports.getStats = async (req, res) => {
 
   const [
     totalOwners,
+    totalAgents,
     totalServants,
     verifiedServants,
     pendingVerification,
@@ -19,6 +34,7 @@ exports.getStats = async (req, res) => {
     monthRevenue
   ] = await Promise.all([
     prisma.houseOwner.count(),
+    prisma.agent.count(),
     prisma.servant.count(),
     prisma.servant.count({ where: { verificationStatus: "VERIFIED" } }),
     prisma.servant.count({
@@ -67,6 +83,7 @@ exports.getStats = async (req, res) => {
 
   sendSuccess(res, {
     totalOwners,
+    totalAgents,
     totalServants,
     verifiedServants,
     pendingVerification,
@@ -86,7 +103,7 @@ exports.listUsers = async (req, res) => {
   const limit = Math.min(100, parseInt(req.query.limit, 10) || 20);
 
   const where = {
-    ...(role ? { role } : {}),
+    ...roleWhereByCode(role),
     ...(isActive !== undefined ? { isActive: isActive === "true" } : {}),
     ...(search
       ? {
@@ -105,9 +122,10 @@ exports.listUsers = async (req, res) => {
         id: true,
         name: true,
         email: true,
-        role: true,
+        roleId: true,
         isActive: true,
-        createdAt: true
+        createdAt: true,
+        role: { select: { id: true, code: true, label: true } }
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -116,7 +134,10 @@ exports.listUsers = async (req, res) => {
     prisma.user.count({ where })
   ]);
 
-  sendSuccess(res, { users, pagination: { page, limit, total } });
+  sendSuccess(res, {
+    users: users.map(serializeUser),
+    pagination: { page, limit, total }
+  });
 };
 
 exports.listBookings = async (req, res) => {
@@ -171,6 +192,114 @@ exports.listServants = async (req, res) => {
   sendSuccess(res, { servants, pagination: { page, limit, total } });
 };
 
+exports.listAgents = async (req, res) => {
+  const { search, city } = req.query;
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(100, parseInt(req.query.limit, 10) || 20);
+
+  const where = {
+    ...(city
+      ? { city: { contains: city, mode: "insensitive" } }
+      : {}),
+    ...(search
+      ? {
+          OR: [
+            { agencyName: { contains: search, mode: "insensitive" } },
+            { city: { contains: search, mode: "insensitive" } },
+            { address: { contains: search, mode: "insensitive" } },
+            { user: { name: { contains: search, mode: "insensitive" } } },
+            { user: { email: { contains: search, mode: "insensitive" } } }
+          ]
+        }
+      : {})
+  };
+
+  const [agents, total] = await Promise.all([
+    prisma.agent.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            isActive: true,
+            createdAt: true
+          }
+        },
+        _count: { select: { servants: true } }
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: "desc" }
+    }),
+    prisma.agent.count({ where })
+  ]);
+
+  sendSuccess(res, { agents, pagination: { page, limit, total } });
+};
+
+exports.createAgent = async (req, res) => {
+  const {
+    name,
+    agencyName,
+    address,
+    city,
+    latitude,
+    longitude,
+    generatePassword
+  } = req.body;
+  const email = normalizeEmail(req.body.email);
+  const phone = normalizePhone(req.body.phone);
+  let password = req.body.password?.trim();
+
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [{ email }, ...(phone ? [{ phone }] : [])]
+    }
+  });
+  if (existing) throw new ApiError(400, "Email or phone already registered");
+
+  if (!password || generatePassword) {
+    password = generateAgentPassword();
+  } else if (password.length < 6) {
+    throw new ApiError(400, "Password must be at least 6 characters");
+  }
+
+  const hashed = await bcrypt.hash(password, 12);
+
+  const user = await prisma.user.create({
+    data: {
+      name: name.trim(),
+      email,
+      phone,
+      password: hashed,
+      roleId: ROLE_IDS.AGENT,
+      agent: {
+        create: {
+          agencyName: agencyName?.trim() || null,
+          address: address.trim(),
+          city: city?.trim() || null,
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude)
+        }
+      }
+    },
+    include: { agent: true, ...userWithRoleInclude }
+  });
+
+  sendSuccess(
+    res,
+    {
+      agent: user.agent,
+      user: serializeUser(user),
+      credentials: { email, password }
+    },
+    201
+  );
+};
+
 exports.toggleUser = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const user = await prisma.user.findUnique({ where: { id } });
@@ -183,10 +312,11 @@ exports.toggleUser = async (req, res) => {
       id: true,
       name: true,
       email: true,
-      role: true,
-      isActive: true
+      roleId: true,
+      isActive: true,
+      role: { select: { id: true, code: true, label: true } }
     }
   });
 
-  sendSuccess(res, { user: updated });
+  sendSuccess(res, { user: serializeUser(updated) });
 };

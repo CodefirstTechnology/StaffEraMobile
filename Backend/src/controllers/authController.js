@@ -12,17 +12,20 @@ const {
 const logger = require("../utils/logger");
 const { normalizeEmail, normalizePhone } = require("../utils/normalize");
 const { validateActiveSkillCodes } = require("../services/skillService");
+const {
+  ROLE_IDS,
+  userWithRoleInclude,
+  getRoleCode,
+  serializeUser
+} = require("../services/roleService");
 
-const sanitizeUser = (user) => {
-  const { password, ...rest } = user;
-  return rest;
-};
+const sanitizeUser = (user) => serializeUser(user);
 
 const issueTokens = async (user) => {
   const accessToken = signAccessToken({
     id: user.id,
     email: user.email,
-    role: user.role
+    role: getRoleCode(user)
   });
 
   const refreshTokenStr = generateRefreshTokenString();
@@ -60,7 +63,7 @@ exports.registerOwner = async (req, res) => {
       email,
       phone,
       password: hashed,
-      role: "HOUSE_OWNER",
+      roleId: ROLE_IDS.HOUSE_OWNER,
       preferredLanguage: preferredLanguage || "en",
       houseOwner: {
         create: {
@@ -71,7 +74,7 @@ exports.registerOwner = async (req, res) => {
         }
       }
     },
-    include: { houseOwner: true }
+    include: { houseOwner: true, ...userWithRoleInclude }
   });
 
   const tokens = await issueTokens(user);
@@ -118,13 +121,13 @@ exports.registerServant = async (req, res) => {
   const byEmail = email
     ? await prisma.user.findUnique({
         where: { email },
-        include: { servant: { include: { skills: true } } }
+        include: { servant: { include: { skills: true } }, ...userWithRoleInclude }
       })
     : null;
   const byPhone = phone
     ? await prisma.user.findFirst({
         where: { phone },
-        include: { servant: { include: { skills: true } } }
+        include: { servant: { include: { skills: true } }, ...userWithRoleInclude }
       })
     : null;
 
@@ -141,12 +144,12 @@ exports.registerServant = async (req, res) => {
     if (existing.isActive) {
       throw new ApiError(
         400,
-        existing.role === "SERVANT"
+        getRoleCode(existing) === "SERVANT"
           ? "This account is already active. Sign in with the email and password your agent shared."
           : "Email or phone is already registered on another account."
       );
     }
-    if (existing.role !== "SERVANT" || !existing.servant) {
+    if (getRoleCode(existing) !== "SERVANT" || !existing.servant) {
       throw new ApiError(400, "Email or phone is already registered on another account type.");
     }
 
@@ -191,7 +194,7 @@ exports.registerServant = async (req, res) => {
       email,
       phone,
       password: placeholderPassword,
-      role: "SERVANT",
+      roleId: ROLE_IDS.SERVANT,
       isActive: false,
       preferredLanguage: preferredLanguage || "en",
       servant: {
@@ -202,7 +205,7 @@ exports.registerServant = async (req, res) => {
         }
       }
     },
-    include: { servant: { include: { skills: true } } }
+    include: { servant: { include: { skills: true } }, ...userWithRoleInclude }
   });
 
   logger.info("Servant registration application", { userId: user.id, servantId: user.servant?.id });
@@ -227,7 +230,7 @@ exports.login = async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { email },
-    include: { houseOwner: true, servant: true, agent: true }
+    include: { houseOwner: true, servant: true, agent: true, ...userWithRoleInclude }
   });
 
   if (!user) {
@@ -235,7 +238,7 @@ exports.login = async (req, res) => {
   }
 
   if (!user.isActive) {
-    if (user.role === "SERVANT") {
+    if (getRoleCode(user) === "SERVANT") {
       throw new ApiError(
         403,
         "Your application is under review. An agent will contact you with login details."
@@ -247,7 +250,7 @@ exports.login = async (req, res) => {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) throw new ApiError(401, "Invalid email or password");
 
-  if (user.role === "SERVANT" && !user.servant) {
+  if (getRoleCode(user) === "SERVANT" && !user.servant) {
     throw new ApiError(403, "Servant profile not found. Contact your agent.");
   }
 
@@ -268,7 +271,7 @@ exports.refresh = async (req, res) => {
 
   const stored = await prisma.refreshToken.findUnique({
     where: { token: decoded.token },
-    include: { user: true }
+    include: { user: { include: userWithRoleInclude } }
   });
 
   if (!stored || stored.expiresAt < new Date()) {
@@ -305,7 +308,8 @@ exports.me = async (req, res) => {
     include: {
       houseOwner: true,
       servant: { include: { skills: true, zones: true } },
-      agent: true
+      agent: true,
+      ...userWithRoleInclude
     }
   });
 
@@ -341,7 +345,7 @@ exports.updateLocation = async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    include: { houseOwner: true, servant: true, agent: true }
+    include: { houseOwner: true, servant: true, agent: true, ...userWithRoleInclude }
   });
 
   sendSuccess(res, { houseOwner: updated, user: sanitizeUser(user) });
@@ -356,7 +360,8 @@ exports.updatePreferences = async (req, res) => {
     include: {
       houseOwner: true,
       servant: { include: { skills: true, zones: true } },
-      agent: true
+      agent: true,
+      ...userWithRoleInclude
     }
   });
 

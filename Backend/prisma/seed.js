@@ -1,9 +1,12 @@
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
+const { seedRoles, ROLE_IDS } = require("../src/services/roleService");
 
 const prisma = new PrismaClient();
 
 async function main() {
+  await seedRoles(prisma);
+
   const password = await bcrypt.hash("StaffEra@123", 12);
 
   const adminUser = await prisma.user.upsert({
@@ -13,7 +16,7 @@ async function main() {
       name: "Admin User",
       email: "admin@staffera.com",
       password,
-      role: "ADMIN",
+      roleId: ROLE_IDS.ADMIN,
       agent: {
         create: { agencyName: "StaffEra Admin", city: "Mumbai" }
       }
@@ -39,7 +42,7 @@ async function main() {
       email: "agent@staffera.com",
       phone: "9000000001",
       password,
-      role: "AGENT",
+      roleId: ROLE_IDS.AGENT,
       agent: {
         create: { agencyName: "StaffEra Agency", city: "Mumbai" }
       }
