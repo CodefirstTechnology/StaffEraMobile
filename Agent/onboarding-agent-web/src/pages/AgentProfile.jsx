@@ -317,7 +317,7 @@ export default function AgentProfile() {
       {user.agent && (
         <SectionCard
           title="Agency settings"
-          description="Agency location is required to onboard servants in your area."
+          description="Agency location is required. You receive app registrations within 15 km of this point."
         >
           <div className="space-y-4">
             <label className="block space-y-1.5">

@@ -39,8 +39,8 @@ const registerServantSchema = z.object({
     address: z.string().min(5, "Address is required"),
     skills: z.preprocess(parseSkillsBody, z.array(z.string()).min(1, "Select at least one skill")),
     city: z.preprocess(emptyToUndefined, z.string().optional()),
-    latitude: optionalFiniteCoord(-90, 90),
-    longitude: optionalFiniteCoord(-180, 180),
+    latitude: z.coerce.number().min(-90).max(90),
+    longitude: z.coerce.number().min(-180).max(180),
     preferredLanguage: z.preprocess(
       (val) => (SUPPORTED_LANGUAGES.includes(val) ? val : undefined),
       z.enum(SUPPORTED_LANGUAGES).optional()

@@ -18,6 +18,8 @@ const {
   getRoleCode,
   serializeUser
 } = require("../services/roleService");
+const { DEFAULT_RADIUS_KM } = require("../services/locationService");
+const { notifyNearbyAgentsOfRegistration } = require("../services/agentRegistrationService");
 
 const sanitizeUser = (user) => serializeUser(user);
 
@@ -99,14 +101,12 @@ exports.registerServant = async (req, res) => {
     throw new ApiError(400, "Select at least one skill");
   }
 
-  const lat =
-    latitude !== undefined && latitude !== null && Number.isFinite(Number(latitude))
-      ? Number(latitude)
-      : null;
-  const lng =
-    longitude !== undefined && longitude !== null && Number.isFinite(Number(longitude))
-      ? Number(longitude)
-      : null;
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new ApiError(400, "Location is required. Enable GPS or pick your area on the map.");
+  }
 
   const servantProfile = {
     address: address.trim(),
@@ -174,13 +174,29 @@ exports.registerServant = async (req, res) => {
       });
     });
 
-    logger.info("Servant registration updated", { userId: existing.id, servantId: updated.id });
+    const nearbyAgents = await notifyNearbyAgentsOfRegistration(updated, {
+      name,
+      city: city?.trim(),
+      address: address.trim()
+    });
+
+    logger.info("Servant registration updated", {
+      userId: existing.id,
+      servantId: updated.id,
+      nearbyAgents: nearbyAgents.length
+    });
+
+    const areaMessage =
+      nearbyAgents.length > 0
+        ? `Your request was sent to ${nearbyAgents.length} agent(s) within ${DEFAULT_RADIUS_KM} km.`
+        : `No agents found within ${DEFAULT_RADIUS_KM} km yet. An admin will assign one soon.`;
 
     return sendSuccess(
       res,
       {
-        message: "Application updated. An agent will contact you to complete verification and share login details.",
-        servantId: updated.id
+        message: `Application updated. ${areaMessage}`,
+        servantId: updated.id,
+        nearbyAgentCount: nearbyAgents.length
       },
       200
     );
@@ -208,13 +224,29 @@ exports.registerServant = async (req, res) => {
     include: { servant: { include: { skills: true } }, ...userWithRoleInclude }
   });
 
-  logger.info("Servant registration application", { userId: user.id, servantId: user.servant?.id });
+  const nearbyAgents = await notifyNearbyAgentsOfRegistration(user.servant, {
+    name,
+    city: city?.trim(),
+    address: address.trim()
+  });
+
+  logger.info("Servant registration application", {
+    userId: user.id,
+    servantId: user.servant?.id,
+    nearbyAgents: nearbyAgents.length
+  });
+
+  const areaMessage =
+    nearbyAgents.length > 0
+      ? `Your request was sent to ${nearbyAgents.length} agent(s) within ${DEFAULT_RADIUS_KM} km.`
+      : `No agents found within ${DEFAULT_RADIUS_KM} km yet. An admin will assign one soon.`;
 
   sendSuccess(
     res,
     {
-      message: "Application submitted. An agent will contact you to complete verification and share login details.",
-      servantId: user.servant?.id
+      message: `Application submitted. ${areaMessage}`,
+      servantId: user.servant?.id,
+      nearbyAgentCount: nearbyAgents.length
     },
     201
   );

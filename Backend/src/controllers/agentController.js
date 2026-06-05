@@ -12,6 +12,13 @@ const {
   serializeUser,
   userWithRoleInclude
 } = require("../services/roleService");
+const {
+  agentHasLocation,
+  boundingBoxForRadius,
+  DEFAULT_RADIUS_KM,
+  filterServantsNearAgent
+} = require("../services/locationService");
+const { assertAgentCanAccessServant } = require("../services/agentRegistrationService");
 
 const parseSkills = (skills) => {
   if (!skills) return [];
@@ -260,12 +267,48 @@ exports.listServants = async (req, res) => {
       : {})
   };
 
-  const where = isRegistrationList
+  let where = isRegistrationList
     ? registrationWhereForScope(scope, sharedFilters)
     : servantWhereForScope(scope, {
         ...(categoryKey === "mine" && scope.agentId ? { agentId: scope.agentId } : {}),
         ...sharedFilters
       });
+
+  let locationNotice = null;
+
+  if (isRegistrationList && !scope.isAdmin && scope.agentId) {
+    const agent = scope.agent || (await prisma.agent.findUnique({ where: { id: scope.agentId } }));
+    if (!agentHasLocation(agent)) {
+      return sendSuccess(res, {
+        servants: [],
+        pagination: { page, limit, total: 0 },
+        locationNotice:
+          "Set your agency location in Profile to receive registrations within 15 km."
+      });
+    }
+
+    const box = boundingBoxForRadius(agent.latitude, agent.longitude, DEFAULT_RADIUS_KM);
+    where = registrationWhereForScope(scope, {
+      ...sharedFilters,
+      ...box
+    });
+
+    const candidates = await prisma.servant.findMany({
+      where,
+      include: servantInclude,
+      orderBy: { createdAt: "desc" }
+    });
+
+    const filtered = filterServantsNearAgent(candidates, agent, DEFAULT_RADIUS_KM);
+    const total = filtered.length;
+    const servants = filtered.slice((page - 1) * limit, page * limit);
+
+    return sendSuccess(res, {
+      servants,
+      pagination: { page, limit, total },
+      locationNotice: `Showing registrations within ${DEFAULT_RADIUS_KM} km of your agency.`
+    });
+  }
 
   const [servants, total] = await Promise.all([
     prisma.servant.findMany({
@@ -278,7 +321,20 @@ exports.listServants = async (req, res) => {
     prisma.servant.count({ where })
   ]);
 
-  sendSuccess(res, { servants, pagination: { page, limit, total } });
+  sendSuccess(res, {
+    servants,
+    pagination: { page, limit, total },
+    ...(locationNotice ? { locationNotice } : {})
+  });
+};
+
+const assertScopedServantAccess = async (scope, servant) => {
+  if (!servant) throw new ApiError(404, "Servant not found");
+  if (!scope.isAdmin && scope.agentId) {
+    const agent =
+      scope.agent || (await prisma.agent.findUnique({ where: { id: scope.agentId } }));
+    assertAgentCanAccessServant(scope, servant, agent);
+  }
 };
 
 exports.getServant = async (req, res) => {
@@ -299,7 +355,7 @@ exports.getServant = async (req, res) => {
     }
   });
 
-  if (!servant) throw new ApiError(404, "Servant not found");
+  await assertScopedServantAccess(scope, servant);
   sendSuccess(res, { servant });
 };
 
@@ -311,7 +367,7 @@ exports.updateServant = async (req, res) => {
     where: recordWhereForScope(scope, { id }),
     include: { user: true }
   });
-  if (!existing) throw new ApiError(404, "Servant not found");
+  await assertScopedServantAccess(scope, existing);
 
   const {
     name,
@@ -452,7 +508,7 @@ exports.setServantPassword = async (req, res) => {
     where: recordWhereForScope(scope, { id }),
     include: { user: true }
   });
-  if (!existing) throw new ApiError(404, "Servant not found");
+  await assertScopedServantAccess(scope, existing);
 
   const isAppRegistration =
     existing.registrationSource === "SELF" || existing.user.isActive === false;
@@ -497,7 +553,7 @@ exports.verifyServant = async (req, res) => {
     where: recordWhereForScope(scope, { id }),
     include: { user: true }
   });
-  if (!existing) throw new ApiError(404, "Servant not found");
+  await assertScopedServantAccess(scope, existing);
 
   const isAppRegistration =
     existing.registrationSource === "SELF" || existing.user.isActive === false;
@@ -571,7 +627,7 @@ exports.uploadIdProof = async (req, res) => {
   const existing = await prisma.servant.findFirst({
     where: recordWhereForScope(scope, { id })
   });
-  if (!existing) throw new ApiError(404, "Servant not found");
+  await assertScopedServantAccess(scope, existing);
 
   const idProofUrl = `/uploads/${req.file.filename}`;
   const servant = await prisma.servant.update({

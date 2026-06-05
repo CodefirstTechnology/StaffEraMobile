@@ -19,7 +19,12 @@ export default function AdminAgents() {
   const [agencyName, setAgencyName] = useState('')
   const [password, setPassword] = useState('')
   const [generatePassword, setGeneratePassword] = useState(true)
+  const [locationMode, setLocationMode] = useState('picker')
   const [location, setLocation] = useState(null)
+  const [manualAddress, setManualAddress] = useState('')
+  const [manualCity, setManualCity] = useState('')
+  const [manualLatitude, setManualLatitude] = useState('')
+  const [manualLongitude, setManualLongitude] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-agents', search],
@@ -38,7 +43,12 @@ export default function AdminAgents() {
     setAgencyName('')
     setPassword('')
     setGeneratePassword(true)
+    setLocationMode('picker')
     setLocation(null)
+    setManualAddress('')
+    setManualCity('')
+    setManualLatitude('')
+    setManualLongitude('')
     setError('')
   }
 
@@ -52,9 +62,32 @@ export default function AdminAgents() {
     e.preventDefault()
     setError('')
 
-    if (!location?.address?.trim() || location.latitude == null || location.longitude == null) {
+    let address
+    let city
+    let latitude
+    let longitude
+
+    if (locationMode === 'manual') {
+      address = manualAddress.trim()
+      city = manualCity.trim() || undefined
+      latitude = Number(manualLatitude)
+      longitude = Number(manualLongitude)
+      if (!address || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        setError('Enter address, latitude, and longitude for manual agent location.')
+        return
+      }
+    } else if (
+      !location?.address?.trim() ||
+      location.latitude == null ||
+      location.longitude == null
+    ) {
       setError('Pick the agent area / office location from search or GPS.')
       return
+    } else {
+      address = location.address
+      city = location.city
+      latitude = location.latitude
+      longitude = location.longitude
     }
 
     setSaving(true)
@@ -66,10 +99,10 @@ export default function AdminAgents() {
         agencyName: agencyName.trim() || undefined,
         password: generatePassword ? undefined : password,
         generatePassword,
-        address: location.address,
-        city: location.city,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        address,
+        city,
+        latitude,
+        longitude,
       })
       setCredentials(res.data?.data?.credentials || null)
       resetForm()
@@ -148,12 +181,74 @@ export default function AdminAgents() {
             </label>
           </div>
 
-          <AgentLocationPicker
-            label="Agent area / office location"
-            required
-            value={location}
-            onChange={setLocation}
-          />
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={locationMode === 'picker'}
+                  onChange={() => setLocationMode('picker')}
+                />
+                Search or GPS
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={locationMode === 'manual'}
+                  onChange={() => setLocationMode('manual')}
+                />
+                Manual coordinates
+              </label>
+            </div>
+
+            {locationMode === 'picker' ? (
+              <AgentLocationPicker
+                label="Agent area / office location"
+                required
+                value={location}
+                onChange={setLocation}
+              />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block space-y-1 sm:col-span-2">
+                  <span className="text-sm font-medium">Address / area *</span>
+                  <input
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    value={manualAddress}
+                    onChange={(e) => setManualAddress(e.target.value)}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium">City</span>
+                  <input
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    value={manualCity}
+                    onChange={(e) => setManualCity(e.target.value)}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium">Latitude *</span>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    value={manualLatitude}
+                    onChange={(e) => setManualLatitude(e.target.value)}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-medium">Longitude *</span>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    value={manualLongitude}
+                    onChange={(e) => setManualLongitude(e.target.value)}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm">

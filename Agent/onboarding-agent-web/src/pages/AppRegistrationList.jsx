@@ -26,11 +26,15 @@ export default function AppRegistrationList() {
           limit: 100,
         },
       })
-      return res.data.data.servants
+      return {
+        servants: res.data.data.servants,
+        locationNotice: res.data.data.locationNotice,
+      }
     },
   })
 
-  const rows = data || []
+  const rows = data?.servants || []
+  const locationNotice = data?.locationNotice
 
   const savePassword = async ({ password }) => {
     if (!passwordTarget) return
@@ -56,8 +60,8 @@ export default function AppRegistrationList() {
         <div>
           <h2 className="text-2xl font-bold text-violet-900">App registrations</h2>
           <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
-            Helpers who signed up in the Servant app — contact details only until you set a
-            password and approve them. Approved helpers then move to your Servants list.
+            Helpers who signed up in the Servant app within 15 km of your agency location.
+            Set your office location in Profile to receive nearby requests.
           </p>
         </div>
         <Link to="/servants">
@@ -66,6 +70,12 @@ export default function AppRegistrationList() {
       </div>
 
       <CredentialsBanner credentials={credentials} onDone={() => setCredentials(null)} />
+
+      {locationNotice && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+          {locationNotice}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <select
