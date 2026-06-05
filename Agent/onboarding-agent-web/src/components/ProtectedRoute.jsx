@@ -9,7 +9,9 @@ export function ProtectedRoute({ children, roles }) {
     )
   }
   if (!user) return <Navigate to="/login" replace />
-  if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />
+  if (roles && !roles.includes(user.role)) {
+    return <Navigate to="/login" replace state={{ forbidden: true }} />
+  }
   return children
 }
 

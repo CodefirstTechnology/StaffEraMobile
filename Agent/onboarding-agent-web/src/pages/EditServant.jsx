@@ -4,20 +4,30 @@ import { useState, useEffect } from 'react'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import { LoginPasswordFields } from '../components/LoginPasswordFields'
+import { SkillDropdown } from '../components/SkillDropdown'
+import { useSkills } from '../hooks/useSkills'
+import { uploadUrl } from '../lib/mediaUrl'
 
-const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost:5000'
-
-const SKILLS = [
-  'COOKING',
-  'CLEANING',
-  'CHILDCARE',
-  'DRIVING',
-  'LAUNDRY',
-  'ELDERLY_CARE',
-  'GARDENING',
-]
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const ID_TYPES = ['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID']
+
+function Field({ label, children }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function FieldLabel({ children }) {
+  return <span className="text-sm font-medium text-gray-700">{children}</span>
+}
+
+function inputClassName() {
+  return 'w-full rounded-lg border px-3 py-2'
+}
 
 const parseWorkingDays = (wd) => {
   if (!wd) return []
@@ -36,7 +46,10 @@ const parseWorkingDays = (wd) => {
 export default function EditServant() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { data: skills = [], isLoading: skillsLoading } = useSkills()
   const [error, setError] = useState('')
+  const [savedCredentials, setSavedCredentials] = useState(null)
+  const [loginPassword, setLoginPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
@@ -59,7 +72,12 @@ export default function EditServant() {
     availableFrom: '09:00',
     availableTo: '18:00',
     workingDays: [],
+    hoursPerDay: '',
+    availabilityNotes: '',
+    offersSession: true,
+    offersMonthly: true,
     skills: [],
+    address: '',
     idProofType: 'AADHAR',
   })
 
@@ -75,19 +93,17 @@ export default function EditServant() {
       availableFrom: servant.availableFrom || '09:00',
       availableTo: servant.availableTo || '18:00',
       workingDays: parseWorkingDays(servant.workingDays),
+      hoursPerDay: servant.hoursPerDay ?? '',
+      availabilityNotes: servant.availabilityNotes || '',
+      offersSession: servant.offersSession ?? true,
+      offersMonthly: servant.offersMonthly ?? true,
       skills: servant.skills?.map((s) => s.skillName) || [],
+      address: servant.address || '',
       idProofType: servant.idProofType || 'AADHAR',
     })
   }, [servant])
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }))
-  const toggleSkill = (s) =>
-    setForm((f) => ({
-      ...f,
-      skills: f.skills.includes(s)
-        ? f.skills.filter((x) => x !== s)
-        : [...f.skills, s],
-    }))
   const toggleDay = (d) =>
     setForm((f) => ({
       ...f,
@@ -98,19 +114,40 @@ export default function EditServant() {
 
   const save = async () => {
     setError('')
+    if (!form.offersSession && !form.offersMonthly) {
+      setError('Select at least one booking type: Session or Monthly')
+      return
+    }
     setSaving(true)
     const fd = new FormData()
     Object.entries(form).forEach(([k, v]) => {
-      if (k === 'skills' || k === 'workingDays') fd.append(k, JSON.stringify(v))
-      else if (v !== '' && v !== null && v !== undefined) fd.append(k, String(v))
+      if (k === 'skills' || k === 'workingDays') {
+        fd.append(k, JSON.stringify(v))
+      } else if (typeof v === 'boolean') {
+        fd.append(k, v ? 'true' : 'false')
+      } else if (v !== '' && v !== null && v !== undefined) {
+        fd.append(k, String(v))
+      }
     })
     if (profilePhoto) fd.append('profilePhoto', profilePhoto)
     if (idProof) fd.append('idProof', idProof)
-
     try {
+      let newCredentials = null
+      if (loginPassword.trim().length >= 6) {
+        const pwRes = await api.patch(`/agent/servants/${id}/password`, {
+          password: loginPassword.trim(),
+        })
+        newCredentials = pwRes.data?.data?.credentials || null
+        if (newCredentials) {
+          setSavedCredentials(newCredentials)
+          setLoginPassword('')
+        }
+      }
+
       await api.patch(`/agent/servants/${id}`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
+      if (newCredentials) return
       navigate(`/servants/${id}`)
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to update servant')
@@ -121,154 +158,256 @@ export default function EditServant() {
 
   if (isLoading || !servant) return <p>Loading…</p>
 
+  const isAppRegistration =
+    servant.registrationSource === 'SELF' || servant.user?.isActive === false
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h2 className="text-2xl font-bold">Edit Servant</h2>
+      <h2 className="text-2xl font-bold">
+        {isAppRegistration ? 'Edit app registration' : 'Edit Servant'}
+      </h2>
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
         <h3 className="font-semibold">Personal Info</h3>
-        <input
-          placeholder="Full name"
-          value={form.name}
-          onChange={(e) => update('name', e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <input
-          placeholder="Email (read-only)"
-          value={servant.user?.email || ''}
-          readOnly
-          className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-subtext"
-        />
-        <input
-          placeholder="Mobile number"
-          value={form.phone}
-          onChange={(e) => update('phone', e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
+        <Field label="Full name">
+          <input
+            placeholder="Enter full name"
+            value={form.name}
+            onChange={(e) => update('name', e.target.value)}
+            className={inputClassName()}
+          />
+        </Field>
+        <Field label="Email">
+          <input
+            value={servant.user?.email || ''}
+            readOnly
+            className={`${inputClassName()} bg-gray-50 text-subtext`}
+          />
+        </Field>
+        <Field label="Mobile">
+          <input
+            placeholder="Enter mobile number"
+            value={form.phone}
+            onChange={(e) => update('phone', e.target.value)}
+            className={inputClassName()}
+          />
+        </Field>
+        <Field label="Skill">
+          <SkillDropdown
+            skills={skills}
+            skillsLoading={skillsLoading}
+            value={form.skills}
+            onChange={(skillsSelected) => update('skills', skillsSelected)}
+          />
+        </Field>
+        <Field label="Address">
+          <textarea
+            placeholder="Enter full residential address"
+            value={form.address}
+            onChange={(e) => update('address', e.target.value)}
+            className={inputClassName()}
+            rows={3}
+          />
+        </Field>
+        {isAppRegistration ? (
+          <LoginPasswordFields
+            email={servant.user?.email}
+            password={loginPassword}
+            onPasswordChange={setLoginPassword}
+          />
+        ) : null}
       </div>
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
-        <h3 className="font-semibold">Skills & Rates</h3>
-        <div className="flex flex-wrap gap-2">
-          {SKILLS.map((s) => (
-            <label key={s} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.skills.includes(s)}
-                onChange={() => toggleSkill(s)}
-              />
-              {s}
-            </label>
-          ))}
-        </div>
-        <input
-          placeholder="Years of experience"
-          type="number"
-          value={form.experience}
-          onChange={(e) => update('experience', e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <textarea
-          placeholder="Bio / description"
-          value={form.bio}
-          onChange={(e) => update('bio', e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-          rows={3}
-        />
-        <input
-          placeholder="Hourly rate"
-          type="number"
-          value={form.hourlyRate}
-          onChange={(e) => update('hourlyRate', e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <input
-          placeholder="Monthly rate"
-          type="number"
-          value={form.monthlyRate}
-          onChange={(e) => update('monthlyRate', e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
+        <h3 className="font-semibold">Rates & experience</h3>
+        <Field label="Years of experience">
+          <input
+            placeholder="e.g. 3"
+            type="number"
+            value={form.experience}
+            onChange={(e) => update('experience', e.target.value)}
+            className={inputClassName()}
+          />
+        </Field>
+        <Field label="Bio">
+          <textarea
+            placeholder="Short description about the servant"
+            value={form.bio}
+            onChange={(e) => update('bio', e.target.value)}
+            className={inputClassName()}
+            rows={3}
+          />
+        </Field>
+        <Field label="Hourly rate (₹)">
+          <input
+            placeholder="e.g. 150"
+            type="number"
+            value={form.hourlyRate}
+            onChange={(e) => update('hourlyRate', e.target.value)}
+            className={inputClassName()}
+          />
+        </Field>
+        <Field label="Monthly rate (₹)">
+          <input
+            placeholder="e.g. 15000"
+            type="number"
+            value={form.monthlyRate}
+            onChange={(e) => update('monthlyRate', e.target.value)}
+            className={inputClassName()}
+          />
+        </Field>
       </div>
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
         <h3 className="font-semibold">Availability</h3>
-        <label className="block text-sm text-subtext">Available from</label>
-        <input
-          type="time"
-          value={form.availableFrom}
-          onChange={(e) => update('availableFrom', e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <label className="block text-sm text-subtext">Available to</label>
-        <input
-          type="time"
-          value={form.availableTo}
-          onChange={(e) => update('availableTo', e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <div className="flex flex-wrap gap-2">
-          {DAYS.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => toggleDay(d)}
-              className={`rounded-full px-3 py-1 text-sm ${form.workingDays.includes(d) ? 'bg-primary text-white' : 'bg-gray-100'}`}
-            >
-              {d}
-            </button>
-          ))}
+        <p className="text-sm text-subtext">
+          Choose which booking types this servant accepts and set the schedule for each.
+        </p>
+
+        <div className="space-y-2">
+          <FieldLabel>Booking types offered</FieldLabel>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.offersSession}
+                onChange={(e) => update('offersSession', e.target.checked)}
+              />
+              Session (one visit)
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.offersMonthly}
+                onChange={(e) => update('offersMonthly', e.target.checked)}
+              />
+              Monthly contract
+            </label>
+          </div>
         </div>
+
+        {form.offersSession && (
+          <div className="space-y-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <h4 className="text-sm font-semibold text-gray-700">Session</h4>
+            <Field label="Session start time">
+              <input
+                type="time"
+                value={form.availableFrom}
+                onChange={(e) => update('availableFrom', e.target.value)}
+                className={inputClassName()}
+              />
+            </Field>
+            <Field label="Session end time">
+              <input
+                type="time"
+                value={form.availableTo}
+                onChange={(e) => update('availableTo', e.target.value)}
+                className={inputClassName()}
+              />
+            </Field>
+          </div>
+        )}
+
+        {form.offersMonthly && (
+          <div className="space-y-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <h4 className="text-sm font-semibold text-gray-700">Monthly</h4>
+            <div className="space-y-1.5">
+              <FieldLabel>Working days</FieldLabel>
+              <div className="flex flex-wrap gap-2">
+                {DAYS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => toggleDay(d)}
+                    className={`rounded-full px-3 py-1 text-sm ${
+                      form.workingDays.includes(d)
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100'
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Field label="Hours per day">
+              <input
+                type="number"
+                min="1"
+                max="24"
+                placeholder="e.g. 8"
+                value={form.hoursPerDay}
+                onChange={(e) => update('hoursPerDay', e.target.value)}
+                className={inputClassName()}
+              />
+            </Field>
+            <Field label="Monthly availability notes">
+              <textarea
+                placeholder="e.g. Second Saturday off, half day on Friday…"
+                value={form.availabilityNotes}
+                onChange={(e) => update('availabilityNotes', e.target.value)}
+                className={inputClassName()}
+                rows={3}
+              />
+            </Field>
+          </div>
+        )}
       </div>
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
         <h3 className="font-semibold">ID & Documents</h3>
-        <select
-          value={form.idProofType}
-          onChange={(e) => update('idProofType', e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        >
-          {ID_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        {servant.idProofUrl && (
-          <a
-            href={`${API_HOST}${servant.idProofUrl}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-primary underline"
+        <Field label="ID proof type">
+          <select
+            value={form.idProofType}
+            onChange={(e) => update('idProofType', e.target.value)}
+            className={inputClassName()}
           >
-            View current ID proof
-          </a>
+            {ID_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {servant.idProofUrl && (
+          <div className="space-y-1.5">
+            <FieldLabel>Current ID proof</FieldLabel>
+            <a
+              href={uploadUrl(servant.idProofUrl)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-primary underline"
+            >
+              View current ID proof
+            </a>
+          </div>
         )}
-        <label className="block">
-          <span className="text-sm">Replace ID proof</span>
+        <Field label="Replace ID proof">
           <input
             type="file"
             accept="image/*"
             onChange={(e) => setIdProof(e.target.files?.[0] || null)}
-            className="mt-1 w-full"
+            className="w-full text-sm"
           />
-        </label>
+        </Field>
         {servant.profilePhoto && (
-          <img
-            src={`${API_HOST}${servant.profilePhoto}`}
-            alt=""
-            className="h-20 w-20 rounded-full object-cover"
-          />
+          <div className="space-y-1.5">
+            <FieldLabel>Current profile photo</FieldLabel>
+            <img
+              src={uploadUrl(servant.profilePhoto)}
+              alt=""
+              className="h-20 w-20 rounded-full object-cover"
+            />
+          </div>
         )}
-        <label className="block">
-          <span className="text-sm">Replace profile photo</span>
+        <Field label="Replace profile photo">
           <input
             type="file"
             accept="image/*"
             onChange={(e) => setProfilePhoto(e.target.files?.[0] || null)}
-            className="mt-1 w-full"
+            className="w-full text-sm"
           />
-        </label>
+        </Field>
       </div>
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
@@ -307,6 +446,33 @@ export default function EditServant() {
                 {z.city ? ` · ${z.city}` : ''}
               </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {savedCredentials && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+          <p className="font-semibold text-emerald-800">Password saved — share with helper</p>
+          <p className="mt-2">
+            Email: <strong>{savedCredentials.email}</strong>
+          </p>
+          <p className="mt-1 font-mono">
+            Password: <strong>{savedCredentials.password}</strong>
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() =>
+                navigator.clipboard?.writeText(
+                  `Email: ${savedCredentials.email}\nPassword: ${savedCredentials.password}`,
+                )
+              }
+            >
+              Copy all
+            </Button>
+            <Button variant="success" onClick={() => navigate(`/servants/${id}`)}>
+              Done
+            </Button>
           </div>
         </div>
       )}

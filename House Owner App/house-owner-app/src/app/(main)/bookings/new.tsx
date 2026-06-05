@@ -1,23 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
+import { LocationPicker } from '@/components/ui/LocationPicker';
+import {
+  AddressUnitFields,
+  type AddressUnitValue,
+} from '@/components/ui/AddressUnitFields';
+import type { LocationValue } from '@/lib/locationTypes';
+import { formatDate, formatCurrency } from '@/lib/i18n/format';
 
 export default function NewBookingScreen() {
+  const { t } = useTranslation();
   const { servantId } = useLocalSearchParams<{ servantId: string }>();
+  const user = useAuthStore((s) => s.user);
   const [bookingType, setBookingType] = useState<'SESSION' | 'MONTHLY'>('SESSION');
   const [sessionDate, setSessionDate] = useState(new Date());
   const [sessionStart, setSessionStart] = useState('09:00');
@@ -28,10 +38,37 @@ export default function NewBookingScreen() {
     d.setMonth(d.getMonth() + 1);
     return d;
   });
-  const [address, setAddress] = useState('');
+  const [location, setLocation] = useState<LocationValue | null>(null);
+  const [addressUnit, setAddressUnit] = useState<AddressUnitValue>({
+    flatNo: '',
+    building: '',
+    area: '',
+  });
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
+
+  useEffect(() => {
+    const ho = user?.houseOwner;
+    if (ho?.latitude != null && ho?.longitude != null && ho.address) {
+      setLocation({
+        address: ho.address,
+        city: ho.city,
+        latitude: ho.latitude,
+        longitude: ho.longitude,
+        flatNo: ho.flatNo,
+        building: ho.building,
+        area: ho.area,
+      });
+    }
+    if (ho) {
+      setAddressUnit({
+        flatNo: ho.flatNo || '',
+        building: ho.building || '',
+        area: ho.area || '',
+      });
+    }
+  }, [user?.houseOwner]);
 
   const { data: servant } = useQuery({
     queryKey: ['servant', servantId],
@@ -54,7 +91,11 @@ export default function NewBookingScreen() {
 
   const submit = async () => {
     if (!servantId) {
-      Alert.alert('Error', 'Select a helper from Browse first');
+      Alert.alert(t('bookings.requestFailed'), t('bookings.selectHelperFirst'));
+      return;
+    }
+    if (!location?.address) {
+      Alert.alert(t('validation.locationRequired'), t('bookings.visitLocationRequired'));
       return;
     }
     setLoading(true);
@@ -62,7 +103,12 @@ export default function NewBookingScreen() {
       const payload: Record<string, unknown> = {
         servantId: Number(servantId),
         bookingType,
-        address: address.trim() || undefined,
+        address: location.address,
+        flatNo: addressUnit.flatNo.trim() || undefined,
+        building: addressUnit.building.trim() || undefined,
+        area: addressUnit.area.trim() || undefined,
+        latitude: location.latitude,
+        longitude: location.longitude,
         notes: notes.trim() || undefined,
         totalAmount: totalAmount || undefined,
       };
@@ -86,14 +132,26 @@ export default function NewBookingScreen() {
       }
 
       const res = await api.post('/bookings', payload);
-      Alert.alert(
-        'Request sent',
-        'The helper will accept or decline. You will be notified.',
-      );
+      Alert.alert(t('bookings.requestSent'), t('bookings.requestSentSub'));
       router.replace(`/(main)/bookings/${res.data.data.booking.id}`);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Booking failed', err.response?.data?.message || 'Please try again');
+      const err = e as { response?: { status?: number; data?: { message?: string } } };
+      const message = err.response?.data?.message || t('auth.tryAgain');
+      const title =
+        err.response?.status === 409
+          ? t('bookings.timeNotAvailable')
+          : t('bookings.bookingFailed');
+      const buttons =
+        err.response?.status === 409
+          ? [
+              { text: t('bookings.changeTime'), style: 'cancel' as const },
+              {
+                text: t('bookings.myBookings'),
+                onPress: () => router.push('/(main)/bookings'),
+              },
+            ]
+          : [{ text: t('common.confirm') }];
+      Alert.alert(title, message, buttons);
     } finally {
       setLoading(false);
     }
@@ -102,19 +160,21 @@ export default function NewBookingScreen() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>← Back</Text>
+        <Text style={styles.back}>← {t('common.back')}</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Book {servant?.user?.name || 'helper'}</Text>
+      <Text style={styles.title}>
+        {t('bookings.bookHelperTitle', { name: servant?.user?.name || t('common.helper') })}
+      </Text>
 
       <View style={styles.toggle}>
-        {(['SESSION', 'MONTHLY'] as const).map((t) => (
+        {(['SESSION', 'MONTHLY'] as const).map((bt) => (
           <TouchableOpacity
-            key={t}
-            style={[styles.toggleBtn, bookingType === t && styles.toggleOn]}
-            onPress={() => setBookingType(t)}
+            key={bt}
+            style={[styles.toggleBtn, bookingType === bt && styles.toggleOn]}
+            onPress={() => setBookingType(bt)}
           >
-            <Text style={[styles.toggleText, bookingType === t && styles.toggleTextOn]}>
-              {t === 'SESSION' ? 'One visit' : 'Monthly'}
+            <Text style={[styles.toggleText, bookingType === bt && styles.toggleTextOn]}>
+              {bt === 'SESSION' ? t('common.oneVisit') : t('common.monthly')}
             </Text>
           </TouchableOpacity>
         ))}
@@ -123,8 +183,8 @@ export default function NewBookingScreen() {
       {bookingType === 'SESSION' ? (
         <>
           <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDate(true)}>
-            <Text style={styles.dateLabel}>Visit date</Text>
-            <Text style={styles.dateValue}>{sessionDate.toLocaleDateString('en-IN')}</Text>
+            <Text style={styles.dateLabel}>{t('bookings.visitDate')}</Text>
+            <Text style={styles.dateValue}>{formatDate(sessionDate)}</Text>
           </TouchableOpacity>
           {showDate && (
             <DateTimePicker
@@ -136,29 +196,36 @@ export default function NewBookingScreen() {
               }}
             />
           )}
-          <GhostInput label="Start time (HH:MM)" value={sessionStart} onChangeText={setSessionStart} />
-          <GhostInput label="End time (HH:MM)" value={sessionEnd} onChangeText={setSessionEnd} />
+          <GhostInput label={t('bookings.startTime')} value={sessionStart} onChangeText={setSessionStart} />
+          <GhostInput label={t('bookings.endTime')} value={sessionEnd} onChangeText={setSessionEnd} />
         </>
       ) : (
         <>
-          <Text style={styles.hint}>Monthly: {monthlyStart.toLocaleDateString('en-IN')} → {monthlyEnd.toLocaleDateString('en-IN')}</Text>
+          <Text style={styles.hint}>
+            {t('bookings.monthlyRange', {
+              start: formatDate(monthlyStart),
+              end: formatDate(monthlyEnd),
+            })}
+          </Text>
         </>
       )}
 
-      <GhostInput
-        label="Home address"
-        value={address}
-        onChangeText={setAddress}
-        placeholder="Flat, street, area"
+      <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
+      <LocationPicker
+        label={t('bookings.visitLocation')}
+        placeholder={t('bookings.visitLocationPlaceholder')}
+        value={location}
+        onChange={setLocation}
       />
-      <GhostInput label="Notes (optional)" value={notes} onChangeText={setNotes} />
+      <GhostInput label={t('bookings.notesOptional')} value={notes} onChangeText={setNotes} />
 
       <Text style={styles.estimate}>
-        Estimated: {Stitch.copy.rupee}
-        {totalAmount.toLocaleString('en-IN')}
+        {t('bookings.estimated', {
+          amount: `${Stitch.copy.rupee}${formatCurrency(totalAmount)}`,
+        })}
       </Text>
 
-      <GradientButton title="Send booking request" onPress={submit} loading={loading} />
+      <GradientButton title={t('bookings.sendBookingRequest')} onPress={submit} loading={loading} />
     </ScrollView>
   );
 }

@@ -3,16 +3,31 @@ import { useQuery } from '@tanstack/react-query'
 import api from '../lib/api'
 
 export default function Dashboard() {
-  const { data, isLoading } = useQuery({
+  const { data: servants = [], isLoading: loadingServants } = useQuery({
     queryKey: ['agent-servants'],
     queryFn: async () => {
-      const res = await api.get('/agent/servants', { params: { limit: 100 } })
+      const res = await api.get('/agent/servants', {
+        params: { category: 'onboarded', limit: 100 },
+      })
       return res.data.data.servants
     },
   })
 
-  const servants = data || []
+  const { data: registrations = [], isLoading: loadingRegistrations } = useQuery({
+    queryKey: ['agent-registrations'],
+    queryFn: async () => {
+      const res = await api.get('/agent/servants', {
+        params: { category: 'registered', limit: 100 },
+      })
+      return res.data.data.servants
+    },
+  })
+
   const pending = servants.filter((s) =>
+    ['PENDING', 'UNDER_REVIEW'].includes(s.verificationStatus),
+  )
+  const appRegistrations = registrations
+  const pendingApp = appRegistrations.filter((s) =>
     ['PENDING', 'UNDER_REVIEW'].includes(s.verificationStatus),
   )
   const verified = servants.filter((s) => s.verificationStatus === 'VERIFIED')
@@ -20,7 +35,9 @@ export default function Dashboard() {
 
   const stats = [
     { label: 'My servants', value: servants.length, accent: 'text-primary' },
+    { label: 'App registrations', value: appRegistrations.length, accent: 'text-violet-600' },
     { label: 'Pending verification', value: pending.length, accent: 'text-tertiary-accent' },
+    { label: 'Pending from app', value: pendingApp.length, accent: 'text-violet-600' },
     { label: 'Verified', value: verified.length, accent: 'text-emerald-600' },
     { label: 'Rejected', value: rejected.length, accent: 'text-error' },
   ]
@@ -34,7 +51,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stats.map((c) => (
           <div key={c.label} className="glass-card p-6">
             <p className="text-sm text-on-surface-variant">{c.label}</p>
@@ -44,7 +61,69 @@ export default function Dashboard() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h3 className="text-lg font-semibold text-primary">Pending verification</h3>
+        <h3 className="text-lg font-semibold text-violet-900">App registrations (Gmail / email)</h3>
+        <Link
+          to="/registrations"
+          className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-800 hover:bg-violet-100"
+        >
+          Manage all ({appRegistrations.length})
+        </Link>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-violet-100 bg-surface shadow-sm">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-violet-50 text-on-surface-variant">
+            <tr>
+              <th className="p-4 font-semibold">Name</th>
+              <th className="p-4 font-semibold">Email</th>
+              <th className="p-4 font-semibold">Password</th>
+              <th className="p-4 font-semibold">Status</th>
+              <th className="p-4 font-semibold">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loadingRegistrations ? (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-on-surface-variant">
+                  Loading…
+                </td>
+              </tr>
+            ) : pendingApp.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-on-surface-variant">
+                  No pending app registrations.
+                </td>
+              </tr>
+            ) : (
+              pendingApp.slice(0, 8).map((s) => (
+                <tr key={s.id} className="border-t border-outline-variant/30">
+                  <td className="p-4 font-medium">{s.user.name}</td>
+                  <td className="p-4">{s.user.email}</td>
+                  <td className="p-4">
+                    {s.user.agentSetPassword ? (
+                      <span className="font-medium text-emerald-700">Set</span>
+                    ) : (
+                      <span className="text-amber-700">Not set</span>
+                    )}
+                  </td>
+                  <td className="p-4">{s.verificationStatus}</td>
+                  <td className="p-4">
+                    <Link
+                      to={`/servants/${s.id}?from=registrations`}
+                      className="font-semibold text-violet-700 hover:underline"
+                    >
+                      Set password & review →
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h3 className="text-lg font-semibold text-primary">My servants — pending verification</h3>
         <Link to="/servants/new" className="btn-gradient px-6 py-2.5 text-sm">
           Onboard new servant
         </Link>
@@ -61,7 +140,7 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
+            {loadingServants ? (
               <tr>
                 <td colSpan={4} className="p-8 text-center text-on-surface-variant">
                   Loading…
@@ -76,7 +155,14 @@ export default function Dashboard() {
             ) : (
               pending.slice(0, 10).map((s) => (
                 <tr key={s.id} className="border-t border-outline-variant/30">
-                  <td className="p-4 font-medium">{s.user.name}</td>
+                  <td className="p-4">
+                    <Link
+                      to={`/servants/${s.id}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {s.user.name}
+                    </Link>
+                  </td>
                   <td className="p-4">{s.user.phone || '—'}</td>
                   <td className="p-4">
                     <span className="rounded-full bg-tertiary-accent/20 px-2.5 py-0.5 text-xs font-semibold text-tertiary">

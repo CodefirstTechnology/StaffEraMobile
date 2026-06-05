@@ -6,6 +6,7 @@ import { DashboardLayout, AdminLayout } from './components/DashboardLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ServantList from './pages/ServantList'
+import AppRegistrationList from './pages/AppRegistrationList'
 import OnboardServant from './pages/OnboardServant'
 import ServantDetail from './pages/ServantDetail'
 import EditServant from './pages/EditServant'
@@ -14,6 +15,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminBookings from './pages/admin/AdminBookings'
 import AdminServants from './pages/admin/AdminServants'
+import AdminSkills from './pages/admin/AdminSkills'
 
 const qc = new QueryClient()
 
@@ -33,6 +35,7 @@ export default function App() {
               }
             >
               <Route index element={<Dashboard />} />
+              <Route path="registrations" element={<AppRegistrationList />} />
               <Route path="servants" element={<ServantList />} />
               <Route path="servants/new" element={<OnboardServant />} />
               <Route path="servants/:id" element={<ServantDetail />} />
@@ -51,6 +54,7 @@ export default function App() {
               <Route path="users" element={<AdminUsers />} />
               <Route path="bookings" element={<AdminBookings />} />
               <Route path="servants" element={<AdminServants />} />
+              <Route path="skills" element={<AdminSkills />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -1,12 +1,16 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
+import { setSessionExpiredHandler } from '@/lib/authSession';
 import { clearAuthTokens, getToken, setToken } from '@/lib/tokenStorage';
+import { useLanguageStore } from '@/store/languageStore';
+import i18n, { isSupportedLanguage } from '@/lib/i18n';
 
 type User = {
   id: number;
   name: string;
   email: string;
   role: string;
+  preferredLanguage?: string;
   servant?: { id: number; verificationStatus: string };
 };
 
@@ -15,6 +19,7 @@ type AuthState = {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  submitApplication: (data: Record<string, unknown>) => Promise<string>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
 };
@@ -23,17 +28,45 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,
-
   hydrate: async () => {
     try {
       const token = await getToken('accessToken');
       if (!token) return set({ isLoading: false });
       const { data } = await api.get('/auth/me');
-      set({ user: data.data.user, isAuthenticated: true, isLoading: false });
+      const user = data.data.user;
+      set({ user, isAuthenticated: true, isLoading: false });
+      if (isSupportedLanguage(user?.preferredLanguage)) {
+        await useLanguageStore.getState().syncFromUser(user.preferredLanguage);
+      }
     } catch {
       await clearAuthTokens();
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
+  },
+
+  submitApplication: async (payload) => {
+    const body = payload as Record<string, string | number | string[] | undefined>;
+    const lang = useLanguageStore.getState().language;
+    const skills = Array.isArray(body.skills) ? body.skills : [];
+    const lat = Number(body.latitude);
+    const lng = Number(body.longitude);
+
+    const res = await api.post('/auth/register-servant', {
+      name: String(body.name ?? '').trim(),
+      email: String(body.email).trim().toLowerCase(),
+      phone: String(body.phone ?? '').replace(/\D/g, ''),
+      address: String(body.address ?? '').trim(),
+      skills,
+      ...(body.city ? { city: String(body.city).trim() } : {}),
+      ...(Number.isFinite(lat) ? { latitude: lat } : {}),
+      ...(Number.isFinite(lng) ? { longitude: lng } : {}),
+      preferredLanguage: lang,
+    });
+    const message = res.data?.data?.message;
+    if (!res.data?.success) {
+      throw { response: { data: { message: res.data?.message || 'Registration failed' } } };
+    }
+    return (message as string) || 'Submitted';
   },
 
   login: async (email, password) => {
@@ -45,14 +78,17 @@ export const useAuthStore = create<AuthState>((set) => ({
       throw {
         response: {
           data: {
-            message: 'This account is not a servant. Use the House Owner or Agent app.',
+            message: i18n.t('auth.wrongRoleServant'),
           },
         },
       };
     }
     await setToken('accessToken', data.data.accessToken);
     await setToken('refreshToken', data.data.refreshToken);
-    set({ user: data.data.user, isAuthenticated: true });
+    const user = data.data.user;
+    set({ user, isAuthenticated: true });
+    const lang = useLanguageStore.getState().language;
+    void useLanguageStore.getState().setLanguage(lang, { syncProfile: true });
   },
 
   logout: async () => {
@@ -60,3 +96,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, isAuthenticated: false });
   },
 }));
+
+setSessionExpiredHandler(() => {
+  useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
+});

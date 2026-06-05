@@ -1,13 +1,25 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
 import { clearAuthTokens, getToken, setToken } from '@/lib/tokenStorage';
+import { useLanguageStore } from '@/store/languageStore';
+import i18n, { isSupportedLanguage } from '@/lib/i18n';
 
 type User = {
   id: number;
   name: string;
   email: string;
   role: string;
-  houseOwner?: { id: number; city?: string };
+  preferredLanguage?: string;
+  houseOwner?: {
+    id: number;
+    city?: string;
+    address?: string;
+    flatNo?: string;
+    building?: string;
+    area?: string;
+    latitude?: number;
+    longitude?: number;
+  };
 };
 
 type AuthState = {
@@ -15,9 +27,10 @@ type AuthState = {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: Record<string, string>) => Promise<void>;
+  register: (data: Record<string, unknown>) => Promise<void>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
+  setUser: (user: User | null) => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -33,7 +46,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
       const { data } = await api.get('/auth/me');
-      set({ user: data.data.user, isAuthenticated: true, isLoading: false });
+      const user = data.data.user;
+      set({ user, isAuthenticated: true, isLoading: false });
+      if (isSupportedLanguage(user?.preferredLanguage)) {
+        await useLanguageStore.getState().syncFromUser(user.preferredLanguage);
+      }
     } catch {
       await clearAuthTokens();
       set({ user: null, isAuthenticated: false, isLoading: false });
@@ -49,24 +66,32 @@ export const useAuthStore = create<AuthState>((set) => ({
       throw {
         response: {
           data: {
-            message: 'This account is not a house owner. Use the Servant or Agent app.',
+            message: i18n.t('auth.wrongRole'),
           },
         },
       };
     }
     await setToken('accessToken', data.data.accessToken);
     await setToken('refreshToken', data.data.refreshToken);
-    set({ user: data.data.user, isAuthenticated: true });
+    const user = data.data.user;
+    set({ user, isAuthenticated: true });
+    const lang = useLanguageStore.getState().language;
+    void useLanguageStore.getState().setLanguage(lang, { syncProfile: true });
   },
 
   register: async (payload) => {
+    const body = payload as Record<string, string | number | undefined>;
+    const lang = useLanguageStore.getState().language;
     const { data } = await api.post('/auth/register-owner', {
-      ...payload,
-      email: payload.email.trim().toLowerCase(),
+      ...body,
+      email: String(body.email).trim().toLowerCase(),
+      preferredLanguage: lang,
     });
     await setToken('accessToken', data.data.accessToken);
     await setToken('refreshToken', data.data.refreshToken);
-    set({ user: data.data.user, isAuthenticated: true });
+    const user = data.data.user;
+    set({ user, isAuthenticated: true });
+    void useLanguageStore.getState().setLanguage(lang, { syncProfile: true });
   },
 
   logout: async () => {
@@ -79,4 +104,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     await clearAuthTokens();
     set({ user: null, isAuthenticated: false });
   },
+
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
 }));

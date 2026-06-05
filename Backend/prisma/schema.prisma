@@ -21,6 +21,11 @@ enum VerificationStatus {
   REJECTED
 }
 
+enum ServantRegistrationSource {
+  AGENT
+  SELF
+}
+
 enum BookingType {
   MONTHLY
   SESSION
@@ -33,6 +38,7 @@ enum BookingStatus {
   COMPLETED
   CANCELLED
   REJECTED
+  EXPIRED
 }
 
 model User {
@@ -42,9 +48,11 @@ model User {
   phone         String?        @unique
   password      String
   role          Role           @default(HOUSE_OWNER)
-  isActive      Boolean        @default(true)
-  fcmToken      String?
-  createdAt     DateTime       @default(now())
+  isActive           Boolean        @default(true)
+  agentSetPassword   Boolean        @default(false)
+  fcmToken           String?
+  preferredLanguage  String         @default("en")
+  createdAt          DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   houseOwner    HouseOwner?
@@ -68,6 +76,9 @@ model HouseOwner {
   userId    Int       @unique
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   address   String?
+  flatNo    String?
+  building  String?
+  area      String?
   city      String?
   latitude  Float?
   longitude Float?
@@ -82,6 +93,7 @@ model Servant {
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   agentId            Int?
   agent              Agent?             @relation(fields: [agentId], references: [id])
+  registrationSource ServantRegistrationSource @default(AGENT)
   verificationStatus VerificationStatus @default(PENDING)
   verifiedAt         DateTime?
   rejectionReason    String?
@@ -98,6 +110,15 @@ model Servant {
   availableFrom      String?
   availableTo        String?
   workingDays        String?
+  offersSession      Boolean            @default(true)
+  offersMonthly      Boolean            @default(true)
+  weekOffDays        String?
+  hoursPerDay        Float?
+  availabilityNotes  String?
+  address            String?
+  city               String?
+  latitude           Float?
+  longitude          Float?
   bookings           Booking[]
   timeEntries        TimeEntry[]
   zones              Zone[]
@@ -112,6 +133,8 @@ model Zone {
   name        String
   description String?
   city        String?
+  latitude    Float?
+  longitude   Float?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -127,12 +150,27 @@ model ServantSkill {
   skillName String
 }
 
+model Skill {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  label     String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
 model Agent {
   id         Int       @id @default(autoincrement())
   userId     Int       @unique
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   agencyName String?
+  address    String?
   city       String?
+  latitude   Float?
+  longitude  Float?
   servants   Servant[]
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -142,10 +180,11 @@ model Booking {
   id               Int           @id @default(autoincrement())
   houseOwnerId     Int
   houseOwner       HouseOwner    @relation(fields: [houseOwnerId], references: [id])
-  servantId        Int
-  servant          Servant       @relation(fields: [servantId], references: [id])
+  servantId        Int?
+  servant          Servant?      @relation(fields: [servantId], references: [id])
   bookingType      BookingType
   status           BookingStatus @default(PENDING)
+  requestedSkill   String?
 
   monthlyStartDate DateTime?
   monthlyEndDate   DateTime?
@@ -156,8 +195,17 @@ model Booking {
   sessionStartTime String?
   sessionEndTime   String?
   sessionHours     Float?
+  sessionSlots     String?
 
   address          String?
+  flatNo           String?
+  building         String?
+  area             String?
+  latitude         Float?
+  longitude        Float?
+  servantLatitude  Float?
+  servantLongitude Float?
+  servantLocationAt DateTime?
   totalAmount      Float?
   isPaid           Boolean       @default(false)
   paymentId        String?

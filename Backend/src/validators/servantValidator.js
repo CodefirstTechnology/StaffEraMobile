@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { optionalNumber } = require("./zodHelpers");
 
 const updateServantMeSchema = z.object({
   body: z.object({
@@ -6,7 +7,12 @@ const updateServantMeSchema = z.object({
     profilePhoto: z.string().optional(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
-    workingDays: z.union([z.string(), z.array(z.string())]).optional()
+    workingDays: z.union([z.string(), z.array(z.string())]).optional(),
+    offersSession: z.coerce.boolean().optional(),
+    offersMonthly: z.coerce.boolean().optional(),
+    weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
+    hoursPerDay: optionalNumber(),
+    availabilityNotes: z.string().optional()
   })
 });
 
@@ -17,14 +23,23 @@ const createServantSchema = z.object({
     phone: z.string().optional(),
     password: z.string().min(6),
     bio: z.string().optional(),
-    experience: z.coerce.number().optional(),
-    hourlyRate: z.coerce.number().optional(),
-    monthlyRate: z.coerce.number().optional(),
+    experience: optionalNumber(),
+    hourlyRate: optionalNumber(),
+    monthlyRate: optionalNumber(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
+    offersSession: z.coerce.boolean().optional(),
+    offersMonthly: z.coerce.boolean().optional(),
+    weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
+    hoursPerDay: optionalNumber(),
+    availabilityNotes: z.string().optional(),
     idProofType: z.string().optional(),
-    skills: z.union([z.string(), z.array(z.string())]).optional()
+    skills: z.union([z.string(), z.array(z.string())]).optional(),
+    address: z.string().optional(),
+    city: z.string().optional(),
+    latitude: z.coerce.number().min(-90).max(90).optional(),
+    longitude: z.coerce.number().min(-180).max(180).optional()
   })
 });
 
@@ -32,22 +47,40 @@ const updateServantSchema = z.object({
   body: z.object({
     name: z.string().min(2).optional(),
     phone: z.string().optional(),
+    address: z.string().optional(),
+    city: z.string().optional(),
+    latitude: z.coerce.number().min(-90).max(90).optional(),
+    longitude: z.coerce.number().min(-180).max(180).optional(),
     bio: z.string().optional(),
-    experience: z.coerce.number().optional(),
-    hourlyRate: z.coerce.number().optional(),
-    monthlyRate: z.coerce.number().optional(),
+    experience: optionalNumber(),
+    hourlyRate: optionalNumber(),
+    monthlyRate: optionalNumber(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
+    offersSession: z.coerce.boolean().optional(),
+    offersMonthly: z.coerce.boolean().optional(),
+    weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
+    hoursPerDay: optionalNumber(),
+    availabilityNotes: z.string().optional(),
     idProofType: z.string().optional(),
     skills: z.union([z.string(), z.array(z.string())]).optional()
+  })
+});
+
+const setServantPasswordSchema = z.object({
+  body: z.object({
+    password: z.string().min(6).optional(),
+    generatePassword: z.coerce.boolean().optional()
   })
 });
 
 const verifyServantSchema = z.object({
   body: z.object({
     status: z.enum(["VERIFIED", "REJECTED", "UNDER_REVIEW", "PENDING"]),
-    reason: z.string().optional()
+    reason: z.string().optional(),
+    password: z.string().min(6).optional(),
+    generatePassword: z.coerce.boolean().optional()
   })
 });
 
@@ -55,5 +88,6 @@ module.exports = {
   updateServantMeSchema,
   createServantSchema,
   updateServantSchema,
+  setServantPasswordSchema,
   verifyServantSchema
 };

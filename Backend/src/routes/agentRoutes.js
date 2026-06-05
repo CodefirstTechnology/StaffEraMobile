@@ -6,10 +6,18 @@ const upload = require("../middleware/upload");
 const validate = require("../middleware/validate");
 const {
   createServantSchema,
-  verifyServantSchema
+  verifyServantSchema,
+  setServantPasswordSchema
 } = require("../validators/servantValidator");
+const { updateAgentProfileSchema } = require("../validators/agentValidator");
 
 router.use(authenticate, requireRole("AGENT", "ADMIN"));
+
+router.patch(
+  "/profile",
+  validate(updateAgentProfileSchema),
+  agentController.updateProfile
+);
 
 router.post(
   "/servants",
@@ -22,6 +30,11 @@ router.post(
 );
 router.get("/servants", agentController.listServants);
 router.get("/servants/:id", agentController.getServant);
+router.patch(
+  "/servants/:id/password",
+  validate(setServantPasswordSchema),
+  agentController.setServantPassword
+);
 router.patch(
   "/servants/:id",
   upload.fields([

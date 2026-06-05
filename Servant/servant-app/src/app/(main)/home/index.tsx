@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -9,51 +11,134 @@ import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { LocationMapPreview } from '@/components/ui/LocationMapPreview';
+import { JobTrackingMap } from '@/components/ui/JobTrackingMap';
+import { formatVisitAddressLines } from '@/lib/visitAddress';
+import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
+import { useNotifications } from '@/hooks/useNotifications';
+import { formatSessionSlotsLabel } from '@/lib/timeSlots';
+import { computeTodayEarnings, computeMonthlyEarnings } from '@/lib/earnings';
+import { localizedSkillLabel } from '@/lib/skills';
+import { formatDate, formatCurrency } from '@/lib/i18n/format';
 
 type Booking = {
   id: number;
   status: string;
   bookingType: string;
   address?: string;
+  flatNo?: string | null;
+  building?: string | null;
+  area?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  requestedSkill?: string | null;
+  sessionStartTime?: string | null;
+  sessionEndTime?: string | null;
+  sessionSlots?: string | null;
+  sessionDate?: string | null;
+  sessionHours?: number | null;
+  monthlyStartDate?: string | null;
+  totalAmount?: number | null;
+  updatedAt?: string;
   houseOwner: { user: { name: string } };
 };
 
 export default function ServantHomeScreen() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const qc = useQueryClient();
   const [elapsed, setElapsed] = useState(0);
   const [activeBookingId, setActiveBookingId] = useState<number | null>(null);
   const [activeEntry, setActiveEntry] = useState<{ clockIn: string; bookingId?: number } | null>(
     null,
   );
+  const [actingId, setActingId] = useState<number | null>(null);
+  const [onWayBookingId, setOnWayBookingId] = useState<number | null>(null);
 
-  const { data: bookings } = useQuery({
+  const trackingBookingId = activeBookingId ?? onWayBookingId;
+  useServantLocationReporter(trackingBookingId, trackingBookingId != null);
+
+  const refreshBookings = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['bookings'] }),
+      qc.invalidateQueries({ queryKey: ['open-requests'] }),
+      qc.invalidateQueries({ queryKey: ['notifications'] }),
+      qc.invalidateQueries({ queryKey: ['schedule'] }),
+    ]);
+
+  const { data: bookings, refetch: refetchBookings } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
       const res = await api.get('/bookings');
       return res.data.data.bookings as Booking[];
     },
+    enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 20000 : false,
   });
 
-  const { data: notifications } = useQuery({
-    queryKey: ['notifications'],
+  const { data: profile } = useQuery({
+    queryKey: ['servant-profile'],
     queryFn: async () => {
-      const res = await api.get('/notifications');
-      return res.data.data.notifications as Array<{ id: number; title: string; body: string; isRead: boolean }>;
+      const res = await api.get('/servants/me');
+      return res.data.data.servant as { hourlyRate?: number | null };
     },
-    refetchInterval: 30000,
+    enabled: isAuthenticated,
   });
 
-  const { data: today } = useQuery({
+  const { data: openRequests } = useQuery({
+    queryKey: ['open-requests'],
+    queryFn: async () => {
+      const res = await api.get('/bookings/open-requests');
+      return res.data.data.requests as Booking[];
+    },
+    enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 15000 : false,
+  });
+
+  const { data: notifications } = useNotifications();
+
+  const { data: today, refetch: refetchToday } = useQuery({
     queryKey: ['time-today'],
     queryFn: async () => {
       const res = await api.get('/time/today');
-      return res.data.data;
+      return res.data.data as {
+        totalHours?: number;
+        estimatedEarnings?: number;
+        hourlyRate?: number;
+        entries?: { clockOut: string | null; clockIn: string; bookingId?: number }[];
+      };
     },
+    enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 20000 : false,
+  });
+
+  const { data: monthStats } = useQuery({
+    queryKey: ['time-month'],
+    queryFn: async () => {
+      const res = await api.get('/time/month');
+      return res.data.data as {
+        totalEarnings?: number;
+        completedCount?: number;
+        monthLabel?: string;
+      };
+    },
+    enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 20000 : false,
   });
 
   useEffect(() => {
-    const open = today?.entries?.find((e: { clockOut: string | null }) => !e.clockOut);
+    if (!isAuthenticated) return;
+    const timer = setInterval(() => {
+      refetchBookings();
+      refetchToday();
+      qc.invalidateQueries({ queryKey: ['time-month'] });
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [isAuthenticated, refetchBookings, refetchToday]);
+
+  useEffect(() => {
+    const open = today?.entries?.find((e) => !e.clockOut);
     if (open) {
       setActiveEntry({ clockIn: open.clockIn, bookingId: open.bookingId });
       setActiveBookingId(open.bookingId ?? null);
@@ -89,11 +174,16 @@ export default function ServantHomeScreen() {
   const clockIn = async (bookingId: number) => {
     try {
       await api.post('/time/clock-in', { bookingId });
+      setOnWayBookingId(null);
       setActiveBookingId(bookingId);
-      qc.invalidateQueries({ queryKey: ['time-today', 'bookings'] });
-      Alert.alert('Work started', 'You are on duty at the customer location.');
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['time-today'] }),
+        qc.invalidateQueries({ queryKey: ['time-month'] }),
+        qc.invalidateQueries({ queryKey: ['bookings'] }),
+      ]);
+      Alert.alert(t('servantHome.workStarted'), t('servantHome.onDutyAtCustomer'));
     } catch (e: unknown) {
-      Alert.alert('Could not start', apiError(e, 'Check booking is confirmed'));
+      Alert.alert(t('servantHome.couldNotStart'), apiError(e, t('servantHome.checkConfirmed')));
     }
   };
 
@@ -102,38 +192,72 @@ export default function ServantHomeScreen() {
       await api.post('/time/clock-out');
       setActiveEntry(null);
       setActiveBookingId(null);
-      qc.invalidateQueries({ queryKey: ['time-today', 'bookings'] });
-      Alert.alert('Clocked out', 'Hours saved for payout.');
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['time-today'] }),
+        qc.invalidateQueries({ queryKey: ['time-month'] }),
+        qc.invalidateQueries({ queryKey: ['bookings'] }),
+      ]);
+      Alert.alert(t('servantHome.clockedOutTitle'), t('servantHome.hoursSaved'));
     } catch (e: unknown) {
-      Alert.alert('Error', apiError(e, 'Could not clock out'));
+      Alert.alert(t('errors.generic'), apiError(e, t('servantHome.couldNotClockOut')));
     }
   };
 
   const confirm = async (id: number) => {
+    if (actingId != null) return;
+    setActingId(id);
     try {
       await api.patch(`/bookings/${id}/confirm`);
-      qc.invalidateQueries({ queryKey: ['bookings', 'notifications'] });
-      Alert.alert('Accepted', 'The customer has been notified.');
+      await refreshBookings();
+      Alert.alert(t('servantHome.acceptedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
-      Alert.alert('Could not accept', apiError(e, 'Try again'));
+      const message = apiError(e, 'Try again');
+      if (message.toLowerCase().includes('not pending')) {
+        await refreshBookings();
+        Alert.alert(t('servantHome.alreadyHandled'), t('servantHome.requestHandled'));
+      } else {
+        Alert.alert(t('servantHome.couldNotAccept'), message);
+      }
+    } finally {
+      setActingId(null);
     }
   };
 
   const reject = async (id: number) => {
+    if (actingId != null) return;
+    setActingId(id);
     try {
-      await api.patch(`/bookings/${id}/reject`, { reason: 'Unavailable at this time' });
-      qc.invalidateQueries({ queryKey: ['bookings', 'notifications'] });
-      Alert.alert('Declined', 'The customer has been notified.');
+      await api.patch(`/bookings/${id}/reject`, { reason: t('servantHome.rejectReason') });
+      await refreshBookings();
+      Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
-      Alert.alert('Could not decline', apiError(e, 'Try again'));
+      const message = apiError(e, 'Try again');
+      if (message.toLowerCase().includes('not pending')) {
+        await refreshBookings();
+        Alert.alert(t('servantHome.alreadyHandled'), t('servantHome.requestHandled'));
+      } else {
+        Alert.alert(t('servantHome.couldNotDecline'), message);
+      }
+    } finally {
+      setActingId(null);
     }
   };
 
   const unread = (notifications || []).filter((n) => !n.isRead).length;
 
-  const todayEarnings = (bookings || [])
-    .filter((b) => b.status === 'COMPLETED')
-    .reduce((s, b) => s + ((b as Booking & { totalAmount?: number }).totalAmount || 0), 0);
+  const openJobDetail = (bookingId: number) => {
+    router.push(`/(main)/schedule/${bookingId}`);
+  };
+
+  const hourlyRate = profile?.hourlyRate ?? today?.hourlyRate ?? 0;
+  const todayStats = computeTodayEarnings(bookings || [], hourlyRate, today);
+  const monthlyFromBookings = computeMonthlyEarnings(bookings || [], hourlyRate);
+  const monthlyAmount = Math.max(monthStats?.totalEarnings ?? 0, monthlyFromBookings.amount);
+  const monthlyCount = Math.max(
+    monthStats?.completedCount ?? 0,
+    monthlyFromBookings.completedCount,
+  );
+  const monthLabel = monthStats?.monthLabel ?? monthlyFromBookings.monthLabel;
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
@@ -143,68 +267,228 @@ export default function ServantHomeScreen() {
             <Text style={styles.proAvatarText}>{user?.name?.[0]}</Text>
           </View>
           <View>
-            <Text style={styles.proBrand}>StaffEra Pro</Text>
-            <Text style={styles.proName}>Namaste, {user?.name?.split(' ')[0]}</Text>
+            <Text style={styles.proBrand}>{t('common.appNamePro')}</Text>
+            <Text style={styles.proName}>
+              {t('servantHome.namaste', { name: user?.name?.split(' ')[0] || '' })}
+            </Text>
           </View>
         </View>
         <View style={styles.online}>
           <View style={styles.dot} />
-          <Text style={styles.onlineText}>ONLINE</Text>
-          {unread > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unread}</Text>
-            </View>
-          )}
+          <Text style={styles.onlineText}>{t('servantHome.online')}</Text>
+          <Pressable
+            onPress={() => router.push('/(main)/notifications')}
+            style={styles.notifBtn}
+            hitSlop={8}
+          >
+            <MaterialIcons name="notifications" size={22} color={Stitch.colors.primary} />
+            {unread > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+              </View>
+            )}
+          </Pressable>
         </View>
       </View>
 
       {unread > 0 && (
-        <GlassCard style={styles.notifBanner}>
-          <MaterialIcons name="notifications-active" size={20} color={Stitch.colors.secondary} />
-          <Text style={styles.notifText}>
-            {unread} new notification{unread > 1 ? 's' : ''} — check booking requests below
-          </Text>
-        </GlassCard>
+        <Pressable onPress={() => router.push('/(main)/notifications')}>
+          <GlassCard style={styles.notifBanner}>
+            <MaterialIcons name="notifications-active" size={20} color={Stitch.colors.secondary} />
+            <Text style={styles.notifText}>
+              {t('servantHome.newNotifications', { count: unread })}
+            </Text>
+            <MaterialIcons name="chevron-right" size={20} color={Stitch.colors.onSurfaceVariant} />
+          </GlassCard>
+        </Pressable>
       )}
 
       <View style={styles.earnRow}>
         <View>
-          <Text style={styles.earnLabel}>TODAY&apos;S EARNINGS</Text>
+          <Text style={styles.earnLabel}>{t('servantHome.todayEarningsLabel')}</Text>
           <Text style={styles.earnValue}>
             {Stitch.copy.rupee}
-            {todayEarnings.toLocaleString('en-IN')}
+            {formatCurrency(todayStats.amount)}
+          </Text>
+          <Text style={styles.earnSub}>
+            {todayStats.completedCount > 0
+              ? t('servantHome.jobsCompletedToday', { count: todayStats.completedCount })
+              : todayStats.hoursToday > 0
+                ? t('servantHome.hoursLoggedToday', { hours: todayStats.hoursToday.toFixed(1) })
+                : t('servantHome.earningsUpdateHint')}
           </Text>
         </View>
         <View style={styles.jobsBadge}>
           <Text style={styles.jobsNum}>{todayJobs.length}</Text>
-          <Text style={styles.jobsLbl}>JOBS</Text>
+          <Text style={styles.jobsLbl}>{t('servantHome.jobsLabel')}</Text>
         </View>
       </View>
 
+      <GlassCard style={styles.monthCard}>
+        <View style={styles.monthRow}>
+          <View style={styles.monthIconWrap}>
+            <MaterialIcons name="calendar-month" size={22} color={Stitch.colors.secondary} />
+          </View>
+          <View style={styles.monthBody}>
+            <Text style={styles.monthLabel}>
+              {t('servantHome.monthCardLabel', { month: monthLabel.toUpperCase() })}
+            </Text>
+            <Text style={styles.monthValue}>
+              {Stitch.copy.rupee}
+              {formatCurrency(monthlyAmount)}
+            </Text>
+            <Text style={styles.monthSub}>
+              {monthlyCount > 0
+                ? t('servantHome.monthJobsSub', { count: monthlyCount })
+                : t('servantHome.monthEmptySub')}
+            </Text>
+          </View>
+          <Pressable onPress={() => router.push('/(main)/earnings')} hitSlop={8}>
+            <MaterialIcons name="chevron-right" size={24} color={Stitch.colors.onSurfaceVariant} />
+          </Pressable>
+        </View>
+      </GlassCard>
+
       {activeEntry ? (
-        <LinearGradient colors={[Stitch.colors.error, '#c62828']} style={styles.clockCard}>
-          <Text style={styles.clockLabel}>Work in progress</Text>
-          <Text style={styles.clockTime}>{formatElapsed(elapsed)}</Text>
-          <TouchableOpacity style={styles.clockBtn} onPress={clockOut}>
-            <Text style={styles.clockBtnText}>End work & clock out</Text>
-          </TouchableOpacity>
-        </LinearGradient>
+        <>
+          <Pressable onPress={() => activeBookingId && openJobDetail(activeBookingId)}>
+            <LinearGradient colors={[Stitch.colors.error, '#c62828']} style={styles.clockCard}>
+              <Text style={styles.clockLabel}>{t('servantHome.workInProgress')}</Text>
+              <Text style={styles.clockTime}>{formatElapsed(elapsed)}</Text>
+              <Text style={styles.viewDetail}>{t('servantHome.tapJobDetails')}</Text>
+              <TouchableOpacity style={styles.clockBtn} onPress={clockOut}>
+                <Text style={styles.clockBtnText}>{t('servantHome.endWorkClockOut')}</Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </Pressable>
+          {(() => {
+            const activeJob = todayJobs.find((b) => b.id === activeBookingId);
+            const home =
+              activeJob?.latitude != null && activeJob?.longitude != null
+                ? { latitude: activeJob.latitude, longitude: activeJob.longitude }
+                : null;
+            return (
+              <View style={styles.liveMap}>
+                <JobTrackingMap
+                  home={home}
+                  homeLabel={activeJob?.houseOwner.user.name || t('schedule.customer')}
+                  showMyLocation
+                  showMapInitially
+                  height={220}
+                  visitAddress={
+                    activeJob
+                      ? {
+                          flatNo: activeJob.flatNo,
+                          building: activeJob.building,
+                          area: activeJob.area,
+                          address: activeJob.address,
+                        }
+                      : null
+                  }
+                  caption={t('servantHome.sharingLocation')}
+                />
+              </View>
+            );
+          })()}
+        </>
       ) : null}
+
+      {openRequests && openRequests.length > 0 && (
+        <>
+          <Text style={styles.section}>{t('servantHome.openRequestsTitle')}</Text>
+          <Text style={styles.sectionSub}>{t('servantHome.openRequestsSub')}</Text>
+          {openRequests.map((b) => {
+            const slotLabel = formatSessionSlotsLabel(
+              b.sessionSlots,
+              b.sessionStartTime,
+              b.sessionEndTime,
+            );
+            const visitDate = b.sessionDate ? formatDate(b.sessionDate) : null;
+            return (
+            <GlassCard key={`open-${b.id}`} style={styles.mb}>
+              <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
+                  <Text style={styles.cardMeta}>
+                    {localizedSkillLabel(b.requestedSkill || '', []) || t('servantHome.generalHelp')}
+                    {' · '}
+                    {b.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly')}
+                  </Text>
+                  {visitDate && slotLabel ? (
+                    <Text style={styles.slotText}>
+                      {visitDate} · {slotLabel}
+                    </Text>
+                  ) : slotLabel ? (
+                    <Text style={styles.slotText}>{slotLabel}</Text>
+                  ) : null}
+                  {b.address ? <Text style={styles.addr}>{b.address}</Text> : null}
+                </View>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={22}
+                  color={Stitch.colors.onSurfaceVariant}
+                />
+              </Pressable>
+              <LocationMapPreview
+                latitude={b.latitude}
+                longitude={b.longitude}
+                address={b.address}
+                height={140}
+              />
+              <TouchableOpacity
+                style={[styles.accept, actingId === b.id && styles.btnDisabled]}
+                onPress={() => confirm(b.id)}
+                disabled={actingId != null}
+              >
+                <Text style={styles.acceptText}>
+                  {actingId === b.id ? t('servantHome.accepting') : t('servantHome.acceptJobFirstWins')}
+                </Text>
+              </TouchableOpacity>
+            </GlassCard>
+            );
+          })}
+        </>
+      )}
 
       {pending.length > 0 && (
         <>
-          <Text style={styles.section}>New requests — accept or decline</Text>
+          <Text style={styles.section}>{t('servantHome.newRequestsSection')}</Text>
           {pending.map((b) => (
             <GlassCard key={b.id} style={styles.mb}>
-              <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
-              <Text style={styles.cardMeta}>{b.bookingType}</Text>
-              {b.address ? <Text style={styles.addr}>{b.address}</Text> : null}
+              <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
+                  <Text style={styles.cardMeta}>{b.bookingType}</Text>
+                  {b.address ? <Text style={styles.addr}>{b.address}</Text> : null}
+                </View>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={22}
+                  color={Stitch.colors.onSurfaceVariant}
+                />
+              </Pressable>
+              <LocationMapPreview
+                latitude={b.latitude}
+                longitude={b.longitude}
+                address={b.address}
+                height={140}
+              />
               <View style={styles.row}>
-                <TouchableOpacity style={styles.accept} onPress={() => confirm(b.id)}>
-                  <Text style={styles.acceptText}>Accept</Text>
+                <TouchableOpacity
+                  style={[styles.accept, actingId === b.id && styles.btnDisabled]}
+                  onPress={() => confirm(b.id)}
+                  disabled={actingId != null}
+                >
+                  <Text style={styles.acceptText}>
+                    {actingId === b.id ? t('servantHome.pleaseWait') : t('schedule.accept')}
+                  </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.reject} onPress={() => reject(b.id)}>
-                  <Text style={styles.rejectText}>Decline</Text>
+                <TouchableOpacity
+                  style={[styles.reject, actingId === b.id && styles.btnDisabled]}
+                  onPress={() => reject(b.id)}
+                  disabled={actingId != null}
+                >
+                  <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
                 </TouchableOpacity>
               </View>
             </GlassCard>
@@ -212,33 +496,83 @@ export default function ServantHomeScreen() {
         </>
       )}
 
-      <Text style={styles.section}>Today&apos;s jobs</Text>
+      <Text style={styles.section}>{t('servantHome.todayJobsSection')}</Text>
       {todayJobs.length === 0 ? (
         <GlassCard>
-          <Text style={styles.empty}>No confirmed jobs — stay online for new requests</Text>
+          <Text style={styles.empty}>{t('servantHome.noConfirmedJobs')}</Text>
         </GlassCard>
       ) : (
         todayJobs.map((b) => {
           const isActive = b.status === 'ACTIVE' || activeBookingId === b.id;
           return (
             <GlassCard key={b.id} style={styles.mb}>
-              <View style={styles.jobRow}>
-                <MaterialIcons name="location-on" size={18} color={Stitch.colors.secondary} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
-                  <Text style={styles.cardMeta}>{b.address || 'Address on file'}</Text>
+              <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
+                <View style={styles.jobRow}>
+                  <MaterialIcons name="location-on" size={18} color={Stitch.colors.secondary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
+                    <Text style={styles.cardMeta}>
+                      {formatVisitAddressLines(b).join(' · ') || b.address || t('servantHome.addressOnFile')}
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={22}
+                    color={Stitch.colors.onSurfaceVariant}
+                  />
                 </View>
-              </View>
+              </Pressable>
               <StatusPill status={b.status} />
-              {!activeEntry && b.status === 'CONFIRMED' && (
-                <GradientButton
-                  title="I arrived — start work"
-                  onPress={() => clockIn(b.id)}
-                  style={{ marginTop: 12 }}
+              {b.latitude != null && b.longitude != null ? (
+                <JobTrackingMap
+                  home={{ latitude: b.latitude, longitude: b.longitude }}
+                  homeLabel={b.houseOwner.user.name}
+                  showMyLocation={!activeEntry}
+                  showMapInitially={onWayBookingId === b.id}
+                  height={160}
+                  visitAddress={{
+                    flatNo: b.flatNo,
+                    building: b.building,
+                    area: b.area,
+                    address: b.address,
+                  }}
+                  caption={
+                    onWayBookingId === b.id
+                      ? t('servantHome.locationShared')
+                      : t('servantHome.tapDirections')
+                  }
+                />
+              ) : (
+                <LocationMapPreview
+                  latitude={b.latitude}
+                  longitude={b.longitude}
+                  address={b.address}
+                  height={140}
                 />
               )}
+              {!activeEntry && b.status === 'CONFIRMED' && (
+                <>
+                  <TouchableOpacity
+                    style={styles.onWayBtn}
+                    onPress={() =>
+                      setOnWayBookingId((prev) => (prev === b.id ? null : b.id))
+                    }
+                  >
+                    <Text style={styles.onWayText}>
+                      {onWayBookingId === b.id
+                        ? t('servantHome.stopSharingLocation')
+                        : t('servantHome.onMyWayShare')}
+                    </Text>
+                  </TouchableOpacity>
+                  <GradientButton
+                    title={t('servantHome.arrivedStartWork')}
+                    onPress={() => clockIn(b.id)}
+                    style={{ marginTop: 12 }}
+                  />
+                </>
+              )}
               {isActive && activeEntry && (
-                <Text style={styles.onDuty}>You are clocked in at this home</Text>
+                <Text style={styles.onDuty}>{t('servantHome.clockedInAtHome')}</Text>
               )}
             </GlassCard>
           );
@@ -275,14 +609,18 @@ const styles = StyleSheet.create({
   online: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' },
   onlineText: { fontSize: 11, fontWeight: '700', color: Stitch.colors.primary, letterSpacing: 1 },
+  notifBtn: { marginLeft: 4, position: 'relative' },
   badge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
     backgroundColor: Stitch.colors.gradientEnd,
     borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    minWidth: 18,
+    height: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 4,
+    paddingHorizontal: 4,
   },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   notifBanner: {
@@ -302,6 +640,13 @@ const styles = StyleSheet.create({
   },
   earnLabel: { fontSize: 12, fontWeight: '600', color: Stitch.colors.onSurfaceVariant },
   earnValue: { fontSize: 36, fontWeight: '700', color: Stitch.colors.primary, marginTop: 4 },
+  earnSub: {
+    fontSize: 12,
+    color: Stitch.colors.onSurfaceVariant,
+    marginTop: 4,
+    maxWidth: 220,
+    lineHeight: 16,
+  },
   jobsBadge: {
     backgroundColor: 'rgba(214, 151, 254, 0.25)',
     paddingHorizontal: 16,
@@ -311,9 +656,40 @@ const styles = StyleSheet.create({
   },
   jobsNum: { fontSize: 22, fontWeight: '700', color: Stitch.colors.secondary },
   jobsLbl: { fontSize: 10, fontWeight: '700', color: Stitch.colors.secondary },
-  clockCard: { marginHorizontal: 24, borderRadius: 24, padding: 24, marginBottom: 20 },
+  monthCard: { marginHorizontal: Stitch.spacing.padding, marginBottom: 20 },
+  monthRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  monthIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(214, 151, 254, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthBody: { flex: 1 },
+  monthLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Stitch.colors.onSurfaceVariant,
+    letterSpacing: 0.5,
+  },
+  monthValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Stitch.colors.secondary,
+    marginTop: 4,
+  },
+  monthSub: {
+    fontSize: 12,
+    color: Stitch.colors.onSurfaceVariant,
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  clockCard: { marginHorizontal: 24, borderRadius: 24, padding: 24, marginBottom: 12 },
+  liveMap: { marginHorizontal: 24, marginBottom: 20 },
   clockLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 14 },
   clockTime: { color: '#fff', fontSize: 32, fontWeight: '700', marginVertical: 12 },
+  viewDetail: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginBottom: 12 },
   clockBtn: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -329,9 +705,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginTop: 8,
   },
+  sectionSub: {
+    fontSize: 13,
+    color: Stitch.colors.onSurfaceVariant,
+    marginHorizontal: 24,
+    marginBottom: 12,
+    marginTop: -6,
+    lineHeight: 18,
+  },
   mb: { marginHorizontal: 24, marginBottom: 12 },
   cardTitle: { fontSize: 17, fontWeight: '600' },
   cardMeta: { color: Stitch.colors.onSurfaceVariant, marginTop: 4, marginBottom: 4 },
+  slotText: { fontSize: 13, color: Stitch.colors.primary, fontWeight: '600', marginBottom: 4 },
   addr: { fontSize: 13, color: Stitch.colors.secondary, marginBottom: 8 },
   row: { flexDirection: 'row', gap: 10 },
   accept: {
@@ -351,7 +736,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rejectText: { color: Stitch.colors.error, fontWeight: '600' },
-  jobRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  btnDisabled: { opacity: 0.55 },
+  onWayBtn: {
+    marginTop: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Stitch.colors.secondary,
+  },
+  onWayText: { color: Stitch.colors.secondary, fontWeight: '600', fontSize: 13 },
+  jobRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  jobHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
   empty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant },
   onDuty: { marginTop: 10, color: Stitch.colors.success, fontWeight: '600' },
 });

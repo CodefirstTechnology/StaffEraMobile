@@ -1,12 +1,18 @@
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { formatTime } from '@/lib/i18n/format';
 
 export default function TimeScreen() {
+  const { t } = useTranslation();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['time-today'],
+    enabled: isAuthenticated,
     queryFn: async () => {
       const res = await api.get('/time/today');
       return res.data.data;
@@ -24,9 +30,9 @@ export default function TimeScreen() {
 
   return (
     <View style={styles.root}>
-      <Text style={styles.title}>Today&apos;s time</Text>
+      <Text style={styles.title}>{t('time.todayTitle')}</Text>
       <Text style={styles.sub}>
-        Total hours: {data?.totalHours?.toFixed(1) ?? '0.0'}
+        {t('time.totalHoursLabel', { hours: data?.totalHours?.toFixed(1) ?? '0.0' })}
       </Text>
       <FlatList
         data={entries}
@@ -36,22 +42,21 @@ export default function TimeScreen() {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <GlassCard>
-            <Text style={styles.empty}>Clock in from Home when you reach the customer</Text>
+            <Text style={styles.empty}>{t('time.clockInHint')}</Text>
           </GlassCard>
         }
         renderItem={({ item }) => (
           <GlassCard style={styles.card}>
             <Text style={styles.row}>
-              In: {new Date(item.clockIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+              {t('time.clockInAt', { time: formatTime(item.clockIn) })}
             </Text>
             <Text style={styles.row}>
-              Out:{' '}
               {item.clockOut
-                ? new Date(item.clockOut).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-                : 'On duty'}
+                ? t('time.clockOutAt', { time: formatTime(item.clockOut) })
+                : t('time.onDuty')}
             </Text>
             {item.hoursWorked != null && (
-              <Text style={styles.hours}>{item.hoursWorked} hrs</Text>
+              <Text style={styles.hours}>{t('time.hoursShort', { hours: item.hoursWorked })}</Text>
             )}
           </GlassCard>
         )}
@@ -76,7 +81,7 @@ const styles = StyleSheet.create({
   },
   list: { paddingHorizontal: Stitch.spacing.padding, paddingBottom: 100 },
   card: { marginBottom: 12 },
-  row: { fontSize: 15 },
+  row: { fontSize: 15, color: Stitch.colors.onBackground },
   hours: { marginTop: 6, fontWeight: '700', color: Stitch.colors.secondary },
   empty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant },
 });

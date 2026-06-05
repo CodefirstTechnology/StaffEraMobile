@@ -1,9 +1,11 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const { createNotification } = require("../services/notificationService");
 const { normalizeEmail, normalizePhone } = require("../utils/normalize");
+const { validateActiveSkillCodes } = require("../services/skillService");
 
 const parseSkills = (skills) => {
   if (!skills) return [];
@@ -18,20 +20,121 @@ const parseSkills = (skills) => {
   }
 };
 
+const stringifyDays = (days) =>
+  days === undefined || days === null
+    ? undefined
+    : Array.isArray(days)
+      ? JSON.stringify(days)
+      : days;
+
+const parseBool = (value, fallback = true) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  return String(value).toLowerCase() === "true";
+};
+
+const generateServantPassword = () => {
+  const part = crypto.randomBytes(4).toString("hex");
+  return `St${part}1`;
+};
+
 const getAgent = async (userId) => {
   const agent = await prisma.agent.findUnique({ where: { userId } });
   if (!agent) throw new ApiError(403, "Agent profile required");
   return agent;
 };
 
+/** AGENT: scoped to own servants. ADMIN: full access (no agent profile required). */
+const resolveAgentScope = async (user) => {
+  if (user.role === "ADMIN") {
+    return { isAdmin: true, agent: null, agentId: null };
+  }
+  const agent = await getAgent(user.id);
+  return { isAdmin: false, agent, agentId: agent.id };
+};
+
+/** Agent onboarded / assigned staff (not pending app sign-ups). */
+const servantWhereForScope = (scope, extra = {}) => {
+  if (scope.isAdmin) return { ...extra };
+  return {
+    AND: [
+      { agentId: scope.agentId, registrationSource: "AGENT" },
+      ...(Object.keys(extra).length ? [extra] : [])
+    ]
+  };
+};
+
+/** Pending sign-ups from the Servant app — separate from the servants pipeline. */
+const registrationWhereForScope = (scope, extra = {}) => {
+  const base = { registrationSource: "SELF", agentId: null };
+  if (scope.isAdmin) return { ...base, ...extra };
+  return { ...base, ...extra };
+};
+
+/** Single-record access: assigned servants or unassigned app registration. */
+const recordWhereForScope = (scope, extra = {}) => {
+  if (scope.isAdmin) return { ...extra };
+  return {
+    AND: [
+      {
+        OR: [
+          { agentId: scope.agentId, registrationSource: "AGENT" },
+          { registrationSource: "SELF", agentId: null }
+        ]
+      },
+      ...(Object.keys(extra).length ? [extra] : [])
+    ]
+  };
+};
+
+const assertAgentLocationSet = async (agentId) => {
+  const agent = await prisma.agent.findUnique({ where: { id: agentId } });
+  if (
+    !agent?.address?.trim() ||
+    agent.latitude == null ||
+    agent.longitude == null
+  ) {
+    throw new ApiError(
+      400,
+      "Set your agency location in Profile settings before onboarding servants"
+    );
+  }
+};
+
 const servantInclude = {
-  user: { select: { id: true, name: true, email: true, phone: true, isActive: true } },
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      isActive: true,
+      agentSetPassword: true
+    }
+  },
   skills: true,
   zones: true
 };
 
+const applyAppRegistrationPassword = async (userId, email, plainPassword) => {
+  const hash = await bcrypt.hash(plainPassword, 12);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hash, agentSetPassword: true }
+  });
+  return { email, password: plainPassword };
+};
+
 exports.createServant = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
+  if (!scope.isAdmin && scope.agentId) {
+    await assertAgentLocationSet(scope.agentId);
+  }
+  const assignAgentId = scope.isAdmin
+    ? req.body.agentId
+      ? parseInt(req.body.agentId, 10)
+      : null
+    : scope.agentId;
   const {
     name,
     email: rawEmail,
@@ -44,8 +147,17 @@ exports.createServant = async (req, res) => {
     availableFrom,
     availableTo,
     workingDays,
+    weekOffDays,
+    hoursPerDay,
+    availabilityNotes,
+    offersSession,
+    offersMonthly,
     idProofType,
-    skills
+    skills,
+    address,
+    city,
+    latitude,
+    longitude
   } = req.body;
 
   const email = normalizeEmail(rawEmail);
@@ -59,20 +171,21 @@ exports.createServant = async (req, res) => {
     if (phoneTaken) throw new ApiError(400, "Phone number already registered");
   }
 
-  const profilePhoto = req.files?.profilePhoto?.[0]
-    ? `/uploads/${req.files.profilePhoto[0].filename}`
-    : req.body.profilePhoto;
+  if (!req.files?.profilePhoto?.[0]) {
+    throw new ApiError(400, "Profile photo is required");
+  }
+  if (!req.files?.idProof?.[0]) {
+    throw new ApiError(400, "ID proof document is required");
+  }
 
-  const idProofUrl = req.files?.idProof?.[0]
-    ? `/uploads/${req.files.idProof[0].filename}`
-    : req.body.idProofUrl;
+  const profilePhoto = `/uploads/${req.files.profilePhoto[0].filename}`;
+  const idProofUrl = `/uploads/${req.files.idProof[0].filename}`;
 
-  const skillList = parseSkills(skills);
+  const skillList = await validateActiveSkillCodes(parseSkills(skills));
   const hashed = await bcrypt.hash(password, 12);
 
-  const wd = Array.isArray(workingDays)
-    ? JSON.stringify(workingDays)
-    : workingDays;
+  const wd = stringifyDays(workingDays);
+  const wod = stringifyDays(weekOffDays);
 
   const user = await prisma.user.create({
     data: {
@@ -83,7 +196,7 @@ exports.createServant = async (req, res) => {
       role: "SERVANT",
       servant: {
         create: {
-          agentId: agent.id,
+          agentId: assignAgentId,
           bio,
           experience: experience ? parseInt(experience, 10) : null,
           hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
@@ -91,10 +204,20 @@ exports.createServant = async (req, res) => {
           availableFrom,
           availableTo,
           workingDays: wd,
+          weekOffDays: wod,
+          hoursPerDay: hoursPerDay ? parseFloat(hoursPerDay) : null,
+          availabilityNotes: availabilityNotes || null,
+          offersSession: parseBool(offersSession, true),
+          offersMonthly: parseBool(offersMonthly, true),
           idProofType,
           idProofUrl,
           profilePhoto,
           verificationStatus: "PENDING",
+          registrationSource: "AGENT",
+          address: address?.trim() || null,
+          city: city?.trim() || null,
+          latitude: latitude !== undefined && latitude !== "" ? parseFloat(latitude) : null,
+          longitude: longitude !== undefined && longitude !== "" ? parseFloat(longitude) : null,
           skills: {
             create: skillList.map((skillName) => ({ skillName }))
           }
@@ -108,13 +231,16 @@ exports.createServant = async (req, res) => {
 };
 
 exports.listServants = async (req, res) => {
-  const agent = await getAgent(req.user.id);
-  const { status, search } = req.query;
+  const scope = await resolveAgentScope(req.user);
+  const { status, search, category } = req.query;
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, parseInt(req.query.limit, 10) || 20);
 
-  const where = {
-    agentId: agent.id,
+  const categoryKey = String(category || "").toLowerCase();
+  const isRegistrationList =
+    categoryKey === "registered" || categoryKey === "app" || categoryKey === "self";
+
+  const sharedFilters = {
     ...(status ? { verificationStatus: status } : {}),
     ...(search
       ? {
@@ -127,6 +253,13 @@ exports.listServants = async (req, res) => {
         }
       : {})
   };
+
+  const where = isRegistrationList
+    ? registrationWhereForScope(scope, sharedFilters)
+    : servantWhereForScope(scope, {
+        ...(categoryKey === "mine" && scope.agentId ? { agentId: scope.agentId } : {}),
+        ...sharedFilters
+      });
 
   const [servants, total] = await Promise.all([
     prisma.servant.findMany({
@@ -143,11 +276,11 @@ exports.listServants = async (req, res) => {
 };
 
 exports.getServant = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
   const id = parseInt(req.params.id, 10);
 
   const servant = await prisma.servant.findFirst({
-    where: { id, agentId: agent.id },
+    where: recordWhereForScope(scope, { id }),
     include: {
       ...servantInclude,
       bookings: {
@@ -165,11 +298,11 @@ exports.getServant = async (req, res) => {
 };
 
 exports.updateServant = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
   const id = parseInt(req.params.id, 10);
 
   const existing = await prisma.servant.findFirst({
-    where: { id, agentId: agent.id },
+    where: recordWhereForScope(scope, { id }),
     include: { user: true }
   });
   if (!existing) throw new ApiError(404, "Servant not found");
@@ -184,7 +317,18 @@ exports.updateServant = async (req, res) => {
     availableFrom,
     availableTo,
     workingDays,
-    skills
+    weekOffDays,
+    hoursPerDay,
+    availabilityNotes,
+    offersSession,
+    offersMonthly,
+    skills,
+    address,
+    city,
+    latitude,
+    longitude,
+    password,
+    generatePassword
   } = req.body;
 
   const phone = rawPhone !== undefined ? normalizePhone(rawPhone) : undefined;
@@ -196,7 +340,7 @@ exports.updateServant = async (req, res) => {
     if (phoneTaken) throw new ApiError(400, "Phone number already registered");
   }
 
-  const skillList = skills ? parseSkills(skills) : null;
+  const skillList = skills ? await validateActiveSkillCodes(parseSkills(skills)) : null;
 
   const profilePhoto = req.files?.profilePhoto?.[0]
     ? `/uploads/${req.files.profilePhoto[0].filename}`
@@ -206,14 +350,37 @@ exports.updateServant = async (req, res) => {
     ? `/uploads/${req.files.idProof[0].filename}`
     : undefined;
 
+  const isAppRegistration =
+    existing.registrationSource === "SELF" || existing.user.isActive === false;
+
+  let loginPassword =
+    password && String(password).trim().length >= 6 ? String(password).trim() : null;
+  if (isAppRegistration && generatePassword && !loginPassword) {
+    loginPassword = generateServantPassword();
+  }
+  if (password && String(password).trim().length > 0 && String(password).trim().length < 6) {
+    throw new ApiError(400, "Password must be at least 6 characters");
+  }
+
+  let credentials = null;
+
   const servant = await prisma.$transaction(async (tx) => {
-    if (name || phone !== undefined) {
+    const userPatch = {
+      ...(name && { name }),
+      ...(phone !== undefined && { phone })
+    };
+    if (loginPassword && isAppRegistration) {
+      userPatch.password = await bcrypt.hash(loginPassword, 12);
+      userPatch.agentSetPassword = true;
+      credentials = {
+        email: existing.user.email,
+        password: loginPassword
+      };
+    }
+    if (Object.keys(userPatch).length > 0) {
       await tx.user.update({
         where: { id: existing.userId },
-        data: {
-          ...(name && { name }),
-          ...(phone !== undefined && { phone })
-        }
+        data: userPatch
       });
     }
 
@@ -234,63 +401,169 @@ exports.updateServant = async (req, res) => {
         ...(availableFrom !== undefined && { availableFrom }),
         ...(availableTo !== undefined && { availableTo }),
         ...(workingDays !== undefined && {
-          workingDays: Array.isArray(workingDays)
-            ? JSON.stringify(workingDays)
-            : workingDays
+          workingDays: stringifyDays(workingDays)
+        }),
+        ...(weekOffDays !== undefined && {
+          weekOffDays: stringifyDays(weekOffDays)
+        }),
+        ...(hoursPerDay !== undefined && {
+          hoursPerDay: hoursPerDay === '' ? null : parseFloat(hoursPerDay)
+        }),
+        ...(availabilityNotes !== undefined && {
+          availabilityNotes: availabilityNotes || null
+        }),
+        ...(offersSession !== undefined && {
+          offersSession: parseBool(offersSession, true)
+        }),
+        ...(offersMonthly !== undefined && {
+          offersMonthly: parseBool(offersMonthly, true)
         }),
         ...(profilePhoto && { profilePhoto }),
         ...(idProofUrl && { idProofUrl }),
-        ...(req.body.idProofType && { idProofType: req.body.idProofType })
+        ...(req.body.idProofType && { idProofType: req.body.idProofType }),
+        ...(address !== undefined && { address: address?.trim() || null }),
+        ...(city !== undefined && { city: city?.trim() || null }),
+        ...(latitude !== undefined && {
+          latitude: latitude === "" ? null : parseFloat(latitude)
+        }),
+        ...(longitude !== undefined && {
+          longitude: longitude === "" ? null : parseFloat(longitude)
+        })
       },
       include: servantInclude
     });
   });
 
-  sendSuccess(res, { servant });
+  sendSuccess(res, { servant, ...(credentials ? { credentials } : {}) });
 };
 
-exports.verifyServant = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+exports.setServantPassword = async (req, res) => {
+  const scope = await resolveAgentScope(req.user);
   const id = parseInt(req.params.id, 10);
-  const { status, reason } = req.body;
+  const { password, generatePassword } = req.body;
 
   const existing = await prisma.servant.findFirst({
-    where: { id, agentId: agent.id },
+    where: recordWhereForScope(scope, { id }),
     include: { user: true }
   });
   if (!existing) throw new ApiError(404, "Servant not found");
+
+  const isAppRegistration =
+    existing.registrationSource === "SELF" || existing.user.isActive === false;
+
+  if (!isAppRegistration) {
+    throw new ApiError(400, "Login password can only be set for app registrations");
+  }
+
+  let loginPassword =
+    password && String(password).trim().length >= 6 ? String(password).trim() : null;
+  if (generatePassword && !loginPassword) {
+    loginPassword = generateServantPassword();
+  }
+  if (!loginPassword) {
+    throw new ApiError(400, "Provide a password (min 6 characters) or use generate password");
+  }
+
+  const credentials = await applyAppRegistrationPassword(
+    existing.userId,
+    existing.user.email,
+    loginPassword
+  );
+
+  const servant = await prisma.servant.findFirst({
+    where: { id },
+    include: servantInclude
+  });
+
+  sendSuccess(res, {
+    servant,
+    credentials,
+    message: "Login password saved. Share these details with the helper, then approve their profile."
+  });
+};
+
+exports.verifyServant = async (req, res) => {
+  const scope = await resolveAgentScope(req.user);
+  const id = parseInt(req.params.id, 10);
+  const { status, reason, password, generatePassword } = req.body;
+
+  const existing = await prisma.servant.findFirst({
+    where: recordWhereForScope(scope, { id }),
+    include: { user: true }
+  });
+  if (!existing) throw new ApiError(404, "Servant not found");
+
+  const isAppRegistration =
+    existing.registrationSource === "SELF" || existing.user.isActive === false;
+
+  let loginPassword =
+    password && String(password).trim().length >= 6 ? String(password).trim() : null;
+
+  if (status === "VERIFIED" && isAppRegistration) {
+    if (!loginPassword && generatePassword) {
+      loginPassword = generateServantPassword();
+    }
+    if (!loginPassword && !existing.user.agentSetPassword) {
+      throw new ApiError(
+        400,
+        "Set a login password first (min 6 characters), or use generate password when approving"
+      );
+    }
+  } else if (status === "VERIFIED" && password && String(password).length < 6) {
+    throw new ApiError(400, "Password must be at least 6 characters when setting login");
+  }
 
   const servant = await prisma.servant.update({
     where: { id },
     data: {
       verificationStatus: status,
       verifiedAt: status === "VERIFIED" ? new Date() : null,
-      rejectionReason: status === "REJECTED" ? reason : null
+      rejectionReason: status === "REJECTED" ? reason : null,
+      ...(status === "VERIFIED" && isAppRegistration && scope.agentId
+        ? { agentId: scope.agentId, registrationSource: "AGENT" }
+        : {})
     },
     include: servantInclude
   });
 
+  let credentials = null;
+
   if (status === "VERIFIED") {
+    const userData = { isActive: true };
+    if (loginPassword) {
+      userData.password = await bcrypt.hash(loginPassword, 12);
+      userData.agentSetPassword = true;
+      credentials = {
+        email: existing.user.email,
+        password: loginPassword
+      };
+    }
+    await prisma.user.update({
+      where: { id: existing.userId },
+      data: userData
+    });
     await createNotification({
       userId: existing.userId,
       title: "Profile verified",
-      body: "Your servant profile has been verified",
+      body: loginPassword
+        ? "Your profile is verified. Use the email and password your agent shared to sign in."
+        : "Your servant profile has been verified",
       type: "SERVANT_VERIFIED",
       data: { servantId: id }
     });
   }
 
-  sendSuccess(res, { servant });
+  sendSuccess(res, { servant, ...(credentials ? { credentials } : {}) });
 };
 
 exports.uploadIdProof = async (req, res) => {
-  const agent = await getAgent(req.user.id);
+  const scope = await resolveAgentScope(req.user);
   const id = parseInt(req.params.id, 10);
 
   if (!req.file) throw new ApiError(400, "No file uploaded");
 
   const existing = await prisma.servant.findFirst({
-    where: { id, agentId: agent.id }
+    where: recordWhereForScope(scope, { id })
   });
   if (!existing) throw new ApiError(404, "Servant not found");
 
@@ -302,4 +575,38 @@ exports.uploadIdProof = async (req, res) => {
   });
 
   sendSuccess(res, { servant });
+};
+
+exports.updateProfile = async (req, res) => {
+  const agent = await prisma.agent.findUnique({
+    where: { userId: req.user.id }
+  });
+  if (!agent) {
+    throw new ApiError(404, "Agent profile not found. Contact support to link your agency.");
+  }
+
+  const { agencyName, address, city, latitude, longitude } = req.body;
+
+  const updated = await prisma.agent.update({
+    where: { id: agent.id },
+    data: {
+      ...(agencyName !== undefined && { agencyName: agencyName?.trim() || null }),
+      address: address.trim(),
+      city: city?.trim() || null,
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude)
+    }
+  });
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    include: {
+      houseOwner: true,
+      servant: { include: { skills: true, zones: true } },
+      agent: true
+    }
+  });
+
+  const { password, ...safeUser } = user;
+  sendSuccess(res, { agent: updated, user: safeUser });
 };

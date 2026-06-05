@@ -11,7 +11,22 @@ const ApiError = require("./utils/ApiError");
 
 const app = express();
 
-app.use(helmet());
+const uploadDir = path.join(process.cwd(), process.env.UPLOAD_DIR || "uploads");
+app.use(
+  "/uploads",
+  express.static(uploadDir, {
+    setHeaders(res) {
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
+  })
+);
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+  })
+);
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "*",
@@ -24,24 +39,34 @@ app.use(compression());
 app.use(cookieParser());
 app.use(morgan("combined"));
 
+const isProduction = process.env.NODE_ENV === "production";
+const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000;
+const rateLimitMax = Number(process.env.RATE_LIMIT_MAX) || (isProduction ? 800 : 3000);
+
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200
+    windowMs: rateLimitWindowMs,
+    max: rateLimitMax,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      success: false,
+      message: "Too many requests. Please wait a moment and try again."
+    },
+    skip: (req) => req.method === "OPTIONS"
   })
 );
 
-const uploadDir = path.join(process.cwd(), process.env.UPLOAD_DIR || "uploads");
-app.use("/uploads", express.static(uploadDir));
-
 app.use("/api/v1/auth", require("./routes/authRoutes"));
 app.use("/api/v1/servants", require("./routes/servantRoutes"));
+app.use("/api/v1/skills", require("./routes/skillRoutes"));
 app.use("/api/v1/bookings", require("./routes/bookingRoutes"));
 app.use("/api/v1/time", require("./routes/timeRoutes"));
 app.use("/api/v1/agent", require("./routes/agentRoutes"));
 app.use("/api/v1/admin", require("./routes/adminRoutes"));
 app.use("/api/v1/notifications", require("./routes/notificationRoutes"));
 app.use("/api/v1/zones", require("./routes/zoneRoutes"));
+app.use("/api/v1/geo", require("./routes/geoRoutes"));
 
 app.get("/", (req, res) => {
   res.json({ success: true, message: "StaffEra API Running" });

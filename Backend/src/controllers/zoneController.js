@@ -19,7 +19,7 @@ exports.listMyZones = async (req, res) => {
 
 exports.createZone = async (req, res) => {
   const servant = await getServantForUser(req.user.id);
-  const { name, description, city } = req.body;
+  const { name, description, city, latitude, longitude } = req.body;
 
   if (!name?.trim()) throw new ApiError(400, "Zone name is required");
 
@@ -28,7 +28,9 @@ exports.createZone = async (req, res) => {
       servantId: servant.id,
       name: name.trim(),
       description: description?.trim() || null,
-      city: city?.trim() || null
+      city: city?.trim() || null,
+      latitude: latitude ?? undefined,
+      longitude: longitude ?? undefined
     }
   });
 
@@ -44,7 +46,7 @@ exports.updateZone = async (req, res) => {
   });
   if (!existing) throw new ApiError(404, "Zone not found");
 
-  const { name, description, city } = req.body;
+  const { name, description, city, latitude, longitude } = req.body;
   const zone = await prisma.zone.update({
     where: { id },
     data: {
@@ -52,7 +54,9 @@ exports.updateZone = async (req, res) => {
       ...(description !== undefined && {
         description: description?.trim() || null
       }),
-      ...(city !== undefined && { city: city?.trim() || null })
+      ...(city !== undefined && { city: city?.trim() || null }),
+      ...(latitude !== undefined && { latitude }),
+      ...(longitude !== undefined && { longitude })
     }
   });
 

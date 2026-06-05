@@ -6,7 +6,8 @@ const validate = require("../middleware/validate");
 const {
   createBookingSchema,
   reviewSchema,
-  rejectBookingSchema
+  rejectBookingSchema,
+  updateTrackingSchema
 } = require("../validators/bookingValidator");
 
 router.post(
@@ -17,7 +18,21 @@ router.post(
   bookingController.createBooking
 );
 router.get("/", authenticate, bookingController.listBookings);
+router.get(
+  "/open-requests",
+  authenticate,
+  requireRole("SERVANT"),
+  bookingController.listOpenRequests
+);
 router.get("/:id", authenticate, bookingController.getBooking);
+router.get("/:id/tracking", authenticate, bookingController.getBookingTracking);
+router.post(
+  "/:id/tracking",
+  authenticate,
+  requireRole("SERVANT"),
+  validate(updateTrackingSchema),
+  bookingController.updateBookingTracking
+);
 router.patch(
   "/:id/confirm",
   authenticate,

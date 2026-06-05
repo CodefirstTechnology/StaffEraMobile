@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { getLoginErrorMessage } from '@/lib/getLoginErrorMessage';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
+import { LanguageSelector } from '@/components/ui/LanguageSelector';
 
 export default function LoginScreen() {
+  const { t } = useTranslation();
   const login = useAuthStore((s) => s.login);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +23,7 @@ export default function LoginScreen() {
       await login(email, password);
       router.replace('/(main)/home');
     } catch (e: unknown) {
-      Alert.alert('Login failed', getLoginErrorMessage(e));
+      Alert.alert(t('auth.loginFailed'), getLoginErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -30,32 +34,36 @@ export default function LoginScreen() {
       <View style={styles.blob1} />
       <View style={styles.blob2} />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.badge}>StaffEra Pro</Text>
-        <Text style={styles.logo}>Welcome back</Text>
-        <Text style={styles.subtitle}>
-          Sign in with the email your agent registered. Earn with dignity — on your schedule.
-        </Text>
+        <LanguageSelector compact showTitle />
+        <Text style={styles.badge}>{t('common.appNamePro')}</Text>
+        <Text style={styles.logo}>{t('auth.welcomeBack')}</Text>
+        <Text style={styles.subtitle}>{t('auth.servantLoginSubtitle')}</Text>
 
         <GhostInput
-          label="Email"
+          label={t('auth.email')}
           autoCapitalize="none"
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
         />
         <GhostInput
-          label="Password"
+          label={t('auth.password')}
           secureTextEntry
           value={password}
           onChangeText={setPassword}
         />
 
-        <GradientButton title="Sign in" onPress={submit} loading={loading} />
+        <GradientButton title={t('auth.signIn')} onPress={submit} loading={loading} />
 
-        <Text style={styles.hint}>
-          No self-signup. Your agent creates your account and verifies your ID.
-        </Text>
-        <Text style={styles.trust}>{Stitch.copy.safeData}</Text>
+        <Link href="/(auth)/register" asChild>
+          <Text style={styles.link}>{t('auth.servantNewAccount')}</Text>
+        </Link>
+        <Text style={styles.trust}>{t('auth.safeData')}</Text>
+        {__DEV__ ? (
+          <Text style={styles.apiHint} selectable>
+            API: {getApiBaseUrl()}
+          </Text>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -102,12 +110,12 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     lineHeight: 24,
   },
-  hint: {
+  link: {
     textAlign: 'center',
-    color: Stitch.colors.onSurfaceVariant,
+    color: Stitch.colors.secondary,
     marginTop: 20,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 15,
+    fontWeight: '600',
   },
   trust: {
     textAlign: 'center',
@@ -115,5 +123,11 @@ const styles = StyleSheet.create({
     marginTop: 24,
     fontSize: 12,
     opacity: 0.75,
+  },
+  apiHint: {
+    marginTop: 16,
+    fontSize: 11,
+    color: Stitch.colors.secondary,
+    textAlign: 'center',
   },
 });

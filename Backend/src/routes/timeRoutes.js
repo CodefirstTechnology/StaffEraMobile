@@ -22,6 +22,12 @@ router.get(
   timeController.getToday
 );
 router.get(
+  "/month",
+  authenticate,
+  requireRole("SERVANT"),
+  timeController.getMonth
+);
+router.get(
   "/history",
   authenticate,
   requireRole("SERVANT"),

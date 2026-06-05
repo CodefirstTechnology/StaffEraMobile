@@ -2,6 +2,22 @@ const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const { createNotification } = require("../services/notificationService");
+const { computeBookingEarnings, isSessionPast, expireStaleSessionBookings } = require("../services/bookingService");
+
+const getMonthBounds = (ref = new Date()) => {
+  const start = new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0);
+  const end = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999);
+  return { start, end };
+};
+
+const getBookingEarningsDate = (booking) =>
+  booking.sessionDate || booking.monthlyStartDate || booking.updatedAt;
+
+const isInMonth = (value, start, end) => {
+  if (!value) return false;
+  const d = new Date(value);
+  return d >= start && d <= end;
+};
 
 const getServant = async (userId) => {
   const servant = await prisma.servant.findUnique({ where: { userId } });
@@ -90,6 +106,27 @@ exports.clockOut = async (req, res) => {
     data: { clockOut: now, hoursWorked: Math.round(hoursWorked * 100) / 100 }
   });
 
+  const booking = await prisma.booking.findUnique({
+    where: { id: openEntry.bookingId },
+    include: { timeEntries: true, servant: { select: { hourlyRate: true } } }
+  });
+
+  if (booking && ["CONFIRMED", "ACTIVE"].includes(booking.status)) {
+    const totalAmount = computeBookingEarnings(
+      { ...booking, timeEntries: booking.timeEntries },
+      booking.servant?.hourlyRate
+    );
+    const sessionEnded = booking.bookingType === "SESSION" && isSessionPast(booking, now);
+
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        ...(totalAmount > 0 ? { totalAmount } : {}),
+        ...(sessionEnded ? { status: "COMPLETED" } : {})
+      }
+    });
+  }
+
   sendSuccess(res, { entry });
 };
 
@@ -111,7 +148,48 @@ exports.getToday = async (req, res) => {
 
   const totalHours = entries.reduce((sum, e) => sum + (e.hoursWorked || 0), 0);
 
-  sendSuccess(res, { entries, totalHours });
+  const servantProfile = await prisma.servant.findUnique({
+    where: { id: servant.id },
+    select: { hourlyRate: true }
+  });
+  const hourlyRate = servantProfile?.hourlyRate || 0;
+  const estimatedEarnings = Math.round(totalHours * hourlyRate * 100) / 100;
+
+  sendSuccess(res, { entries, totalHours, hourlyRate, estimatedEarnings });
+};
+
+exports.getMonth = async (req, res) => {
+  const servant = await getServant(req.user.id);
+  const now = new Date();
+  const { start, end } = getMonthBounds(now);
+
+  await expireStaleSessionBookings({ servantId: servant.id });
+
+  const completed = await prisma.booking.findMany({
+    where: {
+      servantId: servant.id,
+      status: "COMPLETED"
+    },
+    include: { timeEntries: true }
+  });
+
+  const hourlyRate = servant.hourlyRate || 0;
+  const inMonth = completed.filter((booking) => {
+    const earningsDate = getBookingEarningsDate(booking);
+    return isInMonth(earningsDate, start, end) || isInMonth(booking.updatedAt, start, end);
+  });
+
+  const totalEarnings = inMonth.reduce(
+    (sum, booking) => sum + computeBookingEarnings(booking, hourlyRate),
+    0
+  );
+
+  sendSuccess(res, {
+    totalEarnings: Math.round(totalEarnings * 100) / 100,
+    completedCount: inMonth.length,
+    hourlyRate,
+    monthLabel: now.toLocaleDateString("en-IN", { month: "long", year: "numeric" })
+  });
 };
 
 exports.getHistory = async (req, res) => {

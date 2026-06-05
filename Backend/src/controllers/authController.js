@@ -11,6 +11,7 @@ const {
 } = require("../utils/jwt");
 const logger = require("../utils/logger");
 const { normalizeEmail, normalizePhone } = require("../utils/normalize");
+const { validateActiveSkillCodes } = require("../services/skillService");
 
 const sanitizeUser = (user) => {
   const { password, ...rest } = user;
@@ -42,7 +43,7 @@ const issueTokens = async (user) => {
 };
 
 exports.registerOwner = async (req, res) => {
-  const { name, password, address, city } = req.body;
+  const { name, password, address, city, latitude, longitude, preferredLanguage } = req.body;
   const email = normalizeEmail(req.body.email);
   const phone = normalizePhone(req.body.phone);
 
@@ -60,8 +61,14 @@ exports.registerOwner = async (req, res) => {
       phone,
       password: hashed,
       role: "HOUSE_OWNER",
+      preferredLanguage: preferredLanguage || "en",
       houseOwner: {
-        create: { address, city }
+        create: {
+          address,
+          city,
+          latitude: latitude ?? undefined,
+          longitude: longitude ?? undefined
+        }
       }
     },
     include: { houseOwner: true }
@@ -73,6 +80,139 @@ exports.registerOwner = async (req, res) => {
   sendSuccess(
     res,
     { user: sanitizeUser(user), ...tokens },
+    201
+  );
+};
+
+const digitsOnlyPhone = (phone) => String(phone ?? "").replace(/\D/g, "") || null;
+
+exports.registerServant = async (req, res) => {
+  const { name, address, city, latitude, longitude, preferredLanguage, skills } = req.body;
+  const email = normalizeEmail(req.body.email);
+  const phone = digitsOnlyPhone(normalizePhone(req.body.phone));
+
+  const skillList = await validateActiveSkillCodes(skills);
+  if (!skillList.length) {
+    throw new ApiError(400, "Select at least one skill");
+  }
+
+  const lat =
+    latitude !== undefined && latitude !== null && Number.isFinite(Number(latitude))
+      ? Number(latitude)
+      : null;
+  const lng =
+    longitude !== undefined && longitude !== null && Number.isFinite(Number(longitude))
+      ? Number(longitude)
+      : null;
+
+  const servantProfile = {
+    address: address.trim(),
+    city: city?.trim() || null,
+    latitude: lat,
+    longitude: lng,
+    verificationStatus: "PENDING",
+    registrationSource: "SELF"
+  };
+  const skillCreates = skillList.map((skillName) => ({ skillName }));
+
+  const byEmail = email
+    ? await prisma.user.findUnique({
+        where: { email },
+        include: { servant: { include: { skills: true } } }
+      })
+    : null;
+  const byPhone = phone
+    ? await prisma.user.findFirst({
+        where: { phone },
+        include: { servant: { include: { skills: true } } }
+      })
+    : null;
+
+  if (byEmail && byPhone && byEmail.id !== byPhone.id) {
+    throw new ApiError(
+      400,
+      "This phone number is linked to a different account. Use that email or another phone number."
+    );
+  }
+
+  const existing = byEmail || byPhone;
+
+  if (existing) {
+    if (existing.isActive) {
+      throw new ApiError(
+        400,
+        existing.role === "SERVANT"
+          ? "This account is already active. Sign in with the email and password your agent shared."
+          : "Email or phone is already registered on another account."
+      );
+    }
+    if (existing.role !== "SERVANT" || !existing.servant) {
+      throw new ApiError(400, "Email or phone is already registered on another account type.");
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: existing.id },
+        data: {
+          name,
+          phone,
+          preferredLanguage: preferredLanguage || existing.preferredLanguage || "en"
+        }
+      });
+      await tx.servantSkill.deleteMany({ where: { servantId: existing.servant.id } });
+      return tx.servant.update({
+        where: { id: existing.servant.id },
+        data: {
+          ...servantProfile,
+          agentId: null,
+          skills: { create: skillCreates }
+        },
+        include: { skills: true }
+      });
+    });
+
+    logger.info("Servant registration updated", { userId: existing.id, servantId: updated.id });
+
+    return sendSuccess(
+      res,
+      {
+        message: "Application updated. An agent will contact you to complete verification and share login details.",
+        servantId: updated.id
+      },
+      200
+    );
+  }
+
+  const placeholderPassword = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
+
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      phone,
+      password: placeholderPassword,
+      role: "SERVANT",
+      isActive: false,
+      preferredLanguage: preferredLanguage || "en",
+      servant: {
+        create: {
+          ...servantProfile,
+          agentId: null,
+          skills: { create: skillCreates }
+        }
+      }
+    },
+    include: { servant: { include: { skills: true } } }
+  });
+
+  logger.info("Servant registration application", { userId: user.id, servantId: user.servant?.id });
+
+  sendSuccess(
+    res,
+    {
+      message: "Application submitted. An agent will contact you to complete verification and share login details.",
+      servantId: user.servant?.id
+    },
     201
   );
 };
@@ -90,7 +230,17 @@ exports.login = async (req, res) => {
     include: { houseOwner: true, servant: true, agent: true }
   });
 
-  if (!user || !user.isActive) {
+  if (!user) {
+    throw new ApiError(401, "Invalid email or password");
+  }
+
+  if (!user.isActive) {
+    if (user.role === "SERVANT") {
+      throw new ApiError(
+        403,
+        "Your application is under review. An agent will contact you with login details."
+      );
+    }
     throw new ApiError(401, "Invalid email or password");
   }
 
@@ -160,6 +310,55 @@ exports.me = async (req, res) => {
   });
 
   if (!user) throw new ApiError(404, "User not found");
+
+  sendSuccess(res, { user: sanitizeUser(user) });
+};
+
+exports.updateLocation = async (req, res) => {
+  if (req.user.role !== "HOUSE_OWNER") {
+    throw new ApiError(403, "Only house owners can update home location");
+  }
+
+  const houseOwner = await prisma.houseOwner.findUnique({
+    where: { userId: req.user.id }
+  });
+  if (!houseOwner) throw new ApiError(404, "House owner profile not found");
+
+  const { address, flatNo, building, area, city, latitude, longitude } = req.body;
+
+  const updated = await prisma.houseOwner.update({
+    where: { id: houseOwner.id },
+    data: {
+      ...(address !== undefined && { address }),
+      ...(flatNo !== undefined && { flatNo: flatNo || null }),
+      ...(building !== undefined && { building: building || null }),
+      ...(area !== undefined && { area: area || null }),
+      ...(city !== undefined && { city }),
+      ...(latitude !== undefined && { latitude }),
+      ...(longitude !== undefined && { longitude })
+    }
+  });
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    include: { houseOwner: true, servant: true, agent: true }
+  });
+
+  sendSuccess(res, { houseOwner: updated, user: sanitizeUser(user) });
+};
+
+exports.updatePreferences = async (req, res) => {
+  const { preferredLanguage } = req.body;
+
+  const user = await prisma.user.update({
+    where: { id: req.user.id },
+    data: { preferredLanguage },
+    include: {
+      houseOwner: true,
+      servant: { include: { skills: true, zones: true } },
+      agent: true
+    }
+  });
 
   sendSuccess(res, { user: sanitizeUser(user) });
 };

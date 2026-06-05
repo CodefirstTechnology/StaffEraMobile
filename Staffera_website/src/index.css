@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --color-primary: #15157d;
+  --color-secondary: #7d44a4;
+  --color-accent-start: #662d8c;
+  --color-accent-end: #ed1e79;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(125, 68, 164, 0.25);
+  color: #15157d;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 6s ease-in-out 2s infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 4s ease-in-out infinite;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 4px 24px rgba(46, 49, 146, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #662d8c 0%, #ed1e79 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-mesh {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(125, 68, 164, 0.18), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 20%, rgba(237, 30, 121, 0.12), transparent),
+    radial-gradient(ellipse 50% 40% at 50% 80%, rgba(21, 21, 125, 0.08), transparent),
+    #fcf8ff;
+}
+
+.section-padding {
+  @apply px-5 py-20 md:px-8 md:py-28 lg:px-12;
+}
+
+.container-narrow {
+  @apply mx-auto max-w-6xl;
+}

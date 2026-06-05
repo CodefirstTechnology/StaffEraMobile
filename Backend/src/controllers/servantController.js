@@ -2,6 +2,12 @@ const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const { parseJsonArray } = require("../services/bookingService");
+const {
+  findServantsNearLocation,
+  servantCoversLocation,
+  bookingMatchesServantSkill,
+  DEFAULT_RADIUS_KM
+} = require("../services/locationService");
 
 const servantInclude = {
   user: { select: { id: true, name: true, email: true, phone: true } },
@@ -10,11 +16,28 @@ const servantInclude = {
   agent: { include: { user: { select: { name: true } } } }
 };
 
+const resolveHouseOwnerCoords = async (userId, queryLat, queryLng) => {
+  let lat = queryLat != null ? Number(queryLat) : null;
+  let lng = queryLng != null ? Number(queryLng) : null;
+
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
+    const ho = await prisma.houseOwner.findUnique({ where: { userId } });
+    if (ho?.latitude != null && ho?.longitude != null) {
+      lat = ho.latitude;
+      lng = ho.longitude;
+    }
+  }
+
+  return { lat, lng };
+};
+
 exports.listServants = async (req, res) => {
-  const { skill, city, zone, type } = req.query;
+  const { skill, city, zone, latitude, longitude, radiusKm } = req.query;
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, parseInt(req.query.limit, 10) || 20);
   const skip = (page - 1) * limit;
+  const { lat, lng } = await resolveHouseOwnerCoords(req.user.id, latitude, longitude);
+  const radius = radiusKm != null ? Number(radiusKm) : DEFAULT_RADIUS_KM;
 
   const where = {
     verificationStatus: "VERIFIED",
@@ -44,18 +67,26 @@ exports.listServants = async (req, res) => {
       : {})
   };
 
-  const [servants, total] = await Promise.all([
-    prisma.servant.findMany({
-      where,
-      include: servantInclude,
-      skip,
-      take: limit,
-      orderBy: { rating: "desc" }
-    }),
-    prisma.servant.count({ where })
-  ]);
+  if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
+    return sendSuccess(res, {
+      servants: [],
+      pagination: { page, limit, total: 0 },
+      locationRequired: true
+    });
+  }
 
-  sendSuccess(res, { servants, pagination: { page, limit, total } });
+  let servants = await prisma.servant.findMany({
+    where,
+    include: servantInclude,
+    orderBy: { rating: "desc" }
+  });
+
+  servants = servants.filter((s) => servantCoversLocation(s, lat, lng, radius));
+
+  const total = servants.length;
+  const paged = servants.slice(skip, skip + limit);
+
+  sendSuccess(res, { servants: paged, pagination: { page, limit, total } });
 };
 
 exports.getServant = async (req, res) => {
@@ -74,11 +105,21 @@ exports.getServant = async (req, res) => {
   });
 
   if (!servant) throw new ApiError(404, "Servant not found");
-  if (
-    req.user.role === "HOUSE_OWNER" &&
-    servant.verificationStatus !== "VERIFIED"
-  ) {
-    throw new ApiError(404, "Servant not found");
+  if (req.user.role === "HOUSE_OWNER") {
+    if (servant.verificationStatus !== "VERIFIED") {
+      throw new ApiError(404, "Servant not found");
+    }
+
+    const { lat, lng } = await resolveHouseOwnerCoords(
+      req.user.id,
+      req.query.latitude,
+      req.query.longitude
+    );
+    if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+      if (!servantCoversLocation(servant, lat, lng)) {
+        throw new ApiError(404, "Servant not found");
+      }
+    }
   }
 
   sendSuccess(res, { servant });

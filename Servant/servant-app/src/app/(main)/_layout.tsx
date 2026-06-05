@@ -1,8 +1,24 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 
 export default function MainLayout() {
+  const { t } = useTranslation();
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={Stitch.colors.primary} />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
+
   return (
     <Tabs
       screenOptions={{
@@ -22,30 +38,30 @@ export default function MainLayout() {
       <Tabs.Screen
         name="home/index"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: ({ color, size }) => <MaterialIcons name="home" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="schedule/index"
+        name="schedule"
         options={{
-          title: 'Schedule',
+          title: t('tabs.schedule'),
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="calendar-today" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="time/index"
+        name="time"
         options={{
-          title: 'Time',
+          title: t('tabs.time'),
           tabBarIcon: ({ color, size }) => <MaterialIcons name="schedule" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="earnings/index"
         options={{
-          title: 'Earnings',
+          title: t('tabs.earnings'),
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="account-balance-wallet" size={size} color={color} />
           ),
@@ -54,11 +70,12 @@ export default function MainLayout() {
       <Tabs.Screen
         name="profile/index"
         options={{
-          title: 'Profile',
+          title: t('tabs.profile'),
           tabBarIcon: ({ color, size }) => <MaterialIcons name="person" size={size} color={color} />,
         }}
       />
       <Tabs.Screen name="zones/index" options={{ href: null }} />
+      <Tabs.Screen name="notifications/index" options={{ href: null }} />
     </Tabs>
   );
 }

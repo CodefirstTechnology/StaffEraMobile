@@ -4,56 +4,150 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  TextInput,
+  RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { StatusPill } from '@/components/ui/StatusPill';
+import { useSkills } from '@/hooks/useSkills';
+import { localizedSkillLabel } from '@/lib/skills';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useLiveLocation } from '@/hooks/useLiveLocation';
+import {
+  BookingSummaryCard,
+  splitBookings,
+  type BookingSummary,
+} from '@/components/bookings/BookingSummaryCard';
+import { formatVisitAddressLines } from '@/lib/visitAddress';
 
-const CATEGORIES = [
-  { icon: 'cleaning-services' as const, label: 'Cleaning' },
-  { icon: 'restaurant' as const, label: 'Cooking' },
-  { icon: 'child-care' as const, label: 'Childcare' },
-  { icon: 'elderly' as const, label: 'Elderly care' },
-  { icon: 'local-laundry-service' as const, label: 'Laundry' },
-  { icon: 'drive-eta' as const, label: 'Driver' },
-];
+const SKILL_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
+  CLEANING: 'cleaning-services',
+  COOKING: 'restaurant',
+  CHILDCARE: 'child-care',
+  ELDERLY_CARE: 'elderly',
+  LAUNDRY: 'local-laundry-service',
+  DRIVING: 'drive-eta',
+  GARDENING: 'yard',
+};
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
+  const { data: skills = [] } = useSkills();
+  const { data: notifications = [] } = useNotifications();
+  const { location: liveLocation, loading: locLoading } = useLiveLocation();
+  const unreadNotifications = notifications.filter((n) => !n.isRead).length;
 
-  const { data: bookings } = useQuery({
+  const searchLocation = useMemo(() => {
+    if (
+      liveLocation?.latitude != null &&
+      liveLocation?.longitude != null &&
+      !Number.isNaN(liveLocation.latitude) &&
+      !Number.isNaN(liveLocation.longitude)
+    ) {
+      return liveLocation;
+    }
+    const ho = user?.houseOwner;
+    if (ho?.latitude != null && ho?.longitude != null) {
+      return { latitude: ho.latitude, longitude: ho.longitude };
+    }
+    return null;
+  }, [liveLocation, user?.houseOwner]);
+
+  const { data: nearbyHelpers = [], isLoading: helpersLoading, refetch: refetchHelpers } = useQuery({
+    queryKey: ['servants', 'home', searchLocation?.latitude, searchLocation?.longitude],
+    enabled: !locLoading && !!searchLocation,
+    queryFn: async () => {
+      const res = await api.get('/servants', {
+        params: {
+          latitude: searchLocation!.latitude,
+          longitude: searchLocation!.longitude,
+        },
+      });
+      return res.data.data.servants as unknown[];
+    },
+  });
+
+  const nearbyCount = nearbyHelpers.length;
+
+  const openRequest = (skillCode?: string) => {
+    router.push({
+      pathname: '/(main)/bookings/request',
+      params: skillCode ? { skill: skillCode } : undefined,
+    });
+  };
+
+  const { data: bookings, refetch: refetchBookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
       const res = await api.get('/bookings');
-      return res.data.data.bookings;
+      return res.data.data.bookings as BookingSummary[];
     },
     refetchInterval: 20000,
   });
 
-  const upcoming = (bookings || [])
-    .filter((b: { status: string }) => ['CONFIRMED', 'ACTIVE', 'PENDING'].includes(b.status))
-    .slice(0, 3);
+  const { active, recent } = splitBookings(bookings || []);
+  const homeActive = active.slice(0, 2);
+  const homeRecent = recent.slice(0, 2);
+  const hasBookings = homeActive.length > 0 || homeRecent.length > 0;
+
+  const headerLocation = (() => {
+    const ho = user?.houseOwner;
+    const detailLines = ho
+      ? formatVisitAddressLines({
+          flatNo: ho.flatNo,
+          building: ho.building,
+          area: ho.area,
+          address: liveLocation?.address || ho.address,
+        })
+      : [];
+    if (detailLines.length > 0) return detailLines.slice(0, 2).join(' · ');
+    return (
+      liveLocation?.address ||
+      (ho?.address ? ho.address.split(',').slice(0, 2).join(',').trim() : null) ||
+      ho?.city ||
+      t('common.tapSetHome')
+    );
+  })();
 
   return (
     <View style={styles.root}>
-      <ScreenHeader location={user?.houseOwner?.city || 'Set your city in profile'} />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.searchWrap}>
-          <MaterialIcons name="search" size={22} color={Stitch.colors.onSurfaceVariant} />
-          <TextInput
-            placeholder="Search verified help — cooking, cleaning…"
-            placeholderTextColor={Stitch.colors.onSurfaceVariant + '99'}
-            style={styles.search}
+      <ScreenHeader
+        location={headerLocation}
+        unreadNotifications={unreadNotifications}
+        onNotifications={() => router.push('/(main)/notifications')}
+        onLocationPress={() => router.push('/(main)/profile')}
+      />
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={helpersLoading || bookingsLoading}
+            onRefresh={() => {
+              refetchHelpers();
+              refetchBookings();
+            }}
+            tintColor={Stitch.colors.primary}
           />
-        </View>
+        }
+      >
+        <TouchableOpacity
+          style={styles.searchWrap}
+          activeOpacity={0.85}
+          onPress={() => openRequest()}
+        >
+          <MaterialIcons name="search" size={22} color={Stitch.colors.onSurfaceVariant} />
+          <Text style={styles.searchPlaceholder}>{t('home.searchPlaceholder')}</Text>
+        </TouchableOpacity>
 
         <LinearGradient
           colors={[Stitch.colors.secondary, Stitch.colors.gradientEnd]}
@@ -62,49 +156,107 @@ export default function HomeScreen() {
           style={styles.hero}
         >
           <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>Welcome offer</Text>
+            <Text style={styles.heroBadgeText}>{t('home.fastBooking')}</Text>
           </View>
-          <Text style={styles.heroTitle}>Book verified help</Text>
-          <Text style={styles.heroSub}>Background-checked staff for your home</Text>
-          <TouchableOpacity style={styles.heroBtn} onPress={() => router.push('/(main)/browse')}>
-            <Text style={styles.heroBtnText}>Browse now</Text>
+          <Text style={styles.heroTitle}>{t('home.requestInArea')}</Text>
+          <Text style={styles.heroSub}>
+            {searchLocation
+              ? nearbyCount > 0
+                ? t('home.helpersNearby', { count: nearbyCount })
+                : t('home.noHelpersNearby')
+              : t('home.enableLocation')}
+          </Text>
+          <TouchableOpacity
+            style={[styles.heroBtn, !searchLocation && styles.heroBtnDisabled]}
+            disabled={!searchLocation}
+            onPress={() => openRequest()}
+          >
+            <Text style={styles.heroBtnText}>{t('home.sendRequestNow')}</Text>
           </TouchableOpacity>
         </LinearGradient>
 
-        <Text style={styles.sectionTitle}>Explore services</Text>
+        {searchLocation ? (
+          <GlassCard style={styles.countCard}>
+            <View style={styles.countRow}>
+              <View style={styles.countIcon}>
+                <MaterialIcons name="groups" size={28} color={Stitch.colors.secondary} />
+              </View>
+              <View style={styles.countBody}>
+                <Text style={styles.countValue}>
+                  {helpersLoading ? '…' : nearbyCount}
+                </Text>
+                <Text style={styles.countLabel}>
+                  {t('home.verifiedNearYou', { count: nearbyCount })}
+                </Text>
+              </View>
+            </View>
+          </GlassCard>
+        ) : null}
+
+        <Text style={[styles.sectionTitle, styles.sectionTitleSpacing]}>{t('home.whatNeed')}</Text>
         <View style={styles.grid}>
-          {CATEGORIES.map((c) => (
+          {skills.map((c) => (
             <TouchableOpacity
-              key={c.label}
+              key={c.code}
               style={styles.cat}
-              onPress={() => router.push('/(main)/browse')}
+              onPress={() => openRequest(c.code)}
             >
               <View style={styles.catIcon}>
-                <MaterialIcons name={c.icon} size={28} color={Stitch.colors.primary} />
+                <MaterialIcons
+                  name={SKILL_ICONS[c.code] || 'handyman'}
+                  size={28}
+                  color={Stitch.colors.primary}
+                />
               </View>
-              <Text style={styles.catLabel}>{c.label}</Text>
+              <Text style={styles.catLabel}>{localizedSkillLabel(c.code, skills)}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Upcoming visits</Text>
-        {upcoming.length === 0 ? (
+        <View style={styles.bookingsHeader}>
+          <Text style={styles.sectionTitle}>{t('home.yourBookings')}</Text>
+          {hasBookings ? (
+            <TouchableOpacity onPress={() => router.push('/(main)/bookings')} hitSlop={8}>
+              <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {!hasBookings ? (
           <GlassCard>
-            <Text style={styles.empty}>No bookings yet — find help in Browse</Text>
+            <Text style={styles.empty}>{t('home.noBookingsYet')}</Text>
           </GlassCard>
         ) : (
-          upcoming.map((b: { id: number; status: string; servant: { user: { name: string } }; bookingType: string }) => (
-            <TouchableOpacity
-              key={b.id}
-              onPress={() => router.push(`/(main)/bookings/${b.id}`)}
-            >
-              <GlassCard style={styles.bookingCard}>
-                <Text style={styles.bookingName}>{b.servant.user.name}</Text>
-                <Text style={styles.bookingMeta}>{b.bookingType}</Text>
-                <StatusPill status={b.status} />
-              </GlassCard>
-            </TouchableOpacity>
-          ))
+          <>
+            {homeActive.length > 0 ? (
+              <>
+                <Text style={styles.bookingsSub}>{t('common.active')}</Text>
+                {homeActive.map((b) => (
+                  <BookingSummaryCard
+                    key={b.id}
+                    booking={b}
+                    skills={skills}
+                    onPress={() => router.push(`/(main)/bookings/${b.id}`)}
+                  />
+                ))}
+              </>
+            ) : null}
+            {homeRecent.length > 0 ? (
+              <>
+                <Text style={[styles.bookingsSub, homeActive.length > 0 && styles.bookingsSubGap]}>
+                  {t('common.recent')}
+                </Text>
+                {homeRecent.map((b) => (
+                  <BookingSummaryCard
+                    key={b.id}
+                    booking={b}
+                    skills={skills}
+                    onPress={() => router.push(`/(main)/bookings/${b.id}`)}
+                  />
+                ))}
+              </>
+            ) : null}
+          </>
         )}
       </ScrollView>
     </View>
@@ -123,7 +275,12 @@ const styles = StyleSheet.create({
     height: 48,
     marginBottom: 20,
   },
-  search: { flex: 1, marginLeft: 8, fontSize: 16, color: Stitch.colors.onBackground },
+  searchPlaceholder: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 16,
+    color: Stitch.colors.onSurfaceVariant + '99',
+  },
   hero: {
     borderRadius: Stitch.radius.xl,
     padding: 24,
@@ -152,12 +309,50 @@ const styles = StyleSheet.create({
     borderRadius: Stitch.radius.lg,
   },
   heroBtnText: { color: Stitch.colors.secondary, fontWeight: '700' },
+  heroBtnDisabled: { opacity: 0.6 },
+  countCard: { marginBottom: 24 },
+  countRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  countIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: Stitch.colors.primaryFixed,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBody: { flex: 1 },
+  countValue: { fontSize: 32, fontWeight: '700', color: Stitch.colors.primary },
+  countLabel: { fontSize: 14, color: Stitch.colors.onSurfaceVariant, marginTop: 2 },
+  countHint: {
+    marginTop: 12,
+    fontSize: 12,
+    lineHeight: 18,
+    color: Stitch.colors.onSurfaceVariant,
+  },
   sectionTitle: {
     ...Stitch.typography.headline,
     fontSize: 20,
     color: Stitch.colors.onBackground,
-    marginBottom: 16,
+    marginBottom: 0,
   },
+  sectionTitleSpacing: { marginBottom: 16 },
+  bookingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  seeAll: { fontSize: 14, fontWeight: '600', color: Stitch.colors.secondary },
+  bookingsSub: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Stitch.colors.onSurfaceVariant,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  bookingsSubGap: { marginTop: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 28 },
   cat: { width: '30%', alignItems: 'center', marginBottom: 8 },
   catIcon: {
@@ -178,8 +373,5 @@ const styles = StyleSheet.create({
     color: Stitch.colors.onSurfaceVariant,
     textAlign: 'center',
   },
-  bookingCard: { marginBottom: 12 },
-  bookingName: { fontSize: 17, fontWeight: '600', color: Stitch.colors.onBackground },
-  bookingMeta: { color: Stitch.colors.onSurfaceVariant, marginTop: 4, marginBottom: 8 },
   empty: { color: Stitch.colors.onSurfaceVariant, textAlign: 'center' },
 });
