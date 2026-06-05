@@ -14,7 +14,13 @@ let refreshPromise: Promise<string | null> | null = null;
 
 function isAuthRoute(config?: InternalAxiosRequestConfig) {
   const url = config?.url ?? '';
-  return url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/register');
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/register-servant') ||
+    url.includes('/auth/register-owner') ||
+    url.includes('/auth/register')
+  );
 }
 
 async function refreshAccessToken(): Promise<string | null> {

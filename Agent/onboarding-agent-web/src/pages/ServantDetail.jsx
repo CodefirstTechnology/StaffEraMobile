@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
 import { uploadUrl } from '../lib/mediaUrl'
@@ -9,7 +9,10 @@ import {
   printOnboardingReport,
 } from '../lib/onboardingReport'
 import { Badge } from '../components/ui/Badge'
+import { SourceBadge } from '../components/ui/SourceBadge'
 import { Button } from '../components/ui/Button'
+import { ApprovePasswordModal } from '../components/ApprovePasswordModal'
+import { SetLoginPasswordCard } from '../components/SetLoginPasswordCard'
 
 const parseWorkingDays = (wd) => {
   if (!wd) return []
@@ -80,8 +83,13 @@ function LoadingSkeleton() {
 
 export default function ServantDetail() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const fromRegistrations = searchParams.get('from') === 'registrations'
   const qc = useQueryClient()
   const [rejectOpen, setRejectOpen] = useState(false)
+  const [approveOpen, setApproveOpen] = useState(false)
+  const [approveLoading, setApproveLoading] = useState(false)
+  const [credentials, setCredentials] = useState(null)
   const [reason, setReason] = useState('')
   const [idModal, setIdModal] = useState(false)
 
@@ -93,14 +101,53 @@ export default function ServantDetail() {
     },
   })
 
-  const verify = async (status, rejectionReason) => {
-    await api.patch(`/agent/servants/${id}/verify`, {
+  const verify = async (status, rejectionReason, opts = {}) => {
+    const res = await api.patch(`/agent/servants/${id}/verify`, {
       status,
       reason: rejectionReason,
+      ...(opts.password ? { password: opts.password } : {}),
+      ...(opts.generatePassword ? { generatePassword: true } : {}),
     })
     qc.invalidateQueries({ queryKey: ['servant', id] })
     qc.invalidateQueries({ queryKey: ['agent-servants'] })
+    qc.invalidateQueries({ queryKey: ['agent-registrations'] })
     setRejectOpen(false)
+    setApproveOpen(false)
+    if (res.data?.data?.credentials) {
+      setCredentials(res.data.data.credentials)
+    }
+    return res
+  }
+
+  const isAppRegistration =
+    servant?.registrationSource === 'SELF' || servant?.user?.isActive === false
+
+  const handleApproveClick = () => {
+    if (isAppRegistration && !servant?.user?.agentSetPassword) {
+      setApproveOpen(true)
+      return
+    }
+    if (isAppRegistration && servant?.user?.agentSetPassword) {
+      if (window.confirm('Approve this helper? They can sign in with the password you already set.')) {
+        verify('VERIFIED')
+      }
+      return
+    }
+    if (window.confirm('Approve this servant?')) {
+      verify('VERIFIED')
+    }
+  }
+
+  const handleApproveWithPassword = async (opts) => {
+    setApproveLoading(true)
+    try {
+      await verify('VERIFIED', undefined, opts)
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Approval failed'
+      window.alert(msg)
+    } finally {
+      setApproveLoading(false)
+    }
   }
 
   if (isLoading) return <LoadingSkeleton />
@@ -125,10 +172,11 @@ export default function ServantDetail() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
-          to="/servants"
+          to={fromRegistrations ? '/registrations' : '/servants'}
           className="inline-flex items-center gap-2 text-sm font-medium text-on-surface-variant transition-colors hover:text-primary"
         >
-          <span aria-hidden>←</span> Back to servants
+          <span aria-hidden>←</span>{' '}
+          {fromRegistrations ? 'Back to app registrations' : 'Back to servants'}
         </Link>
         <Link to={`/servants/${id}/edit`}>
           <Button variant="secondary">Edit profile</Button>
@@ -160,6 +208,7 @@ export default function ServantDetail() {
                   {servant.user.name}
                 </h1>
                 <Badge status={servant.verificationStatus} />
+                <SourceBadge source={servant.registrationSource} />
               </div>
               <p
                 className="text-on-surface-variant"
@@ -174,6 +223,11 @@ export default function ServantDetail() {
                 {servant.user.phone && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container px-3 py-1 text-xs font-medium text-on-surface-variant">
                     📞 {servant.user.phone}
+                  </span>
+                )}
+                {servant.address && (
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-surface-container px-3 py-1 text-xs font-medium text-on-surface-variant">
+                    📍 {servant.address}
                   </span>
                 )}
                 {servant.idProofType && (
@@ -367,6 +421,15 @@ export default function ServantDetail() {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {isAppRegistration ? (
+            <SetLoginPasswordCard
+              servantId={id}
+              email={servant.user.email}
+              passwordAlreadySet={!!servant.user.agentSetPassword}
+              onSaved={() => qc.invalidateQueries({ queryKey: ['servant', id] })}
+            />
+          ) : null}
+
           <section className="glass-card p-6">
             <h3 className="text-lg font-semibold text-primary">Verification</h3>
             <div className="mt-4 space-y-3">
@@ -408,9 +471,7 @@ export default function ServantDetail() {
                 <Button
                   variant="success"
                   className="w-full"
-                  onClick={() => {
-                    if (window.confirm('Approve this servant?')) verify('VERIFIED')
-                  }}
+                  onClick={handleApproveClick}
                 >
                   ✓ Approve
                 </Button>
@@ -481,6 +542,55 @@ export default function ServantDetail() {
               alt="ID proof"
               className="max-h-[85vh] w-full rounded-2xl object-contain shadow-2xl"
             />
+          </div>
+        </div>
+      )}
+
+      <ApprovePasswordModal
+        open={approveOpen}
+        servant={servant}
+        loading={approveLoading}
+        onClose={() => setApproveOpen(false)}
+        onConfirm={handleApproveWithPassword}
+      />
+
+      {credentials && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="glass-card w-full max-w-md p-6 shadow-2xl">
+            <h4 className="text-lg font-semibold text-emerald-700">Approved — share login details</h4>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Give these credentials to the helper so they can sign in to the Servant app.
+            </p>
+            <div className="mt-4 space-y-2 rounded-lg bg-emerald-50 p-4 text-sm">
+              <p>
+                <span className="text-on-surface-variant">Email: </span>
+                <span className="font-semibold text-primary">{credentials.email}</span>
+              </p>
+              <p>
+                <span className="text-on-surface-variant">Password: </span>
+                <span className="font-mono font-semibold text-primary">{credentials.password}</span>
+              </p>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() =>
+                  navigator.clipboard?.writeText(
+                    `Email: ${credentials.email}\nPassword: ${credentials.password}`,
+                  )
+                }
+              >
+                Copy all
+              </Button>
+              <Button variant="success" className="flex-1" onClick={() => setCredentials(null)}>
+                Done
+              </Button>
+            </div>
           </div>
         </div>
       )}

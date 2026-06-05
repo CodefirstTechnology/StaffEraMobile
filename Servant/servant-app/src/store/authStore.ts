@@ -19,6 +19,7 @@ type AuthState = {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  submitApplication: (data: Record<string, unknown>) => Promise<string>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
 };
@@ -27,7 +28,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,
-
   hydrate: async () => {
     try {
       const token = await getToken('accessToken');
@@ -42,6 +42,31 @@ export const useAuthStore = create<AuthState>((set) => ({
       await clearAuthTokens();
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
+  },
+
+  submitApplication: async (payload) => {
+    const body = payload as Record<string, string | number | string[] | undefined>;
+    const lang = useLanguageStore.getState().language;
+    const skills = Array.isArray(body.skills) ? body.skills : [];
+    const lat = Number(body.latitude);
+    const lng = Number(body.longitude);
+
+    const res = await api.post('/auth/register-servant', {
+      name: String(body.name ?? '').trim(),
+      email: String(body.email).trim().toLowerCase(),
+      phone: String(body.phone ?? '').replace(/\D/g, ''),
+      address: String(body.address ?? '').trim(),
+      skills,
+      ...(body.city ? { city: String(body.city).trim() } : {}),
+      ...(Number.isFinite(lat) ? { latitude: lat } : {}),
+      ...(Number.isFinite(lng) ? { longitude: lng } : {}),
+      preferredLanguage: lang,
+    });
+    const message = res.data?.data?.message;
+    if (!res.data?.success) {
+      throw { response: { data: { message: res.data?.message || 'Registration failed' } } };
+    }
+    return (message as string) || 'Submitted';
   },
 
   login: async (email, password) => {

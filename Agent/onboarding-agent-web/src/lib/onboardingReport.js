@@ -27,6 +27,7 @@ export function buildReportFromForm(form, skillsCatalog = [], files = {}) {
       name: form.name,
       email: form.email,
       phone: form.phone,
+      address: form.address,
       passwordSet: Boolean(form.password),
     },
     skills: {
@@ -80,6 +81,7 @@ export function buildReportFromServant(servant) {
       name: u.name,
       email: u.email,
       phone: u.phone,
+      address: servant.address,
       passwordSet: true,
     },
     skills: {
@@ -156,7 +158,8 @@ function reportHtml(data) {
   <table>
     ${row('Full name', data.personal?.name)}
     ${row('Email', data.personal?.email)}
-    ${row('Phone', data.personal?.phone)}
+    ${row('Mobile', data.personal?.phone)}
+    ${row('Address', data.personal?.address)}
     ${row('Login password', data.personal?.passwordSet ? 'Set' : 'Not set')}
   </table>
 

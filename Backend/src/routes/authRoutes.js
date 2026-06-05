@@ -6,6 +6,7 @@ const validate = require("../middleware/validate");
 const asyncHandler = require("../utils/asyncHandler");
 const {
   registerOwnerSchema,
+  registerServantSchema,
   loginSchema,
   refreshSchema,
   forgotPasswordSchema,
@@ -18,6 +19,11 @@ router.post(
   "/register-owner",
   validate(registerOwnerSchema),
   asyncHandler(authController.registerOwner)
+);
+router.post(
+  "/register-servant",
+  validate(registerServantSchema),
+  asyncHandler(authController.registerServant)
 );
 router.post("/login", validate(loginSchema), asyncHandler(authController.login));
 router.post("/refresh", validate(refreshSchema), asyncHandler(authController.refresh));

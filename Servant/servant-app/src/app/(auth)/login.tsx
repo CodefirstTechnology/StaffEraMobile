@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { getLoginErrorMessage } from '@/lib/getLoginErrorMessage';
@@ -37,7 +37,7 @@ export default function LoginScreen() {
         <LanguageSelector compact showTitle />
         <Text style={styles.badge}>{t('common.appNamePro')}</Text>
         <Text style={styles.logo}>{t('auth.welcomeBack')}</Text>
-        <Text style={styles.subtitle}>{t('auth.servantSubtitle')}</Text>
+        <Text style={styles.subtitle}>{t('auth.servantLoginSubtitle')}</Text>
 
         <GhostInput
           label={t('auth.email')}
@@ -55,7 +55,9 @@ export default function LoginScreen() {
 
         <GradientButton title={t('auth.signIn')} onPress={submit} loading={loading} />
 
-        <Text style={styles.hint}>{t('auth.noSelfSignup')}</Text>
+        <Link href="/(auth)/register" asChild>
+          <Text style={styles.link}>{t('auth.servantNewAccount')}</Text>
+        </Link>
         <Text style={styles.trust}>{t('auth.safeData')}</Text>
         {__DEV__ ? (
           <Text style={styles.apiHint} selectable>
@@ -108,12 +110,12 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     lineHeight: 24,
   },
-  hint: {
+  link: {
     textAlign: 'center',
-    color: Stitch.colors.onSurfaceVariant,
+    color: Stitch.colors.secondary,
     marginTop: 20,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 15,
+    fontWeight: '600',
   },
   trust: {
     textAlign: 'center',

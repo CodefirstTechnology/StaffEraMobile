@@ -1,20 +1,37 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '../lib/api'
 import { uploadUrl } from '../lib/mediaUrl'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 
+const CATEGORY_OPTIONS = [
+  { value: '', label: 'My servants' },
+  { value: 'onboarded', label: 'Agent onboarded' },
+]
+
 export default function ServantList() {
+  const [searchParams] = useSearchParams()
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
+  const [category, setCategory] = useState(searchParams.get('category') || '')
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('category') || ''
+    setCategory(fromUrl)
+  }, [searchParams])
 
   const { data, isLoading } = useQuery({
-    queryKey: ['agent-servants', status, search],
+    queryKey: ['agent-servants', status, search, category],
     queryFn: async () => {
       const res = await api.get('/agent/servants', {
-        params: { status: status || undefined, search: search || undefined },
+        params: {
+          status: status || undefined,
+          search: search || undefined,
+          category: category || undefined,
+          limit: 100,
+        },
       })
       return res.data.data.servants
     },
@@ -23,12 +40,32 @@ export default function ServantList() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold">Servants</h2>
+        <div>
+          <h2 className="text-2xl font-bold">Servants</h2>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Staff you onboarded and verified. App sign-ups are managed separately under{' '}
+            <Link to="/registrations" className="font-medium text-violet-700 hover:underline">
+              App registrations
+            </Link>
+            .
+          </p>
+        </div>
         <Link to="/servants/new">
           <Button>Onboard New Servant</Button>
         </Link>
       </div>
       <div className="flex flex-wrap gap-3">
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+        >
+          {CATEGORY_OPTIONS.map((opt) => (
+            <option key={opt.value || 'all'} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
@@ -63,6 +100,13 @@ export default function ServantList() {
               </tr>
             </thead>
             <tbody>
+              {!isLoading && (data || []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-on-surface-variant">
+                    No servants in this category.
+                  </td>
+                </tr>
+              ) : null}
               {(data || []).map((s) => (
                 <tr key={s.id} className="border-b">
                   <td className="p-4">

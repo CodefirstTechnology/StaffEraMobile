@@ -4,6 +4,13 @@ export type Skill = { code: string; label: string };
 
 const skillI18nKey = (raw: string) => `skills.${raw.trim().toUpperCase().replace(/\s+/g, '_')}`;
 
+const humanizeSkillLabel = (raw: string) =>
+  raw
+    .trim()
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
 /** Prefer locale `skills.CODE`, then API label. */
 export function localizedSkillLabel(
   code: string,
@@ -25,7 +32,7 @@ export function localizedSkillLabel(
     if (i18n.exists(key)) return i18n.t(key);
   }
   if (match) return match.label;
-  return formatSkillLabel(code, skills);
+  return humanizeSkillLabel(normalized || code);
 }
 
 export function formatSkillLabel(skillName: string, skills: Skill[] = []) {
@@ -37,6 +44,6 @@ export function formatSkillLabel(skillName: string, skills: Skill[] = []) {
       s.label.toLowerCase() === normalized.toLowerCase() ||
       s.code.toLowerCase() === normalized.toLowerCase(),
   );
-  if (match) return localizedSkillLabel(match.code, skills);
-  return localizedSkillLabel(asCode, skills);
+  if (match) return match.label;
+  return humanizeSkillLabel(asCode);
 }

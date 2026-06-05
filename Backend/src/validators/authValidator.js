@@ -5,6 +5,49 @@ const emptyToUndefined = (val) =>
 
 const SUPPORTED_LANGUAGES = ["en", "hi", "mr"];
 
+const optionalFiniteCoord = (min, max) =>
+  z.preprocess(
+    (val) => {
+      if (val === undefined || val === null || val === "") return undefined;
+      const n = Number(val);
+      return Number.isFinite(n) ? n : undefined;
+    },
+    z.number().min(min).max(max).optional()
+  );
+
+const parseSkillsBody = (val) => {
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : val.trim() ? [val] : [];
+    } catch {
+      return val.trim() ? [val] : [];
+    }
+  }
+  return [];
+};
+
+const registerServantSchema = z.object({
+  body: z.object({
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    email: z.string().email("Invalid email address"),
+    phone: z.preprocess(
+      (val) => String(val ?? "").replace(/\D/g, ""),
+      z.string().min(10, "Mobile number must be at least 10 digits")
+    ),
+    address: z.string().min(5, "Address is required"),
+    skills: z.preprocess(parseSkillsBody, z.array(z.string()).min(1, "Select at least one skill")),
+    city: z.preprocess(emptyToUndefined, z.string().optional()),
+    latitude: optionalFiniteCoord(-90, 90),
+    longitude: optionalFiniteCoord(-180, 180),
+    preferredLanguage: z.preprocess(
+      (val) => (SUPPORTED_LANGUAGES.includes(val) ? val : undefined),
+      z.enum(SUPPORTED_LANGUAGES).optional()
+    )
+  })
+});
+
 const registerOwnerSchema = z.object({
   body: z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -65,6 +108,7 @@ const updatePreferencesSchema = z.object({
 
 module.exports = {
   registerOwnerSchema,
+  registerServantSchema,
   loginSchema,
   refreshSchema,
   forgotPasswordSchema,

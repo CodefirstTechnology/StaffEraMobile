@@ -242,13 +242,13 @@ export default function BrowseScreen() {
             </Text>
           </View>
         </View>
-        <Text style={styles.countHint}>
-          {nearbyCount > 0
-            ? t('browse.countHintActive')
-            : skillLabel
+        {nearbyCount === 0 ? (
+          <Text style={styles.countHint}>
+            {skillLabel
               ? t('browse.countHintNoSkill', { skill: skillLabel })
               : t('browse.countHintNoHelpers')}
-        </Text>
+          </Text>
+        ) : null}
         <GradientButton
           title={
             skillLabel

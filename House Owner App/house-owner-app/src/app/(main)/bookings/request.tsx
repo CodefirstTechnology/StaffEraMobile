@@ -152,17 +152,6 @@ export default function AreaBookingRequestScreen() {
 
       const res = await api.post('/bookings', payload);
       const notified = res.data.data.broadcast?.notifiedServants ?? 0;
-      const helperNames = (res.data.data.broadcast?.helperNames as string[] | undefined) ?? [];
-      const namesPreview =
-        helperNames.length > 0
-          ? t('bookings.notifiedNames', {
-              names: `${helperNames.slice(0, 3).join(', ')}${
-                helperNames.length > 3
-                  ? t('bookings.notifiedMore', { count: helperNames.length - 3 })
-                  : ''
-              }`,
-            })
-          : '';
       const timePreview =
         bookingType === 'SESSION' && slotsSummary
           ? `\n${t('bookings.timeSlotsPreview', { slots: slotsSummary })}`
@@ -171,7 +160,7 @@ export default function AreaBookingRequestScreen() {
         t('bookings.requestSentTitle'),
         `${skillLabel} · ${requestTypeLabel}${timePreview}\n\n${
           notified > 0
-            ? t('bookings.notifiedHelpers', { count: notified, names: namesPreview })
+            ? t('bookings.notifiedHelpers', { count: notified })
             : t('bookings.requestSavedOffline')
         }`,
       );
@@ -232,15 +221,11 @@ export default function AreaBookingRequestScreen() {
               ? t('bookings.nearbyHelpersNotify', { count: nearbyCount, skill: skillLabel })
               : t('bookings.noHelpersInAreaNow', { skill: skillLabel })}
           </Text>
-          {nearbyCount > 0 ? (
-            <Text style={styles.areaNames}>
-              {nearbyHelpers.map((h) => h.user.name).join(' · ')}
-            </Text>
-          ) : (
+          {nearbyCount === 0 ? (
             <Text style={styles.areaNames}>
               {t('bookings.requestStaysOpen', { skill: skillLabel })}
             </Text>
-          )}
+          ) : null}
         </View>
       ) : null}
 

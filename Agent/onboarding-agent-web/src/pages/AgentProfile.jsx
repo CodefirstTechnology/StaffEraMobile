@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
+import { AgentLocationPicker } from '../components/AgentLocationPicker'
 
 const ROLE_LABELS = {
   ADMIN: 'Platform administrator',
@@ -75,15 +77,42 @@ function QuickLink({ to, title, subtitle, icon }) {
   )
 }
 
+function hasAgencyLocation(agent) {
+  return (
+    agent?.address?.trim() &&
+    agent.latitude != null &&
+    agent.longitude != null
+  )
+}
+
 export default function AgentProfile() {
-  const { user, logout } = useAuth()
+  const { user, logout, setUser } = useAuth()
   const navigate = useNavigate()
   const isAdmin = user?.role === 'ADMIN'
+  const [agencyName, setAgencyName] = useState('')
+  const [location, setLocation] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [settingsError, setSettingsError] = useState('')
+
+  useEffect(() => {
+    if (!user?.agent) return
+    setAgencyName(user.agent.agencyName || '')
+    if (hasAgencyLocation(user.agent)) {
+      setLocation({
+        address: user.agent.address,
+        city: user.agent.city,
+        latitude: user.agent.latitude,
+        longitude: user.agent.longitude,
+      })
+    }
+  }, [user?.agent])
 
   const { data: servants = [] } = useQuery({
     queryKey: ['agent-servants-profile'],
     queryFn: async () => {
-      const res = await api.get('/agent/servants', { params: { limit: 100 } })
+      const res = await api.get('/agent/servants', {
+        params: { category: 'onboarded', limit: 100 },
+      })
       return res.data.data.servants
     },
     enabled: !!user && ['AGENT', 'ADMIN'].includes(user.role),
@@ -114,6 +143,31 @@ export default function AgentProfile() {
     await logout()
     navigate('/login')
   }
+
+  const saveAgencySettings = async () => {
+    setSettingsError('')
+    if (!location?.address?.trim() || location.latitude == null || location.longitude == null) {
+      setSettingsError('Agency location is required. Search or use GPS to pick your office area.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await api.patch('/agent/profile', {
+        agencyName: agencyName.trim() || undefined,
+        address: location.address,
+        city: location.city,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      })
+      setUser(res.data.data.user)
+    } catch (e) {
+      setSettingsError(e.response?.data?.message || 'Failed to save agency settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const locationSet = hasAgencyLocation(user?.agent)
 
   if (!user) {
     return (
@@ -170,9 +224,10 @@ export default function AgentProfile() {
                     <span aria-hidden>📞</span> {user.phone}
                   </span>
                 )}
-                {user.agent?.city && (
+                {(user.agent?.address || user.agent?.city) && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-fixed px-3 py-1.5 text-xs font-medium text-primary">
-                    <span aria-hidden>📍</span> {user.agent.city}
+                    <span aria-hidden>📍</span>{' '}
+                    {user.agent.address || user.agent.city}
                   </span>
                 )}
               </div>
@@ -180,6 +235,13 @@ export default function AgentProfile() {
           </div>
         </div>
       </div>
+
+      {user.agent && !locationSet && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>Agency location required.</strong> Set your office location below before
+          onboarding new servants.
+        </div>
+      )}
 
       {/* Pipeline stats */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -217,7 +279,15 @@ export default function AgentProfile() {
                 label="Agency name"
                 value={user.agent.agencyName || 'Not set'}
               />
-              <InfoRow icon="📍" label="City" value={user.agent.city || 'Not set'} />
+              <InfoRow
+                icon="📍"
+                label="Location"
+                value={
+                  user.agent.address ||
+                  (user.agent.city ? user.agent.city : 'Not set — required')
+                }
+              />
+              <InfoRow icon="🌆" label="City" value={user.agent.city || '—'} />
               <InfoRow
                 icon="🔢"
                 label="Agent profile ID"
@@ -243,6 +313,37 @@ export default function AgentProfile() {
           )}
         </SectionCard>
       </div>
+
+      {user.agent && (
+        <SectionCard
+          title="Agency settings"
+          description="Agency location is required to onboard servants in your area."
+        >
+          <div className="space-y-4">
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-gray-700">Agency name</span>
+              <input
+                className="w-full rounded-lg border px-3 py-2"
+                placeholder="Your agency or team name"
+                value={agencyName}
+                onChange={(e) => setAgencyName(e.target.value)}
+              />
+            </label>
+            <AgentLocationPicker
+              label="Agency location"
+              required
+              value={location}
+              onChange={setLocation}
+            />
+            {settingsError && (
+              <p className="text-sm text-error">{settingsError}</p>
+            )}
+            <Button onClick={saveAgencySettings} disabled={saving}>
+              {saving ? 'Saving…' : 'Save agency settings'}
+            </Button>
+          </div>
+        </SectionCard>
+      )}
 
       <SectionCard title="Quick actions" description="Jump to common tasks.">
         <div className="grid gap-3 sm:grid-cols-2">

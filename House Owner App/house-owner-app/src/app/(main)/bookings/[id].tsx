@@ -156,13 +156,6 @@ export default function BookingDetailScreen() {
             {t('bookings.addressRow', { address: booking.address })}
           </Text>
         ) : null}
-        {isOpenBroadcast && areaHelpers.length > 0 ? (
-          <Text style={styles.helpers}>
-            {t('bookings.helpersNotified', {
-              names: areaHelpers.map((h) => h.user.name).join(', '),
-            })}
-          </Text>
-        ) : null}
         {booking.totalAmount != null && (
           <Text style={styles.amount}>
             {Stitch.copy.rupee}

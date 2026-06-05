@@ -190,7 +190,6 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </View>
-            <Text style={styles.countHint}>{t('home.privacyHint')}</Text>
           </GlassCard>
         ) : null}
 

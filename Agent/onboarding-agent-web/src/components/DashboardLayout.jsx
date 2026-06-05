@@ -29,6 +29,9 @@ export function DashboardLayout() {
           <NavLink to="/" end className={linkClass}>
             Dashboard
           </NavLink>
+          <NavLink to="/registrations" className={linkClass}>
+            App registrations
+          </NavLink>
           <NavLink to="/servants" className={linkClass}>
             Servants
           </NavLink>

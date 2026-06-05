@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
+import { SkillDropdown } from '../components/SkillDropdown'
 import { useSkills } from '../hooks/useSkills'
 import {
   buildReportFromForm,
@@ -21,9 +22,9 @@ const STEPS = [
 ]
 
 const PERSONAL_FIELDS = [
-  { key: 'name', label: 'Full name', placeholder: 'Enter full name', type: 'text' },
+  { key: 'name', label: 'Name', placeholder: 'Enter full name', type: 'text' },
   { key: 'email', label: 'Email', placeholder: 'Enter email address', type: 'email' },
-  { key: 'phone', label: 'Phone', placeholder: 'Enter mobile number', type: 'tel' },
+  { key: 'phone', label: 'Mobile', placeholder: 'Enter mobile number', type: 'tel' },
   { key: 'password', label: 'Password', placeholder: 'Create login password', type: 'password' },
 ]
 
@@ -101,19 +102,13 @@ export default function OnboardServant() {
     offersSession: true,
     offersMonthly: true,
     skills: [],
+    address: '',
     idProofType: 'AADHAR',
   })
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }))
-  const toggleSkill = (s) =>
-    setForm((f) => ({
-      ...f,
-      skills: f.skills.includes(s)
-        ? f.skills.filter((x) => x !== s)
-        : [...f.skills, s],
-    }))
   const toggleDay = (d) =>
     setForm((f) => ({
       ...f,
@@ -131,8 +126,20 @@ export default function OnboardServant() {
       setError('Email is required')
       return false
     }
+    if (!form.phone?.trim()) {
+      setError('Mobile number is required')
+      return false
+    }
     if (!form.password || form.password.length < 6) {
       setError('Password must be at least 6 characters')
+      return false
+    }
+    if (!form.skills?.length) {
+      setError('Select at least one skill')
+      return false
+    }
+    if (!form.address?.trim()) {
+      setError('Address is required')
       return false
     }
     return true
@@ -274,35 +281,29 @@ export default function OnboardServant() {
               />
             </Field>
           ))}
+          <Field label="Skill">
+            <SkillDropdown
+              skills={skills}
+              skillsLoading={skillsLoading}
+              value={form.skills}
+              onChange={(skillsSelected) => update('skills', skillsSelected)}
+            />
+          </Field>
+          <Field label="Address">
+            <textarea
+              placeholder="Enter full residential address"
+              value={form.address}
+              onChange={(e) => update('address', e.target.value)}
+              className={inputClassName()}
+              rows={3}
+            />
+          </Field>
         </div>
       )}
 
       {step === 2 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Skills & Rates</h3>
-          <div className="space-y-1.5">
-            <FieldLabel>Skills</FieldLabel>
-            {skillsLoading ? (
-              <p className="text-sm text-subtext">Loading skills…</p>
-            ) : skills.length === 0 ? (
-              <p className="text-sm text-subtext">
-                No skills available. Ask an admin to add skills first.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {skills.map((s) => (
-                  <label key={s.code} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.skills.includes(s.code)}
-                      onChange={() => toggleSkill(s.code)}
-                    />
-                    {s.label}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
           <Field label="Years of experience">
             <input
               placeholder="e.g. 3"
@@ -491,14 +492,8 @@ export default function OnboardServant() {
           <ReviewSection title="Personal Info">
             <ReviewItem label="Name">{form.name || '—'}</ReviewItem>
             <ReviewItem label="Email">{form.email || '—'}</ReviewItem>
-            <ReviewItem label="Phone">{form.phone || '—'}</ReviewItem>
-            <ReviewItem label="Password">
-              {form.password ? '•'.repeat(Math.min(form.password.length, 8)) : '—'}
-            </ReviewItem>
-          </ReviewSection>
-
-          <ReviewSection title="Skills & Rates">
-            <ReviewItem label="Skills">
+            <ReviewItem label="Mobile">{form.phone || '—'}</ReviewItem>
+            <ReviewItem label="Skill">
               <ReviewChips
                 items={form.skills.map(
                   (code) =>
@@ -507,6 +502,13 @@ export default function OnboardServant() {
                 )}
               />
             </ReviewItem>
+            <ReviewItem label="Address">{form.address || '—'}</ReviewItem>
+            <ReviewItem label="Password">
+              {form.password ? '•'.repeat(Math.min(form.password.length, 8)) : '—'}
+            </ReviewItem>
+          </ReviewSection>
+
+          <ReviewSection title="Skills & Rates">
             <ReviewItem label="Experience">
               {form.experience ? `${form.experience} year(s)` : '—'}
             </ReviewItem>

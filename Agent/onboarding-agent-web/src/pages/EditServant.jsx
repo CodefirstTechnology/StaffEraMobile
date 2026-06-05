@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import { LoginPasswordFields } from '../components/LoginPasswordFields'
+import { SkillDropdown } from '../components/SkillDropdown'
 import { useSkills } from '../hooks/useSkills'
 import { uploadUrl } from '../lib/mediaUrl'
 
@@ -46,6 +48,8 @@ export default function EditServant() {
   const navigate = useNavigate()
   const { data: skills = [], isLoading: skillsLoading } = useSkills()
   const [error, setError] = useState('')
+  const [savedCredentials, setSavedCredentials] = useState(null)
+  const [loginPassword, setLoginPassword] = useState('')
   const [saving, setSaving] = useState(false)
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
@@ -73,6 +77,7 @@ export default function EditServant() {
     offersSession: true,
     offersMonthly: true,
     skills: [],
+    address: '',
     idProofType: 'AADHAR',
   })
 
@@ -93,18 +98,12 @@ export default function EditServant() {
       offersSession: servant.offersSession ?? true,
       offersMonthly: servant.offersMonthly ?? true,
       skills: servant.skills?.map((s) => s.skillName) || [],
+      address: servant.address || '',
       idProofType: servant.idProofType || 'AADHAR',
     })
   }, [servant])
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }))
-  const toggleSkill = (s) =>
-    setForm((f) => ({
-      ...f,
-      skills: f.skills.includes(s)
-        ? f.skills.filter((x) => x !== s)
-        : [...f.skills, s],
-    }))
   const toggleDay = (d) =>
     setForm((f) => ({
       ...f,
@@ -132,11 +131,23 @@ export default function EditServant() {
     })
     if (profilePhoto) fd.append('profilePhoto', profilePhoto)
     if (idProof) fd.append('idProof', idProof)
-
     try {
+      let newCredentials = null
+      if (loginPassword.trim().length >= 6) {
+        const pwRes = await api.patch(`/agent/servants/${id}/password`, {
+          password: loginPassword.trim(),
+        })
+        newCredentials = pwRes.data?.data?.credentials || null
+        if (newCredentials) {
+          setSavedCredentials(newCredentials)
+          setLoginPassword('')
+        }
+      }
+
       await api.patch(`/agent/servants/${id}`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
+      if (newCredentials) return
       navigate(`/servants/${id}`)
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to update servant')
@@ -147,9 +158,14 @@ export default function EditServant() {
 
   if (isLoading || !servant) return <p>Loading…</p>
 
+  const isAppRegistration =
+    servant.registrationSource === 'SELF' || servant.user?.isActive === false
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h2 className="text-2xl font-bold">Edit Servant</h2>
+      <h2 className="text-2xl font-bold">
+        {isAppRegistration ? 'Edit app registration' : 'Edit Servant'}
+      </h2>
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
         <h3 className="font-semibold">Personal Info</h3>
@@ -168,7 +184,7 @@ export default function EditServant() {
             className={`${inputClassName()} bg-gray-50 text-subtext`}
           />
         </Field>
-        <Field label="Phone">
+        <Field label="Mobile">
           <input
             placeholder="Enter mobile number"
             value={form.phone}
@@ -176,31 +192,34 @@ export default function EditServant() {
             className={inputClassName()}
           />
         </Field>
+        <Field label="Skill">
+          <SkillDropdown
+            skills={skills}
+            skillsLoading={skillsLoading}
+            value={form.skills}
+            onChange={(skillsSelected) => update('skills', skillsSelected)}
+          />
+        </Field>
+        <Field label="Address">
+          <textarea
+            placeholder="Enter full residential address"
+            value={form.address}
+            onChange={(e) => update('address', e.target.value)}
+            className={inputClassName()}
+            rows={3}
+          />
+        </Field>
+        {isAppRegistration ? (
+          <LoginPasswordFields
+            email={servant.user?.email}
+            password={loginPassword}
+            onPasswordChange={setLoginPassword}
+          />
+        ) : null}
       </div>
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
-        <h3 className="font-semibold">Skills & Rates</h3>
-        <div className="space-y-1.5">
-          <FieldLabel>Skills</FieldLabel>
-          {skillsLoading ? (
-            <p className="text-sm text-subtext">Loading skills…</p>
-          ) : skills.length === 0 ? (
-            <p className="text-sm text-subtext">No skills available.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {skills.map((s) => (
-                <label key={s.code} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.skills.includes(s.code)}
-                    onChange={() => toggleSkill(s.code)}
-                  />
-                  {s.label}
-                </label>
-              ))}
-            </div>
-          )}
-        </div>
+        <h3 className="font-semibold">Rates & experience</h3>
         <Field label="Years of experience">
           <input
             placeholder="e.g. 3"
@@ -427,6 +446,33 @@ export default function EditServant() {
                 {z.city ? ` · ${z.city}` : ''}
               </span>
             ))}
+          </div>
+        </div>
+      )}
+
+      {savedCredentials && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+          <p className="font-semibold text-emerald-800">Password saved — share with helper</p>
+          <p className="mt-2">
+            Email: <strong>{savedCredentials.email}</strong>
+          </p>
+          <p className="mt-1 font-mono">
+            Password: <strong>{savedCredentials.password}</strong>
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() =>
+                navigator.clipboard?.writeText(
+                  `Email: ${savedCredentials.email}\nPassword: ${savedCredentials.password}`,
+                )
+              }
+            >
+              Copy all
+            </Button>
+            <Button variant="success" onClick={() => navigate(`/servants/${id}`)}>
+              Done
+            </Button>
           </div>
         </div>
       )}

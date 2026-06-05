@@ -6,6 +6,7 @@ import { DashboardLayout, AdminLayout } from './components/DashboardLayout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ServantList from './pages/ServantList'
+import AppRegistrationList from './pages/AppRegistrationList'
 import OnboardServant from './pages/OnboardServant'
 import ServantDetail from './pages/ServantDetail'
 import EditServant from './pages/EditServant'
@@ -34,6 +35,7 @@ export default function App() {
               }
             >
               <Route index element={<Dashboard />} />
+              <Route path="registrations" element={<AppRegistrationList />} />
               <Route path="servants" element={<ServantList />} />
               <Route path="servants/new" element={<OnboardServant />} />
               <Route path="servants/:id" element={<ServantDetail />} />
