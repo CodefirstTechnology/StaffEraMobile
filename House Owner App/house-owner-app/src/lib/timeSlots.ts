@@ -34,17 +34,60 @@ export const localizedTimeSlotLabel = (start: string, end: string) => {
   const endHour = parseInt(end.split(':')[0], 10);
   if (Number.isNaN(startHour) || Number.isNaN(endHour)) return `${start} – ${end}`;
   return i18n.t('timeSlots.range', {
-    start: formatHour12Locale(startHour),
-    end: formatHour12Locale(endHour),
+    start: formatHour12(startHour),
+    end: formatHour12(endHour),
   });
 };
 
 export const localizedSlotLabels = (slots: TimeSlot[]) =>
   slots.map((s) => localizedTimeSlotLabel(s.start, s.end)).join(' · ');
 
-const timeToMinutes = (time: string) => {
+export const timeToMinutes = (time: string) => {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + (m || 0);
+};
+
+export const startOfLocalDay = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+export const isSameLocalDay = (a: Date, b: Date) =>
+  startOfLocalDay(a).getTime() === startOfLocalDay(b).getTime();
+
+const slotStartOnDate = (slot: TimeSlot, sessionDate: Date) => {
+  const start = startOfLocalDay(sessionDate);
+  const [hour, minute] = slot.start.split(':').map(Number);
+  start.setHours(hour, minute || 0, 0, 0);
+  return start;
+};
+
+/** True once the slot start time has passed (at 5:01 PM, 5–6 PM is hidden; 6–7 PM is first). */
+export const isSlotExpiredForDate = (slot: TimeSlot, sessionDate: Date, now = new Date()) => {
+  if (!isSameLocalDay(sessionDate, now)) return false;
+  return now.getTime() >= slotStartOnDate(slot, sessionDate).getTime();
+};
+
+/** Slots still bookable for the chosen visit date (past hours hidden when date is today). */
+export const getAvailableTimeSlots = (sessionDate: Date, now = new Date()): TimeSlot[] =>
+  HOURLY_TIME_SLOTS.filter((slot) => !isSlotExpiredForDate(slot, sessionDate, now));
+
+export const getDefaultTimeSlotsForDate = (sessionDate: Date, now = new Date()): TimeSlot[] => {
+  const available = getAvailableTimeSlots(sessionDate, now);
+  return available.length > 0 ? [available[0]] : [];
+};
+
+export const pruneTimeSlotsForDate = (
+  selected: TimeSlot[],
+  sessionDate: Date,
+  now = new Date(),
+): TimeSlot[] => {
+  const available = getAvailableTimeSlots(sessionDate, now);
+  const availableIds = new Set(available.map((s) => s.id));
+  const kept = sortTimeSlots(selected.filter((s) => availableIds.has(s.id)));
+  if (kept.length > 0) return kept;
+  return getDefaultTimeSlotsForDate(sessionDate, now);
 };
 
 export const HOURLY_TIME_SLOTS: TimeSlot[] = Array.from({ length: 14 }, (_, i) => {
@@ -58,8 +101,6 @@ export const HOURLY_TIME_SLOTS: TimeSlot[] = Array.from({ length: 14 }, (_, i) =
     label: `${formatHour12(hour)} to ${formatHour12(hour + 1)}`,
   };
 });
-
-export const DEFAULT_TIME_SLOTS = [HOURLY_TIME_SLOTS.find((s) => s.start === '09:00')!];
 
 export const sortTimeSlots = (slots: TimeSlot[]) =>
   [...slots].sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));

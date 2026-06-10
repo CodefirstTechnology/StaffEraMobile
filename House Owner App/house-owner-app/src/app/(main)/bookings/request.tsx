@@ -25,7 +25,15 @@ import type { LocationValue } from '@/lib/locationTypes';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useAuthStore } from '@/store/authStore';
 import { useSkills } from '@/hooks/useSkills';
-import { DEFAULT_TIME_SLOTS, formatSessionSlotsLabel, slotsToPayload, type TimeSlot } from '@/lib/timeSlots';
+import {
+  formatSessionSlotsLabel,
+  getAvailableTimeSlots,
+  getDefaultTimeSlotsForDate,
+  pruneTimeSlotsForDate,
+  slotsToPayload,
+  startOfLocalDay,
+  type TimeSlot,
+} from '@/lib/timeSlots';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate } from '@/lib/i18n/format';
 
@@ -39,7 +47,7 @@ export default function AreaBookingRequestScreen() {
   const { location: liveLocation, loading: locLoading } = useLiveLocation();
   const [bookingType, setBookingType] = useState<'SESSION' | 'MONTHLY'>('SESSION');
   const [sessionDate, setSessionDate] = useState(new Date());
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(DEFAULT_TIME_SLOTS);
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(() => getDefaultTimeSlotsForDate(new Date()));
   const [monthlyStart, setMonthlyStart] = useState(new Date());
   const [monthlyEnd, setMonthlyEnd] = useState(() => {
     const d = new Date();
@@ -73,6 +81,14 @@ export default function AreaBookingRequestScreen() {
       area: ho.area || '',
     });
   }, [user?.houseOwner]);
+
+  useEffect(() => {
+    const syncSlots = () =>
+      setTimeSlots((prev) => pruneTimeSlotsForDate(prev, sessionDate, new Date()));
+    syncSlots();
+    const timer = setInterval(syncSlots, 30000);
+    return () => clearInterval(timer);
+  }, [sessionDate]);
 
   const skillLabel = selectedSkill
     ? localizedSkillLabel(selectedSkill, skills)
@@ -112,10 +128,20 @@ export default function AreaBookingRequestScreen() {
       Alert.alert(t('bookings.categoryRequired'), t('bookings.whatHelpNeed'));
       return;
     }
-    if (bookingType === 'SESSION' && timeSlots.length === 0) {
-      Alert.alert(t('bookings.timeSlotRequired'), t('bookings.timeSlotRequired'));
-      return;
+
+    let sessionSlotsToSend = timeSlots;
+    if (bookingType === 'SESSION') {
+      const available = getAvailableTimeSlots(sessionDate);
+      sessionSlotsToSend = timeSlots.filter((s) => available.some((a) => a.id === s.id));
+      if (sessionSlotsToSend.length === 0) {
+        Alert.alert(t('bookings.timeSlotRequired'), t('timeSlots.noneLeftToday'));
+        return;
+      }
+      if (sessionSlotsToSend.length !== timeSlots.length) {
+        setTimeSlots(sessionSlotsToSend);
+      }
     }
+
     if (!location?.address || location.latitude == null || location.longitude == null) {
       Alert.alert(t('validation.locationRequired'), t('bookings.locationRequiredShort'));
       return;
@@ -137,7 +163,7 @@ export default function AreaBookingRequestScreen() {
       if (bookingType === 'SESSION') {
         const day = new Date(sessionDate);
         day.setHours(12, 0, 0, 0);
-        const orderedSlots = slotsToPayload(timeSlots);
+        const orderedSlots = slotsToPayload(sessionSlotsToSend);
         payload.sessionDate = day.toISOString();
         payload.sessionSlots = orderedSlots;
         payload.sessionStartTime = orderedSlots[0].start;
@@ -253,6 +279,7 @@ export default function AreaBookingRequestScreen() {
             <DateTimePicker
               value={sessionDate}
               mode="date"
+              minimumDate={startOfLocalDay(new Date())}
               onChange={(_, d) => {
                 setShowDate(false);
                 if (d) setSessionDate(d);
@@ -263,6 +290,7 @@ export default function AreaBookingRequestScreen() {
             label={t('bookings.pickTimeSlots')}
             value={timeSlots}
             onChange={setTimeSlots}
+            sessionDate={sessionDate}
           />
         </>
       ) : (

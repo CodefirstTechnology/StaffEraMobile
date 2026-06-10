@@ -317,6 +317,7 @@
     "hint": "Tap to select multiple slots (1 hour each)",
     "selected": "Selected ({{count}}): {{labels}}",
     "pickAtLeastOne": "Pick at least one time slot",
+    "noneLeftToday": "No time slots left for today. Pick a later date.",
     "range": "{{start}} to {{end}}"
   },
   "servantHome": {

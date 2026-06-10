@@ -1,8 +1,10 @@
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Stitch } from '@/theme/stitch';
 import {
-  HOURLY_TIME_SLOTS,
+  getAvailableTimeSlots,
+  isSameLocalDay,
   localizedSlotLabels,
   localizedTimeSlotLabel,
   type TimeSlot,
@@ -12,11 +14,26 @@ type Props = {
   label?: string;
   value: TimeSlot[];
   onChange: (slots: TimeSlot[]) => void;
+  sessionDate: Date;
 };
 
-export function TimeSlotPicker({ label, value, onChange }: Props) {
+export function TimeSlotPicker({ label, value, onChange, sessionDate }: Props) {
   const { t } = useTranslation();
   const pickerLabel = label ?? t('bookings.timeSlotLabel');
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    setNow(new Date());
+    if (!isSameLocalDay(sessionDate, new Date())) return;
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, [sessionDate]);
+
+  const availableSlots = useMemo(
+    () => getAvailableTimeSlots(sessionDate, now),
+    [sessionDate, now],
+  );
+
   const toggle = (slot: TimeSlot) => {
     const exists = value.some((s) => s.id === slot.id);
     const next = exists
@@ -32,27 +49,31 @@ export function TimeSlotPicker({ label, value, onChange }: Props) {
     <View style={styles.wrap}>
       <Text style={styles.label}>{pickerLabel}</Text>
       <Text style={styles.hint}>{t('timeSlots.hint')}</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.row}
-        contentContainerStyle={styles.rowContent}
-      >
-        {HOURLY_TIME_SLOTS.map((slot) => {
-          const selected = value.some((s) => s.id === slot.id);
-          return (
-            <TouchableOpacity
-              key={slot.id}
-              style={[styles.chip, selected && styles.chipOn]}
-              onPress={() => toggle(slot)}
-            >
-              <Text style={[styles.chipText, selected && styles.chipTextOn]}>
-                {localizedTimeSlotLabel(slot.start, slot.end)}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      {availableSlots.length === 0 ? (
+        <Text style={styles.empty}>{t('timeSlots.noneLeftToday')}</Text>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.row}
+          contentContainerStyle={styles.rowContent}
+        >
+          {availableSlots.map((slot) => {
+            const selected = value.some((s) => s.id === slot.id);
+            return (
+              <TouchableOpacity
+                key={slot.id}
+                style={[styles.chip, selected && styles.chipOn]}
+                onPress={() => toggle(slot)}
+              >
+                <Text style={[styles.chipText, selected && styles.chipTextOn]}>
+                  {localizedTimeSlotLabel(slot.start, slot.end)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
       {value.length > 0 ? (
         <Text style={styles.selected}>
           {t('timeSlots.selected', {
@@ -60,9 +81,9 @@ export function TimeSlotPicker({ label, value, onChange }: Props) {
             labels: localizedSlotLabels(value),
           })}
         </Text>
-      ) : (
+      ) : availableSlots.length > 0 ? (
         <Text style={styles.empty}>{t('timeSlots.pickAtLeastOne')}</Text>
-      )}
+      ) : null}
     </View>
   );
 }
