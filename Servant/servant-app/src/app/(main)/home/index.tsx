@@ -20,6 +20,8 @@ import { formatSessionSlotsLabel } from '@/lib/timeSlots';
 import { computeTodayEarnings, computeMonthlyEarnings } from '@/lib/earnings';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { NotificationBell } from '@/components/ui/NotificationBell';
 
 type Booking = {
   id: number;
@@ -81,10 +83,17 @@ export default function ServantHomeScreen() {
     queryKey: ['servant-profile'],
     queryFn: async () => {
       const res = await api.get('/servants/me');
-      return res.data.data.servant as { hourlyRate?: number | null };
+      return res.data.data.servant as {
+        hourlyRate?: number | null;
+        verificationStatus?: string;
+      };
     },
     enabled: isAuthenticated,
   });
+
+  const isVerified =
+    profile?.verificationStatus === 'VERIFIED' ||
+    user?.servant?.verificationStatus === 'VERIFIED';
 
   const { data: openRequests } = useQuery({
     queryKey: ['open-requests'],
@@ -266,42 +275,25 @@ export default function ServantHomeScreen() {
           <View style={styles.proAvatar}>
             <Text style={styles.proAvatarText}>{user?.name?.[0]}</Text>
           </View>
-          <View>
+          <View style={styles.proText}>
             <Text style={styles.proBrand}>{t('common.appNamePro')}</Text>
-            <Text style={styles.proName}>
-              {t('servantHome.namaste', { name: user?.name?.split(' ')[0] || '' })}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.proName}>
+                {t('servantHome.namaste', { name: user?.name?.split(' ')[0] || '' })}
+              </Text>
+              {isVerified ? <VerifiedBadge /> : null}
+            </View>
           </View>
         </View>
         <View style={styles.online}>
           <View style={styles.dot} />
           <Text style={styles.onlineText}>{t('servantHome.online')}</Text>
-          <Pressable
+          <NotificationBell
+            unread={unread}
             onPress={() => router.push('/(main)/notifications')}
-            style={styles.notifBtn}
-            hitSlop={8}
-          >
-            <MaterialIcons name="notifications" size={22} color={Stitch.colors.primary} />
-            {unread > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
-              </View>
-            )}
-          </Pressable>
+          />
         </View>
       </View>
-
-      {unread > 0 && (
-        <Pressable onPress={() => router.push('/(main)/notifications')}>
-          <GlassCard style={styles.notifBanner}>
-            <MaterialIcons name="notifications-active" size={20} color={Stitch.colors.secondary} />
-            <Text style={styles.notifText}>
-              {t('servantHome.newNotifications', { count: unread })}
-            </Text>
-            <MaterialIcons name="chevron-right" size={20} color={Stitch.colors.onSurfaceVariant} />
-          </GlassCard>
-        </Pressable>
-      )}
 
       <View style={styles.earnRow}>
         <View>
@@ -594,7 +586,15 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: 'rgba(252,248,255,0.9)',
   },
-  proRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  proRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minWidth: 0,
+    marginRight: 8,
+  },
+  proText: { flex: 1, minWidth: 0 },
   proAvatar: {
     width: 44,
     height: 44,
@@ -605,32 +605,11 @@ const styles = StyleSheet.create({
   },
   proAvatarText: { fontSize: 20, fontWeight: '700', color: Stitch.colors.primary },
   proBrand: { fontSize: 12, fontWeight: '700', color: Stitch.colors.primary },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 2 },
   proName: { fontSize: 16, fontWeight: '600' },
-  online: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  online: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22c55e' },
   onlineText: { fontSize: 11, fontWeight: '700', color: Stitch.colors.primary, letterSpacing: 1 },
-  notifBtn: { marginLeft: 4, position: 'relative' },
-  badge: {
-    position: 'absolute',
-    top: -6,
-    right: -8,
-    backgroundColor: Stitch.colors.gradientEnd,
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  notifBanner: {
-    marginHorizontal: 24,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  notifText: { flex: 1, fontSize: 13, color: Stitch.colors.onBackground },
   earnRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

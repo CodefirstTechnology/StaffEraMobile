@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
 import { Badge } from '../components/ui/Badge'
+import { VerifiedBadge } from '../components/ui/VerifiedBadge'
 import { Button } from '../components/ui/Button'
 import { SetPasswordModal } from '../components/SetPasswordModal'
 import { CredentialsBanner } from '../components/CredentialsBanner'
@@ -120,7 +121,12 @@ export default function AppRegistrationList() {
               ) : (
                 rows.map((s) => (
                   <tr key={s.id} className="border-b">
-                    <td className="p-4 font-medium">{s.user.name}</td>
+                    <td className="p-4">
+                      <div className="flex flex-wrap items-center gap-2 font-medium">
+                        {s.user.name}
+                        {s.verificationStatus === 'VERIFIED' ? <VerifiedBadge /> : null}
+                      </div>
+                    </td>
                     <td className="p-4">{s.user.email}</td>
                     <td className="p-4">{s.user.phone || '—'}</td>
                     <td className="p-4">

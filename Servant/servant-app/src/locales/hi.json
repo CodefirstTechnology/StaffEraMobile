@@ -52,7 +52,8 @@
     "profile": "प्रोफ़ाइल",
     "schedule": "शेड्यूल",
     "time": "समय",
-    "earnings": "कमाई"
+    "earnings": "कमाई",
+    "notifications": "सूचनाएँ"
   },
   "auth": {
     "trustedSubtitle": "आपके परिवार के लिए विश्वसनीय घरेलू सहायता",
@@ -141,6 +142,7 @@
     "VERIFIED": "सत्यापित"
   },
   "verification": {
+    "verified": "सत्यापित",
     "verifiedHelper": "सत्यापित सहायक",
     "pending": "सत्यापन लंबित",
     "underReview": "समीक्षा में",

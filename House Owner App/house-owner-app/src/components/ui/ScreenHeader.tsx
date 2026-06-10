@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
+import { NotificationBell } from '@/components/ui/NotificationBell';
 
 type Props = {
   locationLabel?: string;
@@ -55,16 +56,7 @@ export function ScreenHeader({
         )}
         <View style={styles.actions}>
           {onNotifications ? (
-            <Pressable onPress={onNotifications} style={styles.avatar}>
-              <MaterialIcons name="notifications" size={22} color={Stitch.colors.primary} />
-              {unreadNotifications > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
+            <NotificationBell unread={unreadNotifications} onPress={onNotifications} />
           ) : null}
           {title ? (
             <Text style={styles.brand}>{title}</Text>
@@ -102,7 +94,7 @@ const styles = StyleSheet.create({
   locLabel: { ...Stitch.typography.caption, color: Stitch.colors.onSurfaceVariant },
   locValue: { ...Stitch.typography.label, color: Stitch.colors.onBackground },
   brand: { ...Stitch.typography.headline, color: Stitch.colors.primary },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
   avatar: {
     width: 40,
     height: 40,
@@ -113,17 +105,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Stitch.colors.outlineVariant,
   },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: Stitch.colors.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });

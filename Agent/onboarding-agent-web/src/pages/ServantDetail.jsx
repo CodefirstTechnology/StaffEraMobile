@@ -9,6 +9,7 @@ import {
   printOnboardingReport,
 } from '../lib/onboardingReport'
 import { Badge } from '../components/ui/Badge'
+import { VerifiedBadge } from '../components/ui/VerifiedBadge'
 import { LocationIcon } from '../components/icons/LocationIcon'
 import { SourceBadge } from '../components/ui/SourceBadge'
 import { Button } from '../components/ui/Button'
@@ -208,7 +209,11 @@ export default function ServantDetail() {
                 <h1 className="text-2xl font-bold text-primary sm:text-3xl">
                   {servant.user.name}
                 </h1>
-                <Badge status={servant.verificationStatus} />
+                {servant.verificationStatus === 'VERIFIED' ? (
+                  <VerifiedBadge size="md" />
+                ) : (
+                  <Badge status={servant.verificationStatus} />
+                )}
                 <SourceBadge source={servant.registrationSource} />
               </div>
               <p
@@ -436,7 +441,11 @@ export default function ServantDetail() {
           <section className="glass-card p-6">
             <h3 className="text-lg font-semibold text-primary">Verification</h3>
             <div className="mt-4 space-y-3">
-              <Badge status={servant.verificationStatus} />
+              {servant.verificationStatus === 'VERIFIED' ? (
+                <VerifiedBadge size="md" />
+              ) : (
+                <Badge status={servant.verificationStatus} />
+              )}
               {servant.verifiedAt && (
                 <p className="text-sm text-on-surface-variant">
                   Verified on{' '}

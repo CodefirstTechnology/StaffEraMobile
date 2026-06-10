@@ -16,8 +16,8 @@
   --color-on-surface-variant: #464652;
   --color-outline-variant: #c7c5d4;
   --color-error: #ba1a1a;
-  --gradient-start: #662d8c;
-  --gradient-end: #ed1e79;
+  --gradient-start: #ed1e79;
+  --gradient-end: #662d8c;
   --font-sans: "Inter", system-ui, sans-serif;
   --radius-xl: 1.5rem;
   --shadow-card: 0 4px 30px rgba(46, 49, 146, 0.08);

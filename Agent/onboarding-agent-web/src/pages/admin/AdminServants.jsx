@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '../../lib/api'
 import { Badge } from '../../components/ui/Badge'
+import { VerifiedBadge } from '../../components/ui/VerifiedBadge'
 
 export default function AdminServants() {
   const [status, setStatus] = useState('')
@@ -46,9 +47,12 @@ export default function AdminServants() {
             {(data || []).map((s) => (
               <tr key={s.id} className="border-b">
                 <td className="p-4">
-                  <Link to={`/servants/${s.id}`} className="text-primary">
-                    {s.user.name}
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link to={`/servants/${s.id}`} className="text-primary">
+                      {s.user.name}
+                    </Link>
+                    {s.verificationStatus === 'VERIFIED' ? <VerifiedBadge /> : null}
+                  </div>
                 </td>
                 <td className="p-4">{s.agent?.user?.name || '—'}</td>
                 <td className="p-4">

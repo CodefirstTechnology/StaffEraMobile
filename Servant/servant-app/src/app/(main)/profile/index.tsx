@@ -11,6 +11,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import { translateVerification } from '@/lib/i18n';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { formatCurrency } from '@/lib/i18n/format';
 import { formatSkillLabel } from '@/lib/skills';
 
@@ -70,7 +71,7 @@ export default function ProfileScreen() {
           </View>
           {verification === 'VERIFIED' ? (
             <View style={styles.verifiedBadge}>
-              <MaterialIcons name="verified" size={14} color={Stitch.colors.success} />
+              <MaterialIcons name="verified" size={16} color="#1D9BF0" />
             </View>
           ) : null}
         </View>
@@ -80,11 +81,15 @@ export default function ProfileScreen() {
         </Text>
         <Text style={styles.heroBrand}>{t('common.appNamePro')}</Text>
 
-        <View style={[styles.verifyPill, { backgroundColor: verifyStyle.bg }]}>
-          <Text style={[styles.verifyText, { color: verifyStyle.text }]}>
-            {translateVerification(verification)}
-          </Text>
-        </View>
+        {verification === 'VERIFIED' ? (
+          <VerifiedBadge size="md" />
+        ) : (
+          <View style={[styles.verifyPill, { backgroundColor: verifyStyle.bg }]}>
+            <Text style={[styles.verifyText, { color: verifyStyle.text }]}>
+              {translateVerification(verification)}
+            </Text>
+          </View>
+        )}
 
         {email ? (
           <View style={styles.metaRow}>
@@ -258,7 +263,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: Stitch.colors.primary,
+    borderColor: '#1D9BF0',
   },
   heroName: {
     fontSize: 22,

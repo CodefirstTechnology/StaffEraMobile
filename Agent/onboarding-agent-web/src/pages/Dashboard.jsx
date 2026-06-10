@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import api from '../lib/api'
+import { VerifiedBadge } from '../components/ui/VerifiedBadge'
 
 const formatRupee = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`
 
@@ -207,7 +208,12 @@ export default function Dashboard() {
             ) : (
               pendingApp.slice(0, 8).map((s) => (
                 <tr key={s.id} className="border-t border-outline-variant/30">
-                  <td className="p-4 font-medium">{s.user.name}</td>
+                  <td className="p-4">
+                    <div className="flex flex-wrap items-center gap-2 font-medium">
+                      {s.user.name}
+                      {s.verificationStatus === 'VERIFIED' ? <VerifiedBadge /> : null}
+                    </div>
+                  </td>
                   <td className="p-4">{s.user.email}</td>
                   <td className="p-4">
                     {s.user.agentSetPassword ? (

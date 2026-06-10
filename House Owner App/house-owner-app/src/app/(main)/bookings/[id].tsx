@@ -16,6 +16,7 @@ import { formatVisitAddressLines } from '@/lib/visitAddress';
 import { localizedSkillLabel } from '@/lib/skills';
 import { useSkills } from '@/hooks/useSkills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 
 export default function BookingDetailScreen() {
   const { t } = useTranslation();
@@ -129,9 +130,15 @@ export default function BookingDetailScreen() {
         ← {t('common.back')}
       </Text>
       <GlassCard>
-        <Text style={styles.name}>
-          {booking.servant?.user?.name || t('bookings.findingHelper')}
-        </Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>
+            {booking.servant?.user?.name || t('bookings.findingHelper')}
+          </Text>
+          {booking.servant &&
+          (booking.servant.verificationStatus === 'VERIFIED' || !booking.servant.verificationStatus) ? (
+            <VerifiedBadge size="md" />
+          ) : null}
+        </View>
         <StatusPill status={booking.status} />
         <Text style={styles.hint}>{statusHint[booking.status] || ''}</Text>
         <Text style={styles.row}>{t('bookings.typeLabel', { type: visitType })}</Text>
@@ -210,7 +217,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   muted: { color: Stitch.colors.onSurfaceVariant },
   back: { color: Stitch.colors.primary, fontWeight: '600', marginBottom: 16 },
-  name: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 8,
+  },
+  name: { fontSize: 22, fontWeight: '700' },
   hint: { marginTop: 12, color: Stitch.colors.onSurfaceVariant, lineHeight: 20 },
   row: { marginTop: 8, color: Stitch.colors.onBackground },
   helpers: { marginTop: 10, fontSize: 13, color: Stitch.colors.secondary, lineHeight: 18 },

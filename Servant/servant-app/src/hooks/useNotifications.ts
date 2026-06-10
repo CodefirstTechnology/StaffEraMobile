@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 
 export type AppNotification = {
   id: number;
@@ -12,12 +13,15 @@ export type AppNotification = {
 };
 
 export function useNotifications() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
   return useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
       const res = await api.get('/notifications');
       return res.data.data.notifications as AppNotification[];
     },
-    refetchInterval: 15000,
+    enabled: isAuthenticated,
+    refetchInterval: isAuthenticated ? 15000 : false,
   });
 }

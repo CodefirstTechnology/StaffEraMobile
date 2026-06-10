@@ -8,6 +8,7 @@ import { formatSessionSlotsLabel } from '@/lib/timeSlots';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatDateShort, formatCurrency } from '@/lib/i18n/format';
 import i18n from '@/lib/i18n';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 
 export type BookingSummary = {
   id: number;
@@ -19,7 +20,7 @@ export type BookingSummary = {
   sessionEndTime?: string | null;
   sessionSlots?: string | null;
   createdAt?: string;
-  servant?: { user: { name: string } } | null;
+  servant?: { user: { name: string }; verificationStatus?: string } | null;
   totalAmount?: number | null;
   address?: string | null;
 };
@@ -73,9 +74,16 @@ export function BookingSummaryCard({
             />
           </View>
           <View style={styles.body}>
-            <Text style={styles.helperName} numberOfLines={1}>
-              {helperName || t('common.waitingHelper')}
-            </Text>
+            <View style={styles.helperNameRow}>
+              <Text style={styles.helperName} numberOfLines={1}>
+                {helperName || t('common.waitingHelper')}
+              </Text>
+              {helperName &&
+              (booking.servant?.verificationStatus === 'VERIFIED' ||
+                !booking.servant?.verificationStatus) ? (
+                <VerifiedBadge />
+              ) : null}
+            </View>
             <Text style={styles.meta}>
               {[category, visitType].filter(Boolean).join(' · ')}
             </Text>
@@ -139,7 +147,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   body: { flex: 1, minWidth: 0, paddingRight: 4 },
-  helperName: { fontSize: 17, fontWeight: '700', color: Stitch.colors.onBackground },
+  helperNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, flexWrap: 'wrap' },
+  helperName: { fontSize: 17, fontWeight: '700', color: Stitch.colors.onBackground, flexShrink: 1 },
   meta: { fontSize: 13, color: Stitch.colors.onSurfaceVariant, marginTop: 3 },
   detailRow: {
     flexDirection: 'row',

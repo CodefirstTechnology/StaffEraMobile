@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import api from '../lib/api'
 import { uploadUrl } from '../lib/mediaUrl'
 import { Badge } from '../components/ui/Badge'
+import { VerifiedBadge } from '../components/ui/VerifiedBadge'
 import { Button } from '../components/ui/Button'
 
 const CATEGORY_OPTIONS = [
@@ -123,12 +124,15 @@ export default function ServantList() {
                     )}
                   </td>
                   <td className="p-4">
-                    <Link
-                      to={`/servants/${s.id}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {s.user.name}
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        to={`/servants/${s.id}`}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {s.user.name}
+                      </Link>
+                      {s.verificationStatus === 'VERIFIED' ? <VerifiedBadge /> : null}
+                    </div>
                   </td>
                   <td className="p-4">{s.user.phone || '—'}</td>
                   <td className="p-4">
