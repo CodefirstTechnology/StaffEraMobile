@@ -22,6 +22,7 @@ import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { NotificationBell } from '@/components/ui/NotificationBell';
+import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
 import {
   stopPendingRequestVibration,
   syncPendingRequestVibration,
@@ -48,6 +49,8 @@ type Booking = {
   totalAmount?: number | null;
   updatedAt?: string;
   houseOwner: { user: { name: string } };
+  pendingWorkOtp?: boolean;
+  workOtpExpiresAt?: string | null;
 };
 
 export default function ServantHomeScreen() {
@@ -74,14 +77,21 @@ export default function ServantHomeScreen() {
       qc.invalidateQueries({ queryKey: ['schedule'] }),
     ]);
 
-  const { data: bookings, refetch: refetchBookings } = useQuery({
+  const {
+    data: bookings,
+    refetch: refetchBookings,
+    isLoading: bookingsLoading,
+    isError: bookingsError,
+  } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
       const res = await api.get('/bookings');
       return res.data.data.bookings as Booking[];
     },
     enabled: isAuthenticated,
-    refetchInterval: isAuthenticated ? 20000 : false,
+    staleTime: 5000,
+    refetchInterval: isAuthenticated ? 12000 : false,
+    refetchOnMount: 'always',
   });
 
   const { data: profile } = useQuery({
@@ -107,7 +117,7 @@ export default function ServantHomeScreen() {
       return res.data.data.requests as Booking[];
     },
     enabled: isAuthenticated,
-    refetchInterval: isAuthenticated ? 15000 : false,
+    refetchInterval: isAuthenticated ? 12000 : false,
   });
 
   const { data: notifications } = useNotifications();
@@ -140,16 +150,6 @@ export default function ServantHomeScreen() {
     enabled: isAuthenticated,
     refetchInterval: isAuthenticated ? 20000 : false,
   });
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const timer = setInterval(() => {
-      refetchBookings();
-      refetchToday();
-      qc.invalidateQueries({ queryKey: ['time-month'] });
-    }, 30000);
-    return () => clearInterval(timer);
-  }, [isAuthenticated, refetchBookings, refetchToday]);
 
   useEffect(() => {
     const open = today?.entries?.find((e) => !e.clockOut);
@@ -185,20 +185,24 @@ export default function ServantHomeScreen() {
     return err.response?.data?.message || fallback;
   };
 
-  const clockIn = async (bookingId: number) => {
+  const markArrived = async (bookingId: number) => {
     try {
-      await api.post('/time/clock-in', { bookingId });
+      await api.patch(`/bookings/${bookingId}/arrived`);
       setOnWayBookingId(null);
-      setActiveBookingId(bookingId);
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['time-today'] }),
-        qc.invalidateQueries({ queryKey: ['time-month'] }),
-        qc.invalidateQueries({ queryKey: ['bookings'] }),
-      ]);
-      Alert.alert(t('servantHome.workStarted'), t('servantHome.onDutyAtCustomer'));
+      await refreshBookings();
+      Alert.alert(t('workOtp.requestedTitle'), t('workOtp.requestedBody'));
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotStart'), apiError(e, t('servantHome.checkConfirmed')));
     }
+  };
+
+  const onWorkOtpVerified = async (bookingId: number) => {
+    setActiveBookingId(bookingId);
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['time-today'] }),
+      qc.invalidateQueries({ queryKey: ['time-month'] }),
+      qc.invalidateQueries({ queryKey: ['bookings'] }),
+    ]);
   };
 
   const clockOut = async () => {
@@ -505,7 +509,18 @@ export default function ServantHomeScreen() {
       )}
 
       <Text style={styles.section}>{t('servantHome.todayJobsSection')}</Text>
-      {todayJobs.length === 0 ? (
+      {bookingsLoading && !bookings ? (
+        <GlassCard>
+          <Text style={styles.empty}>{t('common.loading')}</Text>
+        </GlassCard>
+      ) : bookingsError ? (
+        <GlassCard>
+          <Text style={styles.empty}>{t('servantHome.bookingsLoadFailed')}</Text>
+          <TouchableOpacity onPress={() => refetchBookings()} style={{ marginTop: 8 }}>
+            <Text style={styles.retry}>{t('common.retry')}</Text>
+          </TouchableOpacity>
+        </GlassCard>
+      ) : todayJobs.length === 0 ? (
         <GlassCard>
           <Text style={styles.empty}>{t('servantHome.noConfirmedJobs')}</Text>
         </GlassCard>
@@ -572,11 +587,20 @@ export default function ServantHomeScreen() {
                         : t('servantHome.onMyWayShare')}
                     </Text>
                   </TouchableOpacity>
-                  <GradientButton
-                    title={t('servantHome.arrivedStartWork')}
-                    onPress={() => clockIn(b.id)}
-                    style={{ marginTop: 12 }}
-                  />
+                  {b.pendingWorkOtp ? (
+                    <WorkStartOtpPanel
+                      bookingId={b.id}
+                      expiresAt={b.workOtpExpiresAt}
+                      onVerified={() => onWorkOtpVerified(b.id)}
+                      onResend={() => refreshBookings()}
+                    />
+                  ) : (
+                    <GradientButton
+                      title={t('workOtp.requestOtp')}
+                      onPress={() => markArrived(b.id)}
+                      style={{ marginTop: 12 }}
+                    />
+                  )}
                 </>
               )}
               {isActive && activeEntry && (
@@ -749,5 +773,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   empty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant },
+  retry: { textAlign: 'center', color: Stitch.colors.primary, fontWeight: '600' },
   onDuty: { marginTop: 10, color: Stitch.colors.success, fontWeight: '600' },
 });

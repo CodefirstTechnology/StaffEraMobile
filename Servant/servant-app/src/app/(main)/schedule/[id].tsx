@@ -21,6 +21,7 @@ import {
   syncPendingRequestVibration,
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
+import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
 
 export default function ScheduleDetailScreen() {
   const { t } = useTranslation();
@@ -108,19 +109,26 @@ export default function ScheduleDetailScreen() {
     }
   };
 
-  const clockIn = async () => {
+  const markArrived = async () => {
     try {
-      await api.post('/time/clock-in', { bookingId });
+      await api.patch(`/bookings/${id}/arrived`);
       setSharingLocation(false);
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['time-today'] }),
         qc.invalidateQueries({ queryKey: ['booking', id] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
       ]);
-      Alert.alert(t('servantHome.workStarted'), t('servantHome.onDutyAtCustomer'));
+      Alert.alert(t('workOtp.requestedTitle'), t('workOtp.requestedBody'));
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotStart'), apiError(e, t('servantHome.checkConfirmed')));
     }
+  };
+
+  const onWorkOtpVerified = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['time-today'] }),
+      qc.invalidateQueries({ queryKey: ['booking', id] }),
+      qc.invalidateQueries({ queryKey: ['bookings'] }),
+    ]);
   };
 
   if (isLoading || !booking) {
@@ -229,11 +237,20 @@ export default function ScheduleDetailScreen() {
                     : t('servantHome.onMyWayShare')}
                 </Text>
               </TouchableOpacity>
-              <GradientButton
-                title={t('servantHome.arrivedStartWork')}
-                onPress={clockIn}
-                style={{ marginTop: 12 }}
-              />
+              {booking.pendingWorkOtp ? (
+                <WorkStartOtpPanel
+                  bookingId={bookingId!}
+                  expiresAt={booking.workOtpExpiresAt}
+                  onVerified={onWorkOtpVerified}
+                  onResend={() => qc.invalidateQueries({ queryKey: ['booking', id] })}
+                />
+              ) : (
+                <GradientButton
+                  title={t('workOtp.requestOtp')}
+                  onPress={markArrived}
+                  style={{ marginTop: 12 }}
+                />
+              )}
             </>
           )}
           {clockedInHere && (

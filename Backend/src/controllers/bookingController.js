@@ -1,8 +1,21 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
-const { checkBookingConflict, parseJsonArray, expireStaleSessionBookings, isSessionPast, computeBookingEarnings } = require("../services/bookingService");
+const {
+  checkBookingConflict,
+  parseJsonArray,
+  expireStaleSessionBookings,
+  isSessionPast,
+  computeBookingEarnings,
+  normalizeBookingRow
+} = require("../services/bookingService");
 const { createNotification } = require("../services/notificationService");
+const {
+  issueWorkStartOtp,
+  verifyWorkStartOtp,
+  attachWorkOtpFields,
+  hasPendingWorkOtp
+} = require("../services/workStartOtpService");
 const {
   findServantsNearLocation,
   servantCoversLocation,
@@ -268,7 +281,8 @@ exports.listBookings = async (req, res) => {
     orderBy: { createdAt: "desc" }
   });
 
-  sendSuccess(res, { bookings });
+  const enriched = await attachWorkOtpFields(bookings, req.user.role);
+  sendSuccess(res, { bookings: enriched.map(normalizeBookingRow) });
 };
 
 exports.listOpenRequests = async (req, res) => {
@@ -309,7 +323,8 @@ exports.getBooking = async (req, res) => {
   if (!booking) throw new ApiError(404, "Booking not found");
   await assertBookingAccess(req, booking);
 
-  sendSuccess(res, { booking });
+  const [enriched] = await attachWorkOtpFields([booking], req.user.role);
+  sendSuccess(res, { booking: normalizeBookingRow(enriched) });
 };
 
 const assertBookingAccess = async (req, booking) => {
@@ -669,4 +684,124 @@ exports.updateBookingTracking = async (req, res) => {
   }
 
   sendSuccess(res, trackingPayload(updated));
+};
+
+const getServantForUser = async (userId) => {
+  const servant = await prisma.servant.findUnique({
+    where: { userId },
+    include: { user: { select: { id: true, name: true } } }
+  });
+  if (!servant) throw new ApiError(403, "Servant profile required");
+  return servant;
+};
+
+exports.markArrived = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const booking = await loadBooking(id);
+
+  if (!booking) throw new ApiError(404, "Booking not found");
+  if (booking.status !== "CONFIRMED") {
+    throw new ApiError(400, "Booking must be confirmed before starting work");
+  }
+
+  const servant = await getServantForUser(req.user.id);
+  if (booking.servantId !== servant.id) {
+    throw new ApiError(403, "Not your booking");
+  }
+
+  const openEntry = await prisma.timeEntry.findFirst({
+    where: { servantId: servant.id, clockOut: null }
+  });
+  if (openEntry) {
+    throw new ApiError(400, "Already working on a job. Finish it first.");
+  }
+
+  const { expiresAt } = await issueWorkStartOtp({
+    booking,
+    servantUser: servant.user,
+    ownerUserId: booking.houseOwner.userId
+  });
+
+  const refreshed = await prisma.booking.findUnique({
+    where: { id },
+    include: bookingInclude
+  });
+  const [enriched] = await attachWorkOtpFields([refreshed], "SERVANT");
+
+  sendSuccess(res, {
+    booking: enriched,
+    message: "OTP sent to home owner. Ask them for the 4-digit code.",
+    otpExpiresAt: expiresAt.toISOString()
+  });
+};
+
+exports.resendWorkOtp = async (req, res) => {
+  return exports.markArrived(req, res);
+};
+
+exports.verifyWorkOtp = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { otp } = req.body;
+
+  const booking = await loadBooking(id);
+  if (!booking) throw new ApiError(404, "Booking not found");
+  if (booking.status !== "CONFIRMED") {
+    throw new ApiError(400, "Work OTP is only needed for confirmed bookings");
+  }
+
+  const servant = await getServantForUser(req.user.id);
+  if (booking.servantId !== servant.id) {
+    throw new ApiError(403, "Not your booking");
+  }
+
+  const openEntry = await prisma.timeEntry.findFirst({
+    where: { servantId: servant.id, clockOut: null }
+  });
+  if (openEntry) {
+    throw new ApiError(400, "Already clocked in");
+  }
+
+  const pending = await hasPendingWorkOtp(id);
+  if (!pending) {
+    throw new ApiError(400, "No active OTP. Tap I arrived to request a new code.");
+  }
+
+  await verifyWorkStartOtp({ bookingId: id, otpInput: otp });
+
+  const now = new Date();
+  const entry = await prisma.$transaction(async (tx) => {
+    const e = await tx.timeEntry.create({
+      data: {
+        bookingId: id,
+        servantId: servant.id,
+        clockIn: now,
+        date: now
+      }
+    });
+
+    await tx.booking.update({
+      where: { id },
+      data: { status: "ACTIVE", workStartedAt: now }
+    });
+
+    return e;
+  });
+
+  if (booking.houseOwner?.userId) {
+    await createNotification({
+      userId: booking.houseOwner.userId,
+      title: "Helper has arrived",
+      body: `${servant.user?.name || "Your helper"} started work at your location`,
+      type: "BOOKING_ACTIVE",
+      data: { bookingId: id }
+    });
+  }
+
+  const refreshed = await prisma.booking.findUnique({
+    where: { id },
+    include: bookingInclude
+  });
+  const [enriched] = await attachWorkOtpFields([refreshed], "SERVANT");
+
+  sendSuccess(res, { booking: enriched, entry, message: "OTP verified. Work started." });
 };

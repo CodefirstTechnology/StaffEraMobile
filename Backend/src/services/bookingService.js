@@ -4,6 +4,15 @@ const ApiError = require("../utils/ApiError");
 /** Block new bookings when these already occupy the servant's schedule. */
 const BLOCKING_STATUSES = ["PENDING", "CONFIRMED", "ACTIVE"];
 
+/** Map legacy DB statuses so list queries never crash the Prisma client. */
+const normalizeBookingStatus = (status) => {
+  if (status === "OTP_PENDING" || status === "ARRIVED") return "CONFIRMED";
+  return status;
+};
+
+const normalizeBookingRow = (booking) =>
+  booking ? { ...booking, status: normalizeBookingStatus(booking.status) } : booking;
+
 const parseJsonArray = (value) => {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -291,5 +300,7 @@ module.exports = {
   isSessionPast,
   computeBookingEarnings,
   expireStaleSessionBookings,
+  normalizeBookingStatus,
+  normalizeBookingRow,
   BLOCKING_STATUSES
 };

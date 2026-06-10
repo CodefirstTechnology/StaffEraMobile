@@ -32,6 +32,8 @@ enum BookingStatus {
   CANCELLED
   REJECTED
   EXPIRED
+  OTP_PENDING
+  ARRIVED
 }
 
 model Role {
@@ -220,8 +222,27 @@ model Booking {
 
   timeEntries      TimeEntry[]
   review           Review?
+  workStartedAt    DateTime?
+  workStartOtps    BookingWorkStartOtp[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+}
+
+model BookingWorkStartOtp {
+  id         Int       @id @default(autoincrement())
+  bookingId  Int
+  booking    Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  code       String
+  otpHash    String
+  expiresAt  DateTime
+  sentAt     DateTime  @default(now())
+  attempts   Int       @default(0)
+  verifiedAt DateTime?
+  used       Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([bookingId, verifiedAt])
 }
 
 model TimeEntry {

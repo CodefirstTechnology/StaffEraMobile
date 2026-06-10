@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const { createNotification } = require("../services/notificationService");
+const { hasPendingWorkOtp } = require("../services/workStartOtpService");
 const { computeBookingEarnings, isSessionPast, expireStaleSessionBookings } = require("../services/bookingService");
 
 const getMonthBounds = (ref = new Date()) => {
@@ -40,6 +41,14 @@ exports.clockIn = async (req, res) => {
   }
   if (!["CONFIRMED", "ACTIVE"].includes(booking.status)) {
     throw new ApiError(400, "Booking must be confirmed or active to clock in");
+  }
+
+  if (booking.status === "CONFIRMED") {
+    const pending = await hasPendingWorkOtp(bookingId);
+    if (pending) {
+      throw new ApiError(400, "Enter the 4-digit OTP from the home owner to start work");
+    }
+    throw new ApiError(400, "Tap I arrived to get an OTP from the home owner first");
   }
 
   const openEntry = await prisma.timeEntry.findFirst({

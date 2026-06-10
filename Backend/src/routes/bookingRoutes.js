@@ -7,7 +7,8 @@ const {
   createBookingSchema,
   reviewSchema,
   rejectBookingSchema,
-  updateTrackingSchema
+  updateTrackingSchema,
+  verifyWorkOtpSchema
 } = require("../validators/bookingValidator");
 
 router.post(
@@ -45,6 +46,25 @@ router.patch(
   requireRole("SERVANT"),
   validate(rejectBookingSchema),
   bookingController.rejectBooking
+);
+router.patch(
+  "/:id/arrived",
+  authenticate,
+  requireRole("SERVANT"),
+  bookingController.markArrived
+);
+router.post(
+  "/:id/verify-work-otp",
+  authenticate,
+  requireRole("SERVANT"),
+  validate(verifyWorkOtpSchema),
+  bookingController.verifyWorkOtp
+);
+router.post(
+  "/:id/resend-work-otp",
+  authenticate,
+  requireRole("SERVANT"),
+  bookingController.resendWorkOtp
 );
 router.patch(
   "/:id/cancel",

@@ -352,6 +352,25 @@
     "aboutYou": "तुमच्याबद्दल",
     "serviceZonesSub": "या परिसरातील ग्राहक तुमच्या विनंत्या पाहतात"
   },
+  "workOtp": {
+    "requestOtp": "पोहोचलो — OTP मिळवा",
+    "title": "गृहमालकाचा OTP टाका",
+    "sub": "ग्राहकाकडून 4 अंकी कोड विचारा (त्यांच्या होम स्क्रीनवर दिसतो).",
+    "placeholder": "4 अंकी OTP",
+    "verifyStart": "पडताळा आणि काम सुरू करा",
+    "resend": "ग्राहकाला OTP पुन्हा पाठवा",
+    "resending": "पाठवत आहे…",
+    "expiresHint": "कोड 5 मिनिटात संपतो",
+    "requestedTitle": "OTP पाठवला",
+    "requestedBody": "गृहमालकाला अॅपवर OTP मिळाला. कोड विचारा.",
+    "successTitle": "काम सुरू",
+    "successBody": "OTP पडताळला. तुम्ही ड्युटीवर आहात.",
+    "failedTitle": "पडताळणी अयशस्वी",
+    "invalidTitle": "चुकीचा OTP",
+    "invalidBody": "गृहमालकाचा 4 अंकी कोड टाका.",
+    "resentTitle": "नवीन OTP पाठवला",
+    "resentBody": "गृहमालकाला नवीन कोड पाठवला."
+  },
   "pushNotifications": {
     "BOOKING_CREATED": {
       "title": "नवीन बुकिंग विनंती",
@@ -377,6 +396,14 @@
     "SERVANT_VERIFIED": {
       "title": "तुम्ही सत्यापित आहात",
       "body": "प्रोफाइल सत्यापित — नोकऱ्या स्वीकारू शकता"
+    },
+    "WORK_START_OTP": {
+      "title": "काम सुरू OTP",
+      "body": "काम सुरू करण्यासाठी सहाय्यकाला OTP द्या"
+    },
+    "BOOKING_ACTIVE": {
+      "title": "सहाय्यक आला",
+      "body": "सहाय्यकाने काम सुरू केले"
     }
   },
   "servantHome": {

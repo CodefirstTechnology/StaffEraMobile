@@ -86,9 +86,16 @@ const updateTrackingSchema = z.object({
   })
 });
 
+const verifyWorkOtpSchema = z.object({
+  body: z.object({
+    otp: z.string().regex(/^\d{4}$/, "OTP must be 4 digits")
+  })
+});
+
 module.exports = {
   createBookingSchema,
   reviewSchema,
   rejectBookingSchema,
-  updateTrackingSchema
+  updateTrackingSchema,
+  verifyWorkOtpSchema
 };

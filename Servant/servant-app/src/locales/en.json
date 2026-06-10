@@ -291,6 +291,7 @@
     "newRequestsSection": "New requests — accept or decline",
     "todayJobsSection": "Today's jobs",
     "noConfirmedJobs": "No confirmed jobs — stay online for new requests",
+    "bookingsLoadFailed": "Could not load your jobs. Check backend is running and try again.",
     "addressOnFile": "Address on file",
     "locationShared": "Location shared with customer",
     "tapDirections": "Tap directions to navigate",
@@ -444,6 +445,25 @@
     "aboutYou": "About you",
     "serviceZonesSub": "Customers near these areas see your open requests"
   },
+  "workOtp": {
+    "requestOtp": "I arrived — get OTP",
+    "title": "Enter home owner OTP",
+    "sub": "Ask the customer for the 4-digit code shown on their home screen.",
+    "placeholder": "4-digit OTP",
+    "verifyStart": "Verify & start work",
+    "resend": "Resend OTP to customer",
+    "resending": "Sending…",
+    "expiresHint": "Code expires in 5 minutes",
+    "requestedTitle": "OTP sent",
+    "requestedBody": "The home owner received your OTP on their app. Ask them for the code.",
+    "successTitle": "Work started",
+    "successBody": "OTP verified. You are on duty.",
+    "failedTitle": "Could not verify",
+    "invalidTitle": "Invalid OTP",
+    "invalidBody": "Enter the 4-digit code from the home owner.",
+    "resentTitle": "New OTP sent",
+    "resentBody": "A new code was sent to the home owner."
+  },
   "pushNotifications": {
     "BOOKING_CREATED": {
       "title": "New booking request",
@@ -469,6 +489,14 @@
     "SERVANT_VERIFIED": {
       "title": "You are verified",
       "body": "Your profile is verified — you can accept jobs"
+    },
+    "WORK_START_OTP": {
+      "title": "Work start OTP",
+      "body": "Share OTP with your helper to start work"
+    },
+    "BOOKING_ACTIVE": {
+      "title": "Helper has arrived",
+      "body": "Your helper started work at your location"
     }
   }
 }

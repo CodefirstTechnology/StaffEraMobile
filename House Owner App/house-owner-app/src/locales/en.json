@@ -420,6 +420,12 @@
     "aboutYou": "About you",
     "serviceZonesSub": "Customers near these areas see your open requests"
   },
+  "workOtp": {
+    "homeKicker": "Work start code",
+    "homeTitle": "Share this OTP with your helper",
+    "homeHelper": "{{name}} is ready to start",
+    "homeHint": "Tell them this 4-digit code so they can begin work. Expires in 5 minutes."
+  },
   "pushNotifications": {
     "BOOKING_CREATED": {
       "title": "New booking request",
@@ -445,6 +451,19 @@
     "SERVANT_VERIFIED": {
       "title": "You are verified",
       "body": "Your profile is verified — you can accept jobs"
+    },
+    "WORK_START_OTP": {
+      "title": "Work start OTP",
+      "body": "Share this code with your helper",
+      "bodyWithOtp": "OTP {{otp}} — share with {{name}} to start work"
+    },
+    "BOOKING_ACTIVE": {
+      "title": "Work started",
+      "body": "Your helper verified the OTP and started work"
+    },
+    "HELPER_ON_WAY": {
+      "title": "Helper is on the way",
+      "body": "Your helper is sharing live location"
     }
   }
 }

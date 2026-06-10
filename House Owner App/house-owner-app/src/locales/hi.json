@@ -383,6 +383,12 @@
     "aboutYou": "आपके बारे में",
     "serviceZonesSub": "इन इलाकों के पास ग्राहक आपके अनुरोध देखते हैं"
   },
+  "workOtp": {
+    "homeKicker": "काम शुरू कोड",
+    "homeTitle": "यह OTP सहायक को बताएं",
+    "homeHelper": "{{name}} काम शुरू करने को तैयार",
+    "homeHint": "4 अंकों का कोड बताएं। 5 मिनट में समाप्त।"
+  },
   "pushNotifications": {
     "BOOKING_CREATED": {
       "title": "नई बुकिंग अनुरोध",
@@ -408,6 +414,15 @@
     "SERVANT_VERIFIED": {
       "title": "आप सत्यापित हैं",
       "body": "प्रोफ़ाइल सत्यापित — नौकरियाँ स्वीकार कर सकते हैं"
+    },
+    "WORK_START_OTP": {
+      "title": "काम शुरू OTP",
+      "body": "यह कोड सहायक को बताएं",
+      "bodyWithOtp": "OTP {{otp}} — {{name}} को काम शुरू करने के लिए दें"
+    },
+    "BOOKING_ACTIVE": {
+      "title": "काम शुरू",
+      "body": "सहायक ने OTP सत्यापित कर काम शुरू किया"
     }
   }
 }

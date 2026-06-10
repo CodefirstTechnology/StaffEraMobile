@@ -1,7 +1,7 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
-const { parseJsonArray } = require("../services/bookingService");
+const { parseJsonArray, normalizeBookingRow } = require("../services/bookingService");
 const {
   findServantsNearLocation,
   servantCoversLocation,
@@ -190,7 +190,10 @@ exports.getMySchedule = async (req, res) => {
     grouped[key].push(b);
   }
 
-  sendSuccess(res, { schedule: grouped, bookings });
+  sendSuccess(res, {
+    schedule: grouped,
+    bookings: bookings.map(normalizeBookingRow)
+  });
 };
 
 exports.getMyTimeEntries = async (req, res) => {

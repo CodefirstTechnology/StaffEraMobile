@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -9,33 +9,65 @@ import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 
+type ScheduleBooking = {
+  id: number;
+  status: string;
+  bookingType: string;
+  address?: string;
+  sessionDate?: string | null;
+  houseOwner: { user: { name: string } };
+};
+
+const SCHEDULE_STATUSES = new Set(['PENDING', 'CONFIRMED', 'ACTIVE']);
+
 export default function ScheduleScreen() {
   const { t } = useTranslation();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const { data } = useQuery({
-    queryKey: ['schedule'],
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ['bookings'],
     enabled: isAuthenticated,
+    staleTime: 5000,
+    refetchOnMount: 'always',
     queryFn: async () => {
-      const res = await api.get('/servants/me/schedule');
-      return res.data.data.bookings as Array<{
-        id: number;
-        status: string;
-        bookingType: string;
-        address?: string;
-        houseOwner: { user: { name: string } };
-      }>;
+      const res = await api.get('/bookings');
+      return res.data.data.bookings as ScheduleBooking[];
     },
   });
 
+  const scheduleJobs = (data || [])
+    .filter((b) => SCHEDULE_STATUSES.has(b.status))
+    .sort((a, b) => {
+      const aTime = a.sessionDate ? new Date(a.sessionDate).getTime() : 0;
+      const bTime = b.sessionDate ? new Date(b.sessionDate).getTime() : 0;
+      return aTime - bTime;
+    });
+
+  const showLoader = isLoading && scheduleJobs.length === 0;
+
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.scroll}
+      refreshControl={
+        <RefreshControl
+          refreshing={isFetching && !isLoading}
+          onRefresh={() => refetch()}
+          tintColor={Stitch.colors.primary}
+        />
+      }
+    >
       <Text style={styles.title}>{t('schedule.title')}</Text>
-      {(data || []).length === 0 ? (
+      {showLoader ? (
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color={Stitch.colors.primary} />
+          <Text style={styles.empty}>{t('common.loading')}</Text>
+        </View>
+      ) : scheduleJobs.length === 0 ? (
         <GlassCard>
           <Text style={styles.empty}>{t('schedule.emptyCalendar')}</Text>
         </GlassCard>
       ) : (
-        (data || []).map((b) => (
+        scheduleJobs.map((b) => (
           <Pressable key={b.id} onPress={() => router.push(`/(main)/schedule/${b.id}`)}>
             <GlassCard style={styles.card}>
               <View style={styles.cardRow}>
@@ -70,4 +102,5 @@ const styles = StyleSheet.create({
   name: { fontSize: 17, fontWeight: '600' },
   meta: { color: Stitch.colors.onSurfaceVariant, marginVertical: 6 },
   empty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant },
+  loader: { alignItems: 'center', paddingVertical: 32, gap: 12 },
 });

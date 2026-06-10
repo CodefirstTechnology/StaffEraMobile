@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
 import {
   stopPendingRequestVibration,
@@ -12,32 +11,24 @@ type BookingRow = { id: number; status: string };
 /** Repeat vibration while open or direct pending booking requests need a response. */
 export function usePendingRequestVibration() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-
-  const { data: openRequests = [] } = useQuery({
-    queryKey: ['open-requests'],
-    queryFn: async () => {
-      const res = await api.get('/bookings/open-requests');
-      return res.data.data.requests as BookingRow[];
-    },
-    enabled: isAuthenticated,
-    refetchInterval: isAuthenticated ? 8000 : false,
-  });
-
-  const { data: bookings = [] } = useQuery({
-    queryKey: ['bookings'],
-    queryFn: async () => {
-      const res = await api.get('/bookings');
-      return res.data.data.bookings as BookingRow[];
-    },
-    enabled: isAuthenticated,
-    refetchInterval: isAuthenticated ? 8000 : false,
-  });
-
-  const pendingDirect = bookings.filter((b) => b.status === 'PENDING').length;
-  const hasPendingRequests = openRequests.length > 0 || pendingDirect > 0;
+  const qc = useQueryClient();
 
   useEffect(() => {
-    syncPendingRequestVibration(hasPendingRequests);
-    return () => stopPendingRequestVibration();
-  }, [hasPendingRequests]);
+    if (!isAuthenticated) return;
+
+    const evaluate = () => {
+      const openRequests =
+        qc.getQueryData<BookingRow[]>(['open-requests']) ?? [];
+      const bookings = qc.getQueryData<BookingRow[]>(['bookings']) ?? [];
+      const pendingDirect = bookings.filter((b) => b.status === 'PENDING').length;
+      syncPendingRequestVibration(openRequests.length > 0 || pendingDirect > 0);
+    };
+
+    evaluate();
+    const unsub = qc.getQueryCache().subscribe(evaluate);
+    return () => {
+      unsub();
+      stopPendingRequestVibration();
+    };
+  }, [isAuthenticated, qc]);
 }

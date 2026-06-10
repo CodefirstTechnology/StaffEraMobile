@@ -27,6 +27,13 @@ import {
   type BookingSummary,
 } from '@/components/bookings/BookingSummaryCard';
 import { formatVisitAddressLines } from '@/lib/visitAddress';
+import { WorkStartOtpCard } from '@/components/bookings/WorkStartOtpCard';
+
+type BookingWithOtp = BookingSummary & {
+  pendingWorkOtp?: boolean;
+  workStartOtp?: { code: string; expiresAt: string };
+  servant?: { user?: { name?: string } };
+};
 
 const SKILL_ICONS: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   CLEANING: 'cleaning-services',
@@ -91,10 +98,12 @@ export default function HomeScreen() {
       const res = await api.get('/bookings');
       return res.data.data.bookings as BookingSummary[];
     },
-    refetchInterval: 20000,
+    refetchInterval: 10000,
   });
 
-  const { active, recent } = splitBookings(bookings || []);
+  const bookingList = (bookings || []) as BookingWithOtp[];
+  const otpBooking = bookingList.find((b) => b.workStartOtp?.code);
+  const { active, recent } = splitBookings(bookingList);
   const homeActive = active.slice(0, 2);
   const homeRecent = recent.slice(0, 2);
   const hasBookings = homeActive.length > 0 || homeRecent.length > 0;
@@ -212,6 +221,13 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {otpBooking?.workStartOtp?.code ? (
+          <WorkStartOtpCard
+            code={otpBooking.workStartOtp.code}
+            helperName={otpBooking.servant?.user?.name}
+          />
+        ) : null}
 
         <View style={styles.bookingsHeader}>
           <Text style={styles.sectionTitle}>{t('home.yourBookings')}</Text>

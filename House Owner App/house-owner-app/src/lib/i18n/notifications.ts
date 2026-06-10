@@ -23,6 +23,17 @@ export function localizeNotification(n: NotificationPayload): { title: string; b
     return { title, body: i18n.t(`${base}.bodyNamed`, { name: helperName }) };
   }
 
+  if (n.type === 'WORK_START_OTP') {
+    const otp =
+      n.data && typeof n.data === 'object' && 'otp' in n.data ? String(n.data.otp) : '';
+    if (otp && i18n.exists(`${base}.bodyWithOtp`)) {
+      return {
+        title,
+        body: i18n.t(`${base}.bodyWithOtp`, { otp, name: helperName || '' }),
+      };
+    }
+  }
+
   const body = i18n.exists(`${base}.body`) ? i18n.t(`${base}.body`) : n.body;
   return { title, body };
 }
