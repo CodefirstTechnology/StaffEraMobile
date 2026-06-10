@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { GpsIcon, LocationIcon } from './icons/LocationIcon'
 import { getPlaceDetails, reverseGeocode, searchPlaces } from '../lib/geo'
 
 const DEFAULT = { latitude: 19.076, longitude: 72.8777 }
@@ -86,9 +87,12 @@ export function AgentLocationPicker({ value, onChange, label = 'Agency location'
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">
-        {label}
-        {required ? <span className="text-error"> *</span> : null}
+      <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+        <LocationIcon size={15} className="text-secondary" />
+        <span>
+          {label}
+          {required ? <span className="text-error"> *</span> : null}
+        </span>
       </label>
       <div className="flex gap-2">
         <input
@@ -101,9 +105,10 @@ export function AgentLocationPicker({ value, onChange, label = 'Agency location'
           type="button"
           onClick={useGps}
           disabled={resolving}
-          className="shrink-0 rounded-lg border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm text-primary hover:bg-gray-50"
         >
-          📍 GPS
+          <GpsIcon size={16} />
+          GPS
         </button>
       </div>
       {(searching || resolving) && (
@@ -125,9 +130,12 @@ export function AgentLocationPicker({ value, onChange, label = 'Agency location'
         </ul>
       )}
       {value?.address && value.latitude != null && value.longitude != null ? (
-        <p className="text-xs text-subtext">
-          Selected: {value.address}
-          {value.city ? ` · ${value.city}` : ''}
+        <p className="flex items-start gap-1.5 text-xs text-subtext">
+          <LocationIcon size={14} className="mt-0.5 text-secondary" />
+          <span>
+            Selected: {value.address}
+            {value.city ? ` · ${value.city}` : ''}
+          </span>
         </p>
       ) : (
         <p className="text-xs text-subtext">Pick a location from search or GPS (required).</p>

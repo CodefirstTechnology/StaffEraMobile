@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { AgentLocationPicker } from '../components/AgentLocationPicker'
+import { LocationIcon } from '../components/icons/LocationIcon'
 
 const ROLE_LABELS = {
   ADMIN: 'Platform administrator',
@@ -226,7 +227,7 @@ export default function AgentProfile() {
                 )}
                 {(user.agent?.address || user.agent?.city) && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-fixed px-3 py-1.5 text-xs font-medium text-primary">
-                    <span aria-hidden>📍</span>{' '}
+                    <LocationIcon size={14} />
                     {user.agent.address || user.agent.city}
                   </span>
                 )}
@@ -280,7 +281,7 @@ export default function AgentProfile() {
                 value={user.agent.agencyName || 'Not set'}
               />
               <InfoRow
-                icon="📍"
+                icon={<LocationIcon size={18} />}
                 label="Location"
                 value={
                   user.agent.address ||

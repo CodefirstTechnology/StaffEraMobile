@@ -9,6 +9,7 @@ import {
   printOnboardingReport,
 } from '../lib/onboardingReport'
 import { Badge } from '../components/ui/Badge'
+import { LocationIcon } from '../components/icons/LocationIcon'
 import { SourceBadge } from '../components/ui/SourceBadge'
 import { Button } from '../components/ui/Button'
 import { ApprovePasswordModal } from '../components/ApprovePasswordModal'
@@ -227,7 +228,8 @@ export default function ServantDetail() {
                 )}
                 {servant.address && (
                   <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-surface-container px-3 py-1 text-xs font-medium text-on-surface-variant">
-                    📍 {servant.address}
+                    <LocationIcon size={13} className="text-secondary" />
+                    {servant.address}
                   </span>
                 )}
                 {servant.idProofType && (
@@ -297,9 +299,10 @@ export default function ServantDetail() {
                   {servant.zones.map((z) => (
                     <span
                       key={z.id}
-                      className="rounded-lg bg-surface-container px-2.5 py-1 text-xs text-on-surface-variant"
+                      className="inline-flex items-center gap-1 rounded-lg bg-surface-container px-2.5 py-1 text-xs text-on-surface-variant"
                     >
-                      📍 {z.name}
+                      <LocationIcon size={12} className="text-secondary" />
+                      {z.name}
                       {z.city ? ` · ${z.city}` : ''}
                     </span>
                   ))}

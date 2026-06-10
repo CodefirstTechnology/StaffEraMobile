@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import api from '../../lib/api'
+import { LocationIcon } from '../../components/icons/LocationIcon'
 import { Badge } from '../../components/ui/Badge'
 
 export default function AdminDashboard() {
@@ -113,7 +114,10 @@ export default function AdminDashboard() {
                   </td>
                   <td>{a.agencyName || '—'}</td>
                   <td>
-                    <p>{a.city || a.address || '—'}</p>
+                    <div className="flex items-center gap-1.5">
+                      <LocationIcon size={14} className="text-secondary" />
+                      <p>{a.city || a.address || '—'}</p>
+                    </div>
                   </td>
                   <td>{a._count?.servants ?? 0}</td>
                   <td>{a.user.isActive ? 'Active' : 'Inactive'}</td>

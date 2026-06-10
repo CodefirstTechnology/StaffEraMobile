@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
 import { Button } from '../../components/ui/Button'
 import { AgentLocationPicker } from '../../components/AgentLocationPicker'
+import { LocationIcon } from '../../components/icons/LocationIcon'
 import { CredentialsBanner } from '../../components/CredentialsBanner'
 
 export default function AdminAgents() {
@@ -316,8 +317,13 @@ export default function AdminAgents() {
                   </td>
                   <td className="p-4">{a.agencyName || '—'}</td>
                   <td className="p-4">
-                    <p>{a.address || '—'}</p>
-                    {a.city && <p className="text-xs text-subtext">{a.city}</p>}
+                    <div className="flex items-start gap-1.5">
+                      <LocationIcon size={14} className="mt-0.5 text-secondary" />
+                      <div>
+                        <p>{a.address || '—'}</p>
+                        {a.city && <p className="text-xs text-subtext">{a.city}</p>}
+                      </div>
+                    </div>
                   </td>
                   <td className="p-4">{a._count?.servants ?? 0}</td>
                   <td className="p-4">
