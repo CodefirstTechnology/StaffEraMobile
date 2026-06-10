@@ -297,6 +297,7 @@ export default function AdminAgents() {
               <th className="p-4 text-left">Agency</th>
               <th className="p-4 text-left">Area</th>
               <th className="p-4 text-left">Servants</th>
+              <th className="p-4 text-left">Annual revenue</th>
               <th className="p-4 text-left">Status</th>
               <th className="p-4 text-left">Actions</th>
             </tr>
@@ -304,7 +305,7 @@ export default function AdminAgents() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-subtext">
+                <td colSpan={7} className="p-8 text-center text-subtext">
                   No agents yet. Use &quot;Add agent&quot; to onboard a field agent for an area.
                 </td>
               </tr>
@@ -326,6 +327,14 @@ export default function AdminAgents() {
                     </div>
                   </td>
                   <td className="p-4">{a._count?.servants ?? 0}</td>
+                  <td className="p-4 font-medium text-amber-700">
+                    ₹{(a.annualRevenue ?? 0).toLocaleString('en-IN')}
+                    {a.annualCompletedBookings > 0 && (
+                      <p className="text-xs font-normal text-subtext">
+                        {a.annualCompletedBookings} job(s) in {a.revenueYear ?? new Date().getFullYear()}
+                      </p>
+                    )}
+                  </td>
                   <td className="p-4">
                     {a.user.isActive ? 'Active' : 'Inactive'}
                   </td>

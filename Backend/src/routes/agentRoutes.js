@@ -13,6 +13,8 @@ const { updateAgentProfileSchema } = require("../validators/agentValidator");
 
 router.use(authenticate, requireRole("AGENT", "ADMIN"));
 
+router.get("/stats", agentController.getStats);
+
 router.patch(
   "/profile",
   validate(updateAgentProfileSchema),

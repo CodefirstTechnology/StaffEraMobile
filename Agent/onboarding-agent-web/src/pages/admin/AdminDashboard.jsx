@@ -92,13 +92,14 @@ export default function AdminDashboard() {
               <th className="pb-2">Agency</th>
               <th className="pb-2">Area</th>
               <th className="pb-2">Servants</th>
+              <th className="pb-2">Annual revenue</th>
               <th className="pb-2">Status</th>
             </tr>
           </thead>
           <tbody>
             {(agents || []).length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-4 text-subtext">
+                <td colSpan={6} className="py-4 text-subtext">
                   No agents yet.{' '}
                   <Link to="/admin/agents" className="text-primary underline">
                     Add the first agent
@@ -120,6 +121,9 @@ export default function AdminDashboard() {
                     </div>
                   </td>
                   <td>{a._count?.servants ?? 0}</td>
+                  <td className="font-medium text-amber-700">
+                    ₹{(a.annualRevenue ?? 0).toLocaleString('en-IN')}
+                  </td>
                   <td>{a.user.isActive ? 'Active' : 'Inactive'}</td>
                 </tr>
               ))

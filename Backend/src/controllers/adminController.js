@@ -10,6 +10,7 @@ const {
   serializeUser,
   userWithRoleInclude
 } = require("../services/roleService");
+const { attachAnnualRevenueToAgents } = require("../services/agentRevenueService");
 
 const generateAgentPassword = () => {
   const part = crypto.randomBytes(4).toString("hex");
@@ -237,7 +238,9 @@ exports.listAgents = async (req, res) => {
     prisma.agent.count({ where })
   ]);
 
-  sendSuccess(res, { agents, pagination: { page, limit, total } });
+  const agentsWithRevenue = await attachAnnualRevenueToAgents(agents);
+
+  sendSuccess(res, { agents: agentsWithRevenue, pagination: { page, limit, total } });
 };
 
 exports.createAgent = async (req, res) => {

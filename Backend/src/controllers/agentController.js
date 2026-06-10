@@ -19,6 +19,7 @@ const {
   filterServantsNearAgent
 } = require("../services/locationService");
 const { assertAgentCanAccessServant } = require("../services/agentRegistrationService");
+const { getAgentAnnualRevenue } = require("../services/agentRevenueService");
 
 const parseSkills = (skills) => {
   if (!skills) return [];
@@ -637,6 +638,17 @@ exports.uploadIdProof = async (req, res) => {
   });
 
   sendSuccess(res, { servant });
+};
+
+exports.getStats = async (req, res) => {
+  const scope = await resolveAgentScope(req.user);
+  if (scope.isAdmin) {
+    throw new ApiError(403, "Sign in as a field agent to view agency revenue");
+  }
+
+  const year = req.query.year ? parseInt(req.query.year, 10) : new Date().getFullYear();
+  const stats = await getAgentAnnualRevenue(scope.agentId, year);
+  sendSuccess(res, stats);
 };
 
 exports.updateProfile = async (req, res) => {
