@@ -16,6 +16,11 @@ import { GradientButton } from '@/components/ui/GradientButton';
 import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import {
+  stopPendingRequestVibration,
+  syncPendingRequestVibration,
+  vibrateBookingAccepted,
+} from '@/lib/bookingRequestVibration';
 
 export default function ScheduleDetailScreen() {
   const { t } = useTranslation();
@@ -54,9 +59,18 @@ export default function ScheduleDetailScreen() {
     return err.response?.data?.message || fallback;
   };
 
+  const resumePendingVibrationIfNeeded = () => {
+    const open = qc.getQueryData(['open-requests']) as { status: string }[] | undefined;
+    const all = qc.getQueryData(['bookings']) as { status: string }[] | undefined;
+    const stillPending =
+      (open?.length ?? 0) + (all?.filter((b) => b.status === 'PENDING').length ?? 0) > 0;
+    syncPendingRequestVibration(stillPending);
+  };
+
   const confirm = async () => {
     if (acting) return;
     setActing(true);
+    stopPendingRequestVibration();
     try {
       await api.patch(`/bookings/${id}/confirm`);
       await Promise.all([
@@ -65,9 +79,11 @@ export default function ScheduleDetailScreen() {
         qc.invalidateQueries({ queryKey: ['open-requests'] }),
         qc.invalidateQueries({ queryKey: ['schedule'] }),
       ]);
+      await vibrateBookingAccepted();
       Alert.alert(t('servantHome.acceptedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotAccept'), apiError(e, t('auth.tryAgain')));
+      resumePendingVibrationIfNeeded();
     } finally {
       setActing(false);
     }

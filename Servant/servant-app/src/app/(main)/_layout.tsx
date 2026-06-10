@@ -4,10 +4,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
+import { useBookingRequestAlerts } from '@/hooks/useBookingRequestAlerts';
+import { usePendingRequestVibration } from '@/hooks/usePendingRequestVibration';
 
 export default function MainLayout() {
   const { t } = useTranslation();
   const { isAuthenticated, isLoading } = useAuthStore();
+  useBookingRequestAlerts();
+  usePendingRequestVibration();
 
   if (isLoading) {
     return (

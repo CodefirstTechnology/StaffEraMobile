@@ -22,6 +22,11 @@ import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { NotificationBell } from '@/components/ui/NotificationBell';
+import {
+  stopPendingRequestVibration,
+  syncPendingRequestVibration,
+  vibrateBookingAccepted,
+} from '@/lib/bookingRequestVibration';
 
 type Booking = {
   id: number;
@@ -212,12 +217,22 @@ export default function ServantHomeScreen() {
     }
   };
 
+  const resumePendingVibrationIfNeeded = () => {
+    const open = qc.getQueryData(['open-requests']) as Booking[] | undefined;
+    const all = qc.getQueryData(['bookings']) as Booking[] | undefined;
+    const stillPending =
+      (open?.length ?? 0) + (all?.filter((b) => b.status === 'PENDING').length ?? 0) > 0;
+    syncPendingRequestVibration(stillPending);
+  };
+
   const confirm = async (id: number) => {
     if (actingId != null) return;
     setActingId(id);
+    stopPendingRequestVibration();
     try {
       await api.patch(`/bookings/${id}/confirm`);
       await refreshBookings();
+      await vibrateBookingAccepted();
       Alert.alert(t('servantHome.acceptedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
       const message = apiError(e, 'Try again');
@@ -226,6 +241,7 @@ export default function ServantHomeScreen() {
         Alert.alert(t('servantHome.alreadyHandled'), t('servantHome.requestHandled'));
       } else {
         Alert.alert(t('servantHome.couldNotAccept'), message);
+        resumePendingVibrationIfNeeded();
       }
     } finally {
       setActingId(null);

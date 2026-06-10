@@ -40,6 +40,14 @@ export default ({ config }) => ({
         isAndroidBackgroundLocationEnabled: false,
       },
     ],
+    [
+      'expo-notifications',
+      {
+        icon: './assets/images/icon.png',
+        color: '#15157d',
+        sounds: [],
+      },
+    ],
   ],
   extra: {
     apiBaseUrl,
