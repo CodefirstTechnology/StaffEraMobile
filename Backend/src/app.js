@@ -8,8 +8,24 @@ const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
 const logger = require("./utils/logger");
 const ApiError = require("./utils/ApiError");
+const prisma = require("./config/prisma");
 
 const app = express();
+
+if (process.env.NODE_ENV === "production" || process.env.TRUST_PROXY === "true") {
+  app.set("trust proxy", 1);
+}
+
+function parseCorsOrigins(value) {
+  if (!value || value.trim() === "*") return true;
+  const origins = value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (origins.length === 0) return true;
+  if (origins.length === 1) return origins[0];
+  return origins;
+}
 
 const uploadDir = path.join(process.cwd(), process.env.UPLOAD_DIR || "uploads");
 app.use(
@@ -29,7 +45,7 @@ app.use(
 );
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "*",
+    origin: parseCorsOrigins(process.env.CLIENT_URL),
     credentials: true
   })
 );
@@ -70,6 +86,16 @@ app.use("/api/v1/geo", require("./routes/geoRoutes"));
 
 app.get("/", (req, res) => {
   res.json({ success: true, message: "StaffEra API Running" });
+});
+
+app.get("/health", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({ status: "ok", service: "staffera-api" });
+  } catch (err) {
+    logger.error("Health check failed", { message: err.message });
+    res.status(503).json({ status: "error", service: "staffera-api" });
+  }
 });
 
 app.use((err, req, res, next) => {

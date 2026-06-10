@@ -68,6 +68,49 @@ In [Google Cloud Console](https://console.cloud.google.com/), enable **Places AP
 
 **Agent uploads (ID proof & profile photo):** files are saved under `Backend/uploads/` (or `UPLOAD_DIR`). The database stores paths like `/uploads/<filename>` on the `Servant` record. Agent web loads images via the API origin — set `VITE_API_BASE_URL` in `Agent/onboarding-agent-web/.env` (see `.env.example`).
 
+## Production deploy (Docker + host nginx)
+
+StaffEra runs as five containers: PostgreSQL, Redis, API, marketing site, and agent portal. Containers bind to **localhost only** so your existing VPS nginx can reverse-proxy alongside your other apps.
+
+### 1. On the VPS
+
+```bash
+git clone <repo-url> staffera && cd staffera
+cp .env.production.example .env
+# Edit .env: domains, JWT secrets, POSTGRES_PASSWORD, Google Maps, SMS, etc.
+bash deploy/scripts/deploy.sh
+```
+
+Optional first-time seed:
+
+```bash
+docker compose --env-file .env exec api node prisma/seed.js
+```
+
+### 2. Host nginx
+
+Copy `deploy/nginx/staffera.conf` to `/etc/nginx/sites-available/`, replace `staffera.example.com` with your domains, adjust upstream ports if you changed `STAFFERA_*_PORT` in `.env`, then enable and reload nginx.
+
+Default upstream ports (localhost):
+
+| Service | Port |
+|---------|------|
+| API | 15000 |
+| Website | 15001 |
+| Agent portal | 15002 |
+
+### 3. DNS
+
+Point these records to your VPS:
+
+- `staffera.example.com` → marketing site
+- `agent.staffera.example.com` → agent portal
+- `api.staffera.example.com` → backend API + `/uploads`
+
+### 4. Mobile apps
+
+Set `EXPO_PUBLIC_API_BASE_URL=https://api.staffera.example.com/api/v1` in both Expo apps before building release binaries.
+
 ## Business rules
 
 - Servants cannot self-register (agent-only via `POST /api/v1/agent/servants`)

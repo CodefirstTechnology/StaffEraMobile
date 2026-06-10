@@ -1,0 +1,130 @@
+# StaffEra production stack — bind ports to localhost for host nginx reverse proxy.
+# Usage:
+#   cp .env.production.example .env
+#   docker compose --env-file .env up -d --build
+
+name: staffera
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-staffera}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-staffera}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-staffera} -d ${POSTGRES_DB:-staffera}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - staffera
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - staffera
+
+  api:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      TRUST_PROXY: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-staffera}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-staffera}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET in .env}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      CLIENT_URL: ${CLIENT_URL:-*}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
+      UPLOAD_DIR: uploads
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      GOOGLE_MAP_ID: ${GOOGLE_MAP_ID:-}
+      SERVANT_AGENT_RADIUS_KM: ${SERVANT_AGENT_RADIUS_KM:-3}
+      SMS_PROVIDER: ${SMS_PROVIDER:-log}
+      SMS_DEFAULT_COUNTRY_CODE: ${SMS_DEFAULT_COUNTRY_CODE:-91}
+      MSG91_AUTH_KEY: ${MSG91_AUTH_KEY:-}
+      MSG91_SENDER_ID: ${MSG91_SENDER_ID:-STFFRA}
+      MSG91_ROUTE: ${MSG91_ROUTE:-4}
+      MSG91_TEMPLATE_ID: ${MSG91_TEMPLATE_ID:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
+      SMS_ALLOW_DEV_OTP: ${SMS_ALLOW_DEV_OTP:-false}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-800}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "127.0.0.1:${STAFFERA_API_PORT:-15000}:5000"
+    networks:
+      - staffera
+
+  website:
+    build:
+      context: ./Staffera_website
+      dockerfile: Dockerfile
+      args:
+        VITE_HOUSE_OWNER_APP_URL: ${VITE_HOUSE_OWNER_APP_URL:-#}
+        VITE_SERVANT_APP_URL: ${VITE_SERVANT_APP_URL:-#}
+        VITE_AGENT_PORTAL_URL: ${VITE_AGENT_PORTAL_URL:-#}
+        VITE_PLAY_STORE_HOUSE_OWNER: ${VITE_PLAY_STORE_HOUSE_OWNER:-#}
+        VITE_PLAY_STORE_SERVANT: ${VITE_PLAY_STORE_SERVANT:-#}
+        VITE_APP_STORE_HOUSE_OWNER: ${VITE_APP_STORE_HOUSE_OWNER:-#}
+        VITE_APP_STORE_SERVANT: ${VITE_APP_STORE_SERVANT:-#}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${STAFFERA_WEBSITE_PORT:-15001}:80"
+    networks:
+      - staffera
+
+  agent:
+    build:
+      context: ./Agent/onboarding-agent-web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in .env}
+        VITE_API_HOST: ${VITE_API_HOST:-}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:${STAFFERA_AGENT_PORT:-15002}:80"
+    networks:
+      - staffera
+
+networks:
+  staffera:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
