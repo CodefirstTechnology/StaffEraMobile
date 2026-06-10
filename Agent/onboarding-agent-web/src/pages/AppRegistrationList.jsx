@@ -60,7 +60,7 @@ export default function AppRegistrationList() {
         <div>
           <h2 className="text-2xl font-bold text-violet-900">App registrations</h2>
           <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
-            Helpers who signed up in the Servant app within 15 km of your agency location.
+            Helpers who signed up in the Servant app within 3 km of your agency location.
             Set your office location in Profile to receive nearby requests.
           </p>
         </div>

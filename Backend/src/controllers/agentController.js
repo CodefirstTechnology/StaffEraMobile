@@ -283,7 +283,7 @@ exports.listServants = async (req, res) => {
         servants: [],
         pagination: { page, limit, total: 0 },
         locationNotice:
-          "Set your agency location in Profile to receive registrations within 15 km."
+          `Set your agency location in Profile to receive registrations within ${DEFAULT_RADIUS_KM} km.`
       });
     }
 

@@ -1,7 +1,7 @@
 const prisma = require("../config/prisma");
 const { ROLE_IDS } = require("./roleService");
 
-const DEFAULT_RADIUS_KM = 15;
+const DEFAULT_RADIUS_KM = Number(process.env.SERVANT_AGENT_RADIUS_KM) || 3;
 const KM_PER_DEGREE_LAT = 111;
 
 const toRad = (deg) => (deg * Math.PI) / 180;
