@@ -10,6 +10,12 @@ import {
   downloadOnboardingReport,
   printOnboardingReport,
 } from '../lib/onboardingReport'
+import {
+  BankDetailsFields,
+  BankDetailsReview,
+  EMPTY_BANK_FORM,
+  validateBankDetails,
+} from '../components/BankDetailsFields'
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 
@@ -18,7 +24,8 @@ const STEPS = [
   { id: 2, label: 'Skills' },
   { id: 3, label: 'Availability' },
   { id: 4, label: 'Documents' },
-  { id: 5, label: 'Review & submit' },
+  { id: 5, label: 'Bank details' },
+  { id: 6, label: 'Review & submit' },
 ]
 
 const PERSONAL_FIELDS = [
@@ -104,9 +111,11 @@ export default function OnboardServant() {
     skills: [],
     address: '',
     idProofType: 'AADHAR',
+    ...EMPTY_BANK_FORM,
   })
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
+  const [bankAccountConfirm, setBankAccountConfirm] = useState('')
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }))
   const toggleDay = (d) =>
@@ -165,10 +174,20 @@ export default function OnboardServant() {
     return true
   }
 
+  const validateBank = () => {
+    const bankErr = validateBankDetails(form, bankAccountConfirm)
+    if (bankErr) {
+      setError(bankErr)
+      return false
+    }
+    return true
+  }
+
   const validateForReview = () => {
     if (!validatePersonal()) return false
     if (!validateAvailability()) return false
     if (!validateDocuments()) return false
+    if (!validateBank()) return false
     return true
   }
 
@@ -199,6 +218,7 @@ export default function OnboardServant() {
         return
       }
     }
+    if (step === 5 && !validateBank()) return
     setStep((s) => s + 1)
   }
 
@@ -208,6 +228,7 @@ export default function OnboardServant() {
       if (!validatePersonal()) setStep(1)
       else if (!validateAvailability()) setStep(3)
       else if (!validateDocuments()) setStep(4)
+      else if (!validateBank()) setStep(5)
       return
     }
 
@@ -483,6 +504,23 @@ export default function OnboardServant() {
 
       {step === 5 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
+          <h3 className="font-semibold">Bank details</h3>
+          <p className="text-sm text-subtext">
+            Payment account for salary and booking payouts. You can add or update these later from
+            the servant profile.
+          </p>
+          {error && <p className="text-error text-sm">{error}</p>}
+          <BankDetailsFields
+            form={form}
+            update={update}
+            accountNumberConfirm={bankAccountConfirm}
+            onAccountNumberConfirmChange={setBankAccountConfirm}
+          />
+        </div>
+      )}
+
+      {step === 6 && (
+        <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Review &amp; submit</h3>
           <p className="text-sm text-subtext">
             Confirm all details below. You can download or print a report for your records,
@@ -564,6 +602,10 @@ export default function OnboardServant() {
             </ReviewItem>
           </ReviewSection>
 
+          <ReviewSection title="Bank details">
+            <BankDetailsReview form={form} />
+          </ReviewSection>
+
           {error && <p className="text-error text-sm">{error}</p>}
 
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
@@ -607,9 +649,9 @@ export default function OnboardServant() {
         >
           Back
         </Button>
-        {step < 5 && (
+        {step < 6 && (
           <Button onClick={goNext} disabled={submitting}>
-            {step === 4 ? 'Review & submit' : 'Next'}
+            {step === 5 ? 'Review & submit' : 'Next'}
           </Button>
         )}
       </div>

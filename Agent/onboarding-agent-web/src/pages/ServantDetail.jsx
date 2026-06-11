@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
@@ -15,6 +15,8 @@ import { SourceBadge } from '../components/ui/SourceBadge'
 import { Button } from '../components/ui/Button'
 import { ApprovePasswordModal } from '../components/ApprovePasswordModal'
 import { SetLoginPasswordCard } from '../components/SetLoginPasswordCard'
+import { BankDetailsReview } from '../components/BankDetailsFields'
+import { isValidIfscFormat, lookupIfsc } from '../lib/ifscLookup'
 
 const parseWorkingDays = (wd) => {
   if (!wd) return []
@@ -94,6 +96,7 @@ export default function ServantDetail() {
   const [credentials, setCredentials] = useState(null)
   const [reason, setReason] = useState('')
   const [idModal, setIdModal] = useState(false)
+  const [ifscMeta, setIfscMeta] = useState({ bank: '', branch: '' })
 
   const { data: servant, isLoading } = useQuery({
     queryKey: ['servant', id],
@@ -120,6 +123,23 @@ export default function ServantDetail() {
     }
     return res
   }
+
+  useEffect(() => {
+    const code = servant?.bankIfsc
+    if (!code || !isValidIfscFormat(code)) {
+      setIfscMeta({ bank: '', branch: '' })
+      return
+    }
+    let cancelled = false
+    lookupIfsc(code).then((result) => {
+      if (cancelled || !result.ok) return
+      const branch = [result.branch, result.city].filter(Boolean).join(' · ')
+      setIfscMeta({ bank: result.bank || '', branch })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [servant?.bankIfsc])
 
   const isAppRegistration =
     servant?.registrationSource === 'SELF' || servant?.user?.isActive === false
@@ -362,6 +382,20 @@ export default function ServantDetail() {
                 {servant.availabilityNotes}
               </p>
             )}
+          </SectionCard>
+
+          <SectionCard title="Bank details">
+            <BankDetailsReview
+              form={{
+                bankAccountHolder: servant.bankAccountHolder,
+                bankAccountNumber: servant.bankAccountNumber,
+                bankName: servant.bankName || ifscMeta.bank,
+                bankIfsc: servant.bankIfsc,
+                bankUpiId: servant.bankUpiId,
+              }}
+              maskAccount
+              ifscBranch={ifscMeta.branch}
+            />
           </SectionCard>
 
           {/* Bookings */}

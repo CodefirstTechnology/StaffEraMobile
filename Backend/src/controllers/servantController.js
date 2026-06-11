@@ -135,7 +135,18 @@ exports.getMyProfile = async (req, res) => {
 };
 
 exports.updateMyProfile = async (req, res) => {
-  const { bio, profilePhoto, availableFrom, availableTo, workingDays } = req.body;
+  const {
+    bio,
+    profilePhoto,
+    availableFrom,
+    availableTo,
+    workingDays,
+    bankAccountHolder,
+    bankAccountNumber,
+    bankName,
+    bankIfsc,
+    bankUpiId
+  } = req.body;
 
   const servant = await prisma.servant.findUnique({
     where: { userId: req.user.id }
@@ -153,7 +164,18 @@ exports.updateMyProfile = async (req, res) => {
         workingDays: Array.isArray(workingDays)
           ? JSON.stringify(workingDays)
           : workingDays
-      })
+      }),
+      ...(bankAccountHolder !== undefined && {
+        bankAccountHolder: bankAccountHolder?.trim() || null
+      }),
+      ...(bankAccountNumber !== undefined && {
+        bankAccountNumber: bankAccountNumber?.trim() || null
+      }),
+      ...(bankName !== undefined && { bankName: bankName?.trim() || null }),
+      ...(bankIfsc !== undefined && {
+        bankIfsc: bankIfsc?.trim() ? bankIfsc.trim().toUpperCase() : null
+      }),
+      ...(bankUpiId !== undefined && { bankUpiId: bankUpiId?.trim() || null })
     },
     include: servantInclude
   });

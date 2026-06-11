@@ -171,7 +171,12 @@ exports.createServant = async (req, res) => {
     address,
     city,
     latitude,
-    longitude
+    longitude,
+    bankAccountHolder,
+    bankAccountNumber,
+    bankName,
+    bankIfsc,
+    bankUpiId
   } = req.body;
 
   const email = normalizeEmail(rawEmail);
@@ -232,6 +237,11 @@ exports.createServant = async (req, res) => {
           city: city?.trim() || null,
           latitude: latitude !== undefined && latitude !== "" ? parseFloat(latitude) : null,
           longitude: longitude !== undefined && longitude !== "" ? parseFloat(longitude) : null,
+          bankAccountHolder: bankAccountHolder?.trim() || null,
+          bankAccountNumber: bankAccountNumber?.trim() || null,
+          bankName: bankName?.trim() || null,
+          bankIfsc: bankIfsc?.trim()?.toUpperCase() || null,
+          bankUpiId: bankUpiId?.trim() || null,
           skills: {
             create: skillList.map((skillName) => ({ skillName }))
           }
@@ -390,6 +400,11 @@ exports.updateServant = async (req, res) => {
     city,
     latitude,
     longitude,
+    bankAccountHolder,
+    bankAccountNumber,
+    bankName,
+    bankIfsc,
+    bankUpiId,
     password,
     generatePassword
   } = req.body;
@@ -491,7 +506,18 @@ exports.updateServant = async (req, res) => {
         }),
         ...(longitude !== undefined && {
           longitude: longitude === "" ? null : parseFloat(longitude)
-        })
+        }),
+        ...(bankAccountHolder !== undefined && {
+          bankAccountHolder: bankAccountHolder?.trim() || null
+        }),
+        ...(bankAccountNumber !== undefined && {
+          bankAccountNumber: bankAccountNumber?.trim() || null
+        }),
+        ...(bankName !== undefined && { bankName: bankName?.trim() || null }),
+        ...(bankIfsc !== undefined && {
+          bankIfsc: bankIfsc?.trim() ? bankIfsc.trim().toUpperCase() : null
+        }),
+        ...(bankUpiId !== undefined && { bankUpiId: bankUpiId?.trim() || null })
       },
       include: servantInclude
     });

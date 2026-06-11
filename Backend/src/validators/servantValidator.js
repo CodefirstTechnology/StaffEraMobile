@@ -1,6 +1,14 @@
 const { z } = require("zod");
 const { optionalNumber } = require("./zodHelpers");
 
+const bankDetailsFields = {
+  bankAccountHolder: z.string().optional(),
+  bankAccountNumber: z.string().optional(),
+  bankName: z.string().optional(),
+  bankIfsc: z.string().optional(),
+  bankUpiId: z.string().optional()
+};
+
 const updateServantMeSchema = z.object({
   body: z.object({
     bio: z.string().optional(),
@@ -12,7 +20,8 @@ const updateServantMeSchema = z.object({
     offersMonthly: z.coerce.boolean().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
     hoursPerDay: optionalNumber(),
-    availabilityNotes: z.string().optional()
+    availabilityNotes: z.string().optional(),
+    ...bankDetailsFields
   })
 });
 
@@ -39,7 +48,8 @@ const createServantSchema = z.object({
     address: z.string().optional(),
     city: z.string().optional(),
     latitude: z.coerce.number().min(-90).max(90).optional(),
-    longitude: z.coerce.number().min(-180).max(180).optional()
+    longitude: z.coerce.number().min(-180).max(180).optional(),
+    ...bankDetailsFields
   })
 });
 
@@ -64,7 +74,8 @@ const updateServantSchema = z.object({
     hoursPerDay: optionalNumber(),
     availabilityNotes: z.string().optional(),
     idProofType: z.string().optional(),
-    skills: z.union([z.string(), z.array(z.string())]).optional()
+    skills: z.union([z.string(), z.array(z.string())]).optional(),
+    ...bankDetailsFields
   })
 });
 
