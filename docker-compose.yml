@@ -52,7 +52,8 @@ services:
       NODE_ENV: production
       PORT: 5000
       TRUST_PROXY: "true"
-      DATABASE_URL: postgresql://${POSTGRES_USER:-staffera}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-staffera}
+      # Set DATABASE_URL in .env if POSTGRES_PASSWORD contains @ # : / or other URL characters (@ → %40)
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-staffera}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-staffera}}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}

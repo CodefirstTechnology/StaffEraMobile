@@ -2,15 +2,23 @@
   "expo": {
     "name": "house-owner-app",
     "slug": "house-owner-app",
+    "owner": "pravinbehere45",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "houseownerapp",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.justdailai.houseowner",
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.justdailai.houseowner",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "INTERNET"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -25,6 +33,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-font",
       [
         "expo-splash-screen",
         {
@@ -35,11 +44,19 @@
           }
         }
       ],
-      "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "apiBaseUrl": "http://localhost:5000/api/v1",
+      "googleMapsApiKey": "",
+      "googleMapId": "",
+      "router": {},
+      "eas": {
+        "projectId": "8da501d7-a1cd-45a9-a6c0-6e9c6a8937e9"
+      }
     }
   }
 }

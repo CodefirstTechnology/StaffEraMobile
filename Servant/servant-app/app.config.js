@@ -15,7 +15,6 @@ export default ({ config }) => ({
   ...config,
   android: {
     ...appJson.expo.android,
-    usesCleartextTraffic: true,
     config: {
       ...appJson.expo.android?.config,
       googleMaps: {
@@ -50,8 +49,12 @@ export default ({ config }) => ({
     ],
   ],
   extra: {
+    ...appJson.expo.extra,
     apiBaseUrl,
     googleMapsApiKey,
     googleMapId,
+    eas: {
+      ...(appJson.expo.extra?.eas || {}),
+    },
   },
 });

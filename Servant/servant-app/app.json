@@ -2,15 +2,23 @@
   "expo": {
     "name": "servant-app",
     "slug": "servant-app",
+    "owner": "pravinbehere45",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "servantapp",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.justdailai.servant",
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.justdailai.servant",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "INTERNET"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -25,6 +33,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-font",
       [
         "expo-splash-screen",
         {
@@ -40,6 +49,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0c4864b0-0f26-4ec6-aabe-64255b2a3032"
+      }
     }
   }
 }
