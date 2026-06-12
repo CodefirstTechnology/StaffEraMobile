@@ -13,6 +13,7 @@ import {
   EMPTY_BANK_FORM,
   validateBankDetails,
 } from '../components/BankDetailsFields'
+import { AadhaarXmlVerify } from '../components/AadhaarXmlVerify'
 import { ServiceZonesEditor } from '../components/ServiceZonesEditor'
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
@@ -374,6 +375,8 @@ export default function EditServant() {
           </div>
         )}
       </div>
+
+      <AadhaarXmlVerify servantId={id} servant={servant} />
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
         <h3 className="font-semibold">Bank details</h3>

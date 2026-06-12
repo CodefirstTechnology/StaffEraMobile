@@ -16,6 +16,7 @@ import { Button } from '../components/ui/Button'
 import { ApprovePasswordModal } from '../components/ApprovePasswordModal'
 import { SetLoginPasswordCard } from '../components/SetLoginPasswordCard'
 import { BankDetailsReview } from '../components/BankDetailsFields'
+import { AadhaarXmlVerify } from '../components/AadhaarXmlVerify'
 import { isValidIfscFormat, lookupIfsc } from '../lib/ifscLookup'
 
 const parseWorkingDays = (wd) => {
@@ -262,6 +263,16 @@ export default function ServantDetail() {
                     🪪 {servant.idProofType.replace(/_/g, ' ')}
                   </span>
                 )}
+                {servant.aadhaarVerified ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                    ✓ Aadhaar verified
+                  </span>
+                ) : null}
+                {servant.phoneVerified ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">
+                    ✓ Mobile verified
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
@@ -389,6 +400,10 @@ export default function ServantDetail() {
                 {servant.availabilityNotes}
               </p>
             )}
+          </SectionCard>
+
+          <SectionCard title="Aadhaar verification">
+            <AadhaarXmlVerify servantId={id} servant={servant} compact />
           </SectionCard>
 
           <SectionCard title="Bank details">

@@ -133,6 +133,17 @@ model Servant {
   bankName           String?
   bankIfsc           String?
   bankUpiId          String?
+  aadhaarVerified          Boolean   @default(false)
+  aadhaarVerificationType  String?
+  aadhaarVerifiedAt        DateTime?
+  aadhaarVerifiedName      String?
+  aadhaarVerifiedDob       String?
+  aadhaarVerifiedGender    String?
+  aadhaarVerifiedAddress   String?
+  aadhaarPhotoUrl          String?
+  aadhaarReferenceId       String?
+  aadhaarNameMatch         Boolean?
+  phoneVerified            Boolean   @default(false)
   bookings           Booking[]
   timeEntries        TimeEntry[]
   zones              Zone[]

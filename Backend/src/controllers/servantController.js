@@ -39,9 +39,13 @@ exports.listServants = async (req, res) => {
   const { lat, lng } = await resolveHouseOwnerCoords(req.user.id, latitude, longitude);
   const radius = radiusKm != null ? Number(radiusKm) : DEFAULT_RADIUS_KM;
 
+  const requireAadhaar =
+    process.env.REQUIRE_AADHAAR_VERIFICATION !== "false";
+
   const where = {
     verificationStatus: "VERIFIED",
     user: { isActive: true },
+    ...(requireAadhaar ? { aadhaarVerified: true } : {}),
     ...(skill
       ? { skills: { some: { skillName: { equals: skill, mode: "insensitive" } } } }
       : {}),
@@ -107,6 +111,12 @@ exports.getServant = async (req, res) => {
   if (!servant) throw new ApiError(404, "Servant not found");
   if (req.user.role === "HOUSE_OWNER") {
     if (servant.verificationStatus !== "VERIFIED") {
+      throw new ApiError(404, "Servant not found");
+    }
+    if (
+      process.env.REQUIRE_AADHAAR_VERIFICATION !== "false" &&
+      !servant.aadhaarVerified
+    ) {
       throw new ApiError(404, "Servant not found");
     }
 

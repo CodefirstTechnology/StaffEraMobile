@@ -233,6 +233,7 @@ exports.createServant = async (req, res) => {
           profilePhoto,
           verificationStatus: "PENDING",
           registrationSource: "AGENT",
+          phoneVerified: !!phone,
           address: address?.trim() || null,
           city: city?.trim() || null,
           latitude: latitude !== undefined && latitude !== "" ? parseFloat(latitude) : null,
@@ -589,6 +590,17 @@ exports.verifyServant = async (req, res) => {
 
   let loginPassword =
     password && String(password).trim().length >= 6 ? String(password).trim() : null;
+
+  if (
+    status === "VERIFIED" &&
+    !existing.aadhaarVerified &&
+    process.env.REQUIRE_AADHAAR_VERIFICATION !== "false"
+  ) {
+    throw new ApiError(
+      400,
+      "Aadhaar Offline XML verification is required before approving this servant"
+    );
+  }
 
   if (status === "VERIFIED" && isAppRegistration) {
     if (!loginPassword && generatePassword) {

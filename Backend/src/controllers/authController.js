@@ -113,7 +113,8 @@ exports.registerServant = async (req, res) => {
     latitude: lat,
     longitude: lng,
     verificationStatus: "PENDING",
-    registrationSource: "SELF"
+    registrationSource: "SELF",
+    phoneVerified: !!phone
   };
   const skillCreates = skillList.map((skillName) => ({ skillName }));
 
