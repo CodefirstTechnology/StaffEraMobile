@@ -10,6 +10,10 @@ const {
   setServantPasswordSchema
 } = require("../validators/servantValidator");
 const { updateAgentProfileSchema } = require("../validators/agentValidator");
+const {
+  createZoneSchema,
+  updateZoneSchema
+} = require("../validators/zoneValidator");
 
 router.use(authenticate, requireRole("AGENT", "ADMIN"));
 
@@ -55,5 +59,18 @@ router.post(
   upload.single("idProof"),
   agentController.uploadIdProof
 );
+
+router.get("/servants/:id/zones", agentController.listServantZones);
+router.post(
+  "/servants/:id/zones",
+  validate(createZoneSchema),
+  agentController.createServantZone
+);
+router.patch(
+  "/servants/:id/zones/:zoneId",
+  validate(updateZoneSchema),
+  agentController.updateServantZone
+);
+router.delete("/servants/:id/zones/:zoneId", agentController.deleteServantZone);
 
 module.exports = router;

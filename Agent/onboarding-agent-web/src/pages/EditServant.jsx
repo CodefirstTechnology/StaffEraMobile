@@ -13,6 +13,7 @@ import {
   EMPTY_BANK_FORM,
   validateBankDetails,
 } from '../components/BankDetailsFields'
+import { ServiceZonesEditor } from '../components/ServiceZonesEditor'
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const ID_TYPES = ['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID']
@@ -464,25 +465,7 @@ export default function EditServant() {
         )}
       </div>
 
-      {(servant.zones?.length > 0) && (
-        <div className="space-y-2 rounded-xl bg-surface p-6 shadow-sm">
-          <h3 className="font-semibold">Service zones</h3>
-          <p className="text-xs text-subtext">
-            Managed by the servant in the Servant app
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {servant.zones.map((z) => (
-              <span
-                key={z.id}
-                className="rounded-full bg-primary/10 px-3 py-1 text-xs text-primary"
-              >
-                {z.name}
-                {z.city ? ` · ${z.city}` : ''}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <ServiceZonesEditor servantId={id} zones={servant.zones || []} />
 
       {savedCredentials && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">

@@ -18,7 +18,6 @@ const {
   getRoleCode,
   serializeUser
 } = require("../services/roleService");
-const { DEFAULT_RADIUS_KM } = require("../services/locationService");
 const { notifyNearbyAgentsOfRegistration } = require("../services/agentRegistrationService");
 
 const sanitizeUser = (user) => serializeUser(user);
@@ -188,8 +187,8 @@ exports.registerServant = async (req, res) => {
 
     const areaMessage =
       nearbyAgents.length > 0
-        ? `Your request was sent to ${nearbyAgents.length} agent(s) within ${DEFAULT_RADIUS_KM} km.`
-        : `No agents found within ${DEFAULT_RADIUS_KM} km yet. An admin will assign one soon.`;
+        ? `Your request was sent to ${nearbyAgents.length} nearby agent(s).`
+        : "No agents cover your area yet. An admin will assign one soon.";
 
     return sendSuccess(
       res,
@@ -238,8 +237,8 @@ exports.registerServant = async (req, res) => {
 
   const areaMessage =
     nearbyAgents.length > 0
-      ? `Your request was sent to ${nearbyAgents.length} agent(s) within ${DEFAULT_RADIUS_KM} km.`
-      : `No agents found within ${DEFAULT_RADIUS_KM} km yet. An admin will assign one soon.`;
+      ? `Your request was sent to ${nearbyAgents.length} nearby agent(s).`
+      : "No agents cover your area yet. An admin will assign one soon.";
 
   sendSuccess(
     res,

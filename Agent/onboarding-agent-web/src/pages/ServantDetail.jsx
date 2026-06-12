@@ -315,11 +315,11 @@ export default function ServantDetail() {
                 <p className="text-sm text-on-surface-variant">No skills listed</p>
               )}
             </div>
-            {servant.zones?.length > 0 && (
-              <div className="mt-4 border-t border-outline-variant/30 pt-4">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
-                  Zones
-                </p>
+            <div className="mt-4 border-t border-outline-variant/30 pt-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+                Service zones
+              </p>
+              {servant.zones?.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {servant.zones.map((z) => (
                     <span
@@ -332,8 +332,15 @@ export default function ServantDetail() {
                     </span>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-on-surface-variant">
+                  No zones yet.{' '}
+                  <Link to={`/servants/${id}/edit`} className="text-primary underline">
+                    Add service zones
+                  </Link>
+                </p>
+              )}
+            </div>
           </SectionCard>
 
           {/* Availability */}

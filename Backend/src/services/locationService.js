@@ -4,6 +4,14 @@ const { ROLE_IDS } = require("./roleService");
 const DEFAULT_RADIUS_KM = Number(process.env.SERVANT_AGENT_RADIUS_KM) || 3;
 const KM_PER_DEGREE_LAT = 111;
 
+const getAgentRadiusKm = (agent) => {
+  const radius = agent?.serviceRadiusKm;
+  if (radius != null && !Number.isNaN(Number(radius)) && Number(radius) > 0) {
+    return Number(radius);
+  }
+  return DEFAULT_RADIUS_KM;
+};
+
 const toRad = (deg) => (deg * Math.PI) / 180;
 
 const haversineKm = (lat1, lon1, lat2, lon2) => {
@@ -64,15 +72,16 @@ const agentHasLocation = (agent) =>
   !Number.isNaN(agent.latitude) &&
   !Number.isNaN(agent.longitude);
 
-const isServantNearAgent = (servant, agent, radiusKm = DEFAULT_RADIUS_KM) => {
+const isServantNearAgent = (servant, agent, radiusKm) => {
   if (!agentHasLocation(agent)) return false;
   if (servant?.latitude == null || servant?.longitude == null) return false;
+  const km = radiusKm ?? getAgentRadiusKm(agent);
   return isNearPoint(
     servant.latitude,
     servant.longitude,
     agent.latitude,
     agent.longitude,
-    radiusKm
+    km
   );
 };
 
@@ -86,21 +95,22 @@ const boundingBoxForRadius = (latitude, longitude, radiusKm = DEFAULT_RADIUS_KM)
   };
 };
 
-const filterServantsNearAgent = (servants, agent, radiusKm = DEFAULT_RADIUS_KM) =>
-  servants.filter((servant) => isServantNearAgent(servant, agent, radiusKm));
+const filterServantsNearAgent = (servants, agent, radiusKm) => {
+  const km = radiusKm ?? getAgentRadiusKm(agent);
+  return servants.filter((servant) => isServantNearAgent(servant, agent, km));
+};
 
 const findAgentsNearLocation = async (
   latitude,
   longitude,
-  { radiusKm = DEFAULT_RADIUS_KM, activeOnly = true } = {}
+  { activeOnly = true } = {}
 ) => {
   if (latitude == null || longitude == null) return [];
 
-  const box = boundingBoxForRadius(latitude, longitude, radiusKm);
   const agents = await prisma.agent.findMany({
     where: {
-      latitude: box.latitude,
-      longitude: box.longitude,
+      latitude: { not: null },
+      longitude: { not: null },
       ...(activeOnly
         ? { user: { isActive: true, roleId: ROLE_IDS.AGENT } }
         : { user: { roleId: ROLE_IDS.AGENT } })
@@ -111,7 +121,15 @@ const findAgentsNearLocation = async (
   });
 
   return agents
-    .filter((agent) => isNearPoint(latitude, longitude, agent.latitude, agent.longitude, radiusKm))
+    .filter((agent) =>
+      isNearPoint(
+        latitude,
+        longitude,
+        agent.latitude,
+        agent.longitude,
+        getAgentRadiusKm(agent)
+      )
+    )
     .sort(
       (a, b) =>
         haversineKm(latitude, longitude, a.latitude, a.longitude) -
@@ -121,6 +139,7 @@ const findAgentsNearLocation = async (
 
 module.exports = {
   DEFAULT_RADIUS_KM,
+  getAgentRadiusKm,
   haversineKm,
   isNearPoint,
   agentHasLocation,

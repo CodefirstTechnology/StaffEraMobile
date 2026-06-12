@@ -16,6 +16,10 @@ import {
   EMPTY_BANK_FORM,
   validateBankDetails,
 } from '../components/BankDetailsFields'
+import {
+  ServiceZonesEditor,
+  createDraftZonesForServant,
+} from '../components/ServiceZonesEditor'
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 
@@ -23,9 +27,10 @@ const STEPS = [
   { id: 1, label: 'Personal' },
   { id: 2, label: 'Skills' },
   { id: 3, label: 'Availability' },
-  { id: 4, label: 'Documents' },
-  { id: 5, label: 'Bank details' },
-  { id: 6, label: 'Review & submit' },
+  { id: 4, label: 'Service zones' },
+  { id: 5, label: 'Documents' },
+  { id: 6, label: 'Bank details' },
+  { id: 7, label: 'Review & submit' },
 ]
 
 const PERSONAL_FIELDS = [
@@ -116,6 +121,7 @@ export default function OnboardServant() {
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
   const [bankAccountConfirm, setBankAccountConfirm] = useState('')
+  const [draftZones, setDraftZones] = useState([])
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }))
   const toggleDay = (d) =>
@@ -162,6 +168,14 @@ export default function OnboardServant() {
     return true
   }
 
+  const validateZones = () => {
+    if (!draftZones.length) {
+      setError('Add at least one service zone')
+      return false
+    }
+    return true
+  }
+
   const validateDocuments = () => {
     if (!idProof) {
       setError('ID proof document is required (JPEG, PNG, or WebP, max 5 MB)')
@@ -186,6 +200,7 @@ export default function OnboardServant() {
   const validateForReview = () => {
     if (!validatePersonal()) return false
     if (!validateAvailability()) return false
+    if (!validateZones()) return false
     if (!validateDocuments()) return false
     if (!validateBank()) return false
     return true
@@ -207,7 +222,8 @@ export default function OnboardServant() {
     setError('')
     if (step === 1 && !validatePersonal()) return
     if (step === 3 && !validateAvailability()) return
-    if (step === 4) {
+    if (step === 4 && !validateZones()) return
+    if (step === 5) {
       if (!validateDocuments()) return
       if (!validatePersonal()) {
         setStep(1)
@@ -218,7 +234,7 @@ export default function OnboardServant() {
         return
       }
     }
-    if (step === 5 && !validateBank()) return
+    if (step === 6 && !validateBank()) return
     setStep((s) => s + 1)
   }
 
@@ -227,8 +243,9 @@ export default function OnboardServant() {
     if (!validateForReview()) {
       if (!validatePersonal()) setStep(1)
       else if (!validateAvailability()) setStep(3)
-      else if (!validateDocuments()) setStep(4)
-      else if (!validateBank()) setStep(5)
+      else if (!validateZones()) setStep(4)
+      else if (!validateDocuments()) setStep(5)
+      else if (!validateBank()) setStep(6)
       return
     }
 
@@ -251,6 +268,9 @@ export default function OnboardServant() {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       const servant = res.data.data.servant
+      if (draftZones.length) {
+        await createDraftZonesForServant(servant.id, draftZones)
+      }
       downloadOnboardingReport(
         buildReportFromFormSubmitted(form, skills, { idProof, profilePhoto }, servant),
         `servant-${servant.id}`,
@@ -464,6 +484,20 @@ export default function OnboardServant() {
       )}
 
       {step === 4 && (
+        <div className="space-y-2">
+          {error && <p className="text-error text-sm">{error}</p>}
+          <ServiceZonesEditor
+            draftMode
+            draftZones={draftZones}
+            onDraftChange={(zones) => {
+              setDraftZones(zones)
+              if (zones.length) setError('')
+            }}
+          />
+        </div>
+      )}
+
+      {step === 5 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">ID Verification</h3>
           <p className="text-sm text-subtext">
@@ -502,7 +536,7 @@ export default function OnboardServant() {
         </div>
       )}
 
-      {step === 5 && (
+      {step === 6 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Bank details</h3>
           <p className="text-sm text-subtext">
@@ -519,7 +553,7 @@ export default function OnboardServant() {
         </div>
       )}
 
-      {step === 6 && (
+      {step === 7 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Review &amp; submit</h3>
           <p className="text-sm text-subtext">
@@ -590,6 +624,14 @@ export default function OnboardServant() {
             )}
           </ReviewSection>
 
+          <ReviewSection title="Service zones">
+            <ReviewItem label="Areas">
+              <ReviewChips
+                items={draftZones.map((z) => `${z.name}${z.city ? ` · ${z.city}` : ''}`)}
+              />
+            </ReviewItem>
+          </ReviewSection>
+
           <ReviewSection title="ID Verification">
             <ReviewItem label="ID type">
               {form.idProofType?.replace(/_/g, ' ') || '—'}
@@ -649,9 +691,9 @@ export default function OnboardServant() {
         >
           Back
         </Button>
-        {step < 6 && (
+        {step < 7 && (
           <Button onClick={goNext} disabled={submitting}>
-            {step === 5 ? 'Review & submit' : 'Next'}
+            {step === 6 ? 'Review & submit' : 'Next'}
           </Button>
         )}
       </div>

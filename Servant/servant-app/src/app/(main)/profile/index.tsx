@@ -186,7 +186,7 @@ export default function ProfileScreen() {
         </View>
 
         {zones.length === 0 ? (
-          <Text style={styles.zoneEmpty}>{t('zones.empty')}</Text>
+          <Text style={styles.zoneEmpty}>{t('zones.emptyAgent')}</Text>
         ) : (
           <View style={styles.zoneChips}>
             {zones.map((z) => (
@@ -201,18 +201,20 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        <TouchableOpacity
-          style={styles.zoneBtn}
-          activeOpacity={0.85}
-          onPress={() => router.push('/(main)/zones')}
-        >
-          <MaterialIcons name="add-location-alt" size={22} color={Stitch.colors.primary} />
-          <View style={styles.zoneBtnTextWrap}>
-            <Text style={styles.zoneBtnTitle}>{t('zones.manage')}</Text>
-            <Text style={styles.zoneBtnSub}>{t('zones.manageSub')}</Text>
-          </View>
-          <MaterialIcons name="chevron-right" size={22} color={Stitch.colors.onSurfaceVariant} />
-        </TouchableOpacity>
+        {zones.length > 0 ? (
+          <TouchableOpacity
+            style={styles.zoneBtn}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(main)/zones')}
+          >
+            <MaterialIcons name="map" size={22} color={Stitch.colors.primary} />
+            <View style={styles.zoneBtnTextWrap}>
+              <Text style={styles.zoneBtnTitle}>{t('zones.view')}</Text>
+              <Text style={styles.zoneBtnSub}>{t('zones.viewSub')}</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={Stitch.colors.onSurfaceVariant} />
+          </TouchableOpacity>
+        ) : null}
       </GlassCard>
 
       <GradientButton title={t('auth.signOut')} variant="outline" onPress={signOut} style={styles.signOutBtn} />
