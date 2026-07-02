@@ -325,13 +325,11 @@ exports.logout = async (req, res) => {
     try {
       const decoded = verifyRefreshToken(refreshToken);
       await prisma.refreshToken.deleteMany({
-        where: { token: decoded.token, userId: req.user.id }
+        where: { token: decoded.token }
       });
     } catch {
-      await prisma.refreshToken.deleteMany({ where: { userId: req.user.id } });
+      /* invalid or already revoked refresh token */
     }
-  } else {
-    await prisma.refreshToken.deleteMany({ where: { userId: req.user.id } });
   }
 
   sendSuccess(res, { message: "Logged out" });

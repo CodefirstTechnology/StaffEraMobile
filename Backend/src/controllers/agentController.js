@@ -20,7 +20,11 @@ const {
   filterServantsNearAgent
 } = require("../services/locationService");
 const { assertAgentCanAccessServant } = require("../services/agentRegistrationService");
-const { getAgentAnnualRevenue } = require("../services/agentRevenueService");
+const {
+  getAgentAnnualRevenue,
+  getPlatformAnnualRevenue,
+  getEmptyAnnualRevenue
+} = require("../services/agentRevenueService");
 
 const parseSkills = (skills) => {
   if (!skills) return [];
@@ -679,14 +683,19 @@ exports.uploadIdProof = async (req, res) => {
 };
 
 exports.getStats = async (req, res) => {
-  const scope = await resolveAgentScope(req.user);
-  if (scope.isAdmin) {
-    throw new ApiError(403, "Sign in as a field agent to view agency revenue");
+  const year = req.query.year ? parseInt(req.query.year, 10) : new Date().getFullYear();
+  const role = getRoleCode(req.user);
+
+  if (role === "ADMIN") {
+    return sendSuccess(res, await getPlatformAnnualRevenue(year));
   }
 
-  const year = req.query.year ? parseInt(req.query.year, 10) : new Date().getFullYear();
-  const stats = await getAgentAnnualRevenue(scope.agentId, year);
-  sendSuccess(res, stats);
+  const agent = await prisma.agent.findUnique({ where: { userId: req.user.id } });
+  if (!agent) {
+    return sendSuccess(res, getEmptyAnnualRevenue(year));
+  }
+
+  return sendSuccess(res, await getAgentAnnualRevenue(agent.id, year));
 };
 
 exports.updateProfile = async (req, res) => {

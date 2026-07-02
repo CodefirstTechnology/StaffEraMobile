@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useAuthenticatedQuery } from '../hooks/useAuthenticatedQuery'
 import {
   LineChart,
   Line,
@@ -12,11 +12,15 @@ import {
 } from 'recharts'
 import api from '../lib/api'
 import { VerifiedBadge } from '../components/ui/VerifiedBadge'
+import { useAuth } from '../context/AuthContext'
 
 const formatRupee = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`
 
 export default function Dashboard() {
-  const { data: revenue, isLoading: loadingRevenue } = useQuery({
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
+
+  const { data: revenue, isLoading: loadingRevenue } = useAuthenticatedQuery({
     queryKey: ['agent-stats'],
     queryFn: async () => {
       const res = await api.get('/agent/stats')
@@ -24,7 +28,7 @@ export default function Dashboard() {
     },
   })
 
-  const { data: servants = [], isLoading: loadingServants } = useQuery({
+  const { data: servants = [], isLoading: loadingServants } = useAuthenticatedQuery({
     queryKey: ['agent-servants'],
     queryFn: async () => {
       const res = await api.get('/agent/servants', {
@@ -34,7 +38,7 @@ export default function Dashboard() {
     },
   })
 
-  const { data: registrations = [], isLoading: loadingRegistrations } = useQuery({
+  const { data: registrations = [], isLoading: loadingRegistrations } = useAuthenticatedQuery({
     queryKey: ['agent-registrations'],
     queryFn: async () => {
       const res = await api.get('/agent/servants', {
@@ -84,7 +88,9 @@ export default function Dashboard() {
       <div>
         <h2 className="text-2xl font-bold text-primary">Pipeline overview</h2>
         <p className="text-sm text-on-surface-variant mt-1">
-          Revenue from completed jobs by your verified helpers in {year}.
+          {isAdmin
+            ? `Platform-wide revenue from completed jobs in ${revenue?.year ?? new Date().getFullYear()}.`
+            : `Revenue from completed jobs by your verified helpers in ${revenue?.year ?? new Date().getFullYear()}.`}
         </p>
       </div>
 

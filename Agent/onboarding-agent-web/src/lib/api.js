@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { ensureValidAccessToken, refreshAccessToken } from './authSession'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1',
@@ -17,13 +18,36 @@ export function redirectToLogin() {
   }
 }
 
-let refreshPromise = null
+function isAuthRefreshRequest(config) {
+  const url = String(config?.url || '')
+  return url.includes('/auth/refresh') || url.includes('/auth/login')
+}
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+api.interceptors.request.use(
+  async (config) => {
+    if (isAuthRefreshRequest(config)) return config
+
+    const refreshToken = localStorage.getItem('refreshToken')
+    const accessToken = localStorage.getItem('accessToken')
+
+    if (!accessToken && !refreshToken) return config
+
+    try {
+      const token = await ensureValidAccessToken()
+      config.headers.Authorization = `Bearer ${token}`
+    } catch {
+      const url = String(config?.url || '')
+      if (!url.includes('/auth/logout')) {
+        clearAuthSession()
+        redirectToLogin()
+      }
+      return Promise.reject(new axios.CanceledError('Session expired'))
+    }
+
+    return config
+  },
+  (error) => Promise.reject(error),
+)
 
 api.interceptors.response.use(
   (res) => res,
@@ -31,7 +55,7 @@ api.interceptors.response.use(
     const original = error.config
     const status = error.response?.status
 
-    if (status !== 401 || !original || original._retry) {
+    if (status !== 401 || !original || original._retry || isAuthRefreshRequest(original)) {
       return Promise.reject(error)
     }
 
@@ -45,26 +69,13 @@ api.interceptors.response.use(
     original._retry = true
 
     try {
-      if (!refreshPromise) {
-        refreshPromise = axios
-          .post(`${api.defaults.baseURL}/auth/refresh`, { refreshToken })
-          .finally(() => {
-            refreshPromise = null
-          })
-      }
-
-      const { data } = await refreshPromise
-      const nextAccess = data.data.accessToken
-      const nextRefresh = data.data.refreshToken
-
-      localStorage.setItem('accessToken', nextAccess)
-      localStorage.setItem('refreshToken', nextRefresh)
+      const nextAccess = await refreshAccessToken()
       original.headers.Authorization = `Bearer ${nextAccess}`
       return api(original)
-    } catch {
+    } catch (refreshError) {
       clearAuthSession()
       redirectToLogin()
-      return Promise.reject(error)
+      return Promise.reject(refreshError)
     }
   },
 )

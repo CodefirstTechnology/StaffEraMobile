@@ -18,7 +18,17 @@ import AdminServants from './pages/admin/AdminServants'
 import AdminSkills from './pages/admin/AdminSkills'
 import AdminAgents from './pages/admin/AdminAgents'
 
-const qc = new QueryClient()
+const qc = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        const status = error?.response?.status
+        if (status === 401 || status === 403) return false
+        return failureCount < 2
+      },
+    },
+  },
+})
 
 export default function App() {
   return (
