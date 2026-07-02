@@ -1,12 +1,33 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-const linkClass = ({ isActive }) =>
-  `block rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-    isActive
-      ? 'bg-primary text-white shadow-md'
-      : 'text-on-surface-variant hover:bg-surface-container'
-  }`
+const NAV_INACTIVE =
+  'block rounded-xl px-3 py-2.5 text-sm font-medium text-on-surface-variant/85 transition-colors hover:bg-surface-container hover:text-on-background'
+
+const NAV_ACTIVE =
+  'block rounded-xl px-3 py-2.5 text-sm font-semibold bg-primary text-white shadow-md shadow-primary/20'
+
+/** Parent section stays visible when a child admin route is selected. */
+const NAV_PARENT_ACTIVE =
+  'block rounded-xl px-3 py-2.5 text-sm font-semibold bg-primary-fixed text-primary border border-primary/25'
+
+const navLinkClass = ({ isActive }) => (isActive ? NAV_ACTIVE : NAV_INACTIVE)
+
+function AdminOverviewLink() {
+  const { pathname } = useLocation()
+  const isExact = pathname === '/admin'
+  const isChildRoute = pathname.startsWith('/admin/')
+
+  let className = NAV_INACTIVE
+  if (isExact) className = NAV_ACTIVE
+  else if (isChildRoute) className = NAV_PARENT_ACTIVE
+
+  return (
+    <NavLink to="/admin" end className={className}>
+      Overview
+    </NavLink>
+  )
+}
 
 export function DashboardLayout() {
   const { user, logout } = useAuth()
@@ -26,40 +47,38 @@ export function DashboardLayout() {
           <p className="text-xs text-on-surface-variant">Agent pipeline</p>
         </div>
         <nav className="flex flex-1 flex-col gap-1">
-          <NavLink to="/" end className={linkClass}>
+          <NavLink to="/" end className={navLinkClass}>
             Dashboard
           </NavLink>
-          <NavLink to="/registrations" className={linkClass}>
+          <NavLink to="/registrations" className={navLinkClass}>
             App registrations
           </NavLink>
-          <NavLink to="/servants" className={linkClass}>
+          <NavLink to="/servants" className={navLinkClass}>
             Servants
           </NavLink>
-          <NavLink to="/profile" className={linkClass}>
+          <NavLink to="/profile" className={navLinkClass}>
             Profile
           </NavLink>
           {isAdmin && (
             <>
               <div className="my-3 border-t border-outline-variant/40" />
-              <p className="px-3 text-xs font-semibold text-secondary uppercase tracking-wide">
+              <p className="px-3 text-xs font-semibold uppercase tracking-wide text-on-surface-variant/75">
                 Admin
               </p>
-              <NavLink to="/admin" className={linkClass}>
-                Overview
-              </NavLink>
-              <NavLink to="/admin/agents" className={linkClass}>
+              <AdminOverviewLink />
+              <NavLink to="/admin/agents" end className={navLinkClass}>
                 Agents
               </NavLink>
-              <NavLink to="/admin/users" className={linkClass}>
+              <NavLink to="/admin/users" end className={navLinkClass}>
                 Users
               </NavLink>
-              <NavLink to="/admin/bookings" className={linkClass}>
+              <NavLink to="/admin/bookings" end className={navLinkClass}>
                 Bookings
               </NavLink>
-              <NavLink to="/admin/servants" className={linkClass}>
+              <NavLink to="/admin/servants" end className={navLinkClass}>
                 All servants
               </NavLink>
-              <NavLink to="/admin/skills" className={linkClass}>
+              <NavLink to="/admin/skills" end className={navLinkClass}>
                 Skills
               </NavLink>
             </>
@@ -68,7 +87,7 @@ export function DashboardLayout() {
         <button
           type="button"
           onClick={handleLogout}
-          className="mt-4 rounded-xl border border-outline-variant py-2.5 text-sm font-medium text-on-surface-variant hover:bg-surface-container"
+          className="mt-4 rounded-xl border border-outline-variant py-2.5 text-sm font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-background"
         >
           Logout
         </button>
