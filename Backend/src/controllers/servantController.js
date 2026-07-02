@@ -1,3 +1,4 @@
+const { isAadhaarVerificationRequired } = require("../config/features");
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
@@ -39,9 +40,12 @@ exports.listServants = async (req, res) => {
   const { lat, lng } = await resolveHouseOwnerCoords(req.user.id, latitude, longitude);
   const radius = radiusKm != null ? Number(radiusKm) : DEFAULT_RADIUS_KM;
 
+  const requireAadhaar = isAadhaarVerificationRequired();
+
   const where = {
     verificationStatus: "VERIFIED",
     user: { isActive: true },
+    ...(requireAadhaar ? { aadhaarVerified: true } : {}),
     ...(skill
       ? { skills: { some: { skillName: { equals: skill, mode: "insensitive" } } } }
       : {}),
@@ -109,6 +113,12 @@ exports.getServant = async (req, res) => {
     if (servant.verificationStatus !== "VERIFIED") {
       throw new ApiError(404, "Servant not found");
     }
+    if (
+      isAadhaarVerificationRequired() &&
+      !servant.aadhaarVerified
+    ) {
+      throw new ApiError(404, "Servant not found");
+    }
 
     const { lat, lng } = await resolveHouseOwnerCoords(
       req.user.id,
@@ -135,7 +145,18 @@ exports.getMyProfile = async (req, res) => {
 };
 
 exports.updateMyProfile = async (req, res) => {
-  const { bio, profilePhoto, availableFrom, availableTo, workingDays } = req.body;
+  const {
+    bio,
+    profilePhoto,
+    availableFrom,
+    availableTo,
+    workingDays,
+    bankAccountHolder,
+    bankAccountNumber,
+    bankName,
+    bankIfsc,
+    bankUpiId
+  } = req.body;
 
   const servant = await prisma.servant.findUnique({
     where: { userId: req.user.id }
@@ -153,7 +174,18 @@ exports.updateMyProfile = async (req, res) => {
         workingDays: Array.isArray(workingDays)
           ? JSON.stringify(workingDays)
           : workingDays
-      })
+      }),
+      ...(bankAccountHolder !== undefined && {
+        bankAccountHolder: bankAccountHolder?.trim() || null
+      }),
+      ...(bankAccountNumber !== undefined && {
+        bankAccountNumber: bankAccountNumber?.trim() || null
+      }),
+      ...(bankName !== undefined && { bankName: bankName?.trim() || null }),
+      ...(bankIfsc !== undefined && {
+        bankIfsc: bankIfsc?.trim() ? bankIfsc.trim().toUpperCase() : null
+      }),
+      ...(bankUpiId !== undefined && { bankUpiId: bankUpiId?.trim() || null })
     },
     include: servantInclude
   });

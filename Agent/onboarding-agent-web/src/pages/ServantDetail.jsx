@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 import { uploadUrl } from '../lib/mediaUrl'
 import {
   buildReportFromServant,
@@ -15,6 +16,9 @@ import { SourceBadge } from '../components/ui/SourceBadge'
 import { Button } from '../components/ui/Button'
 import { ApprovePasswordModal } from '../components/ApprovePasswordModal'
 import { SetLoginPasswordCard } from '../components/SetLoginPasswordCard'
+import { BankDetailsReview } from '../components/BankDetailsFields'
+import { AadhaarXmlVerify } from '../components/AadhaarXmlVerify'
+import { isValidIfscFormat, lookupIfsc } from '../lib/ifscLookup'
 
 const parseWorkingDays = (wd) => {
   if (!wd) return []
@@ -85,6 +89,7 @@ function LoadingSkeleton() {
 
 export default function ServantDetail() {
   const { id } = useParams()
+  const { user, loading: authLoading } = useAuth()
   const [searchParams] = useSearchParams()
   const fromRegistrations = searchParams.get('from') === 'registrations'
   const qc = useQueryClient()
@@ -94,49 +99,74 @@ export default function ServantDetail() {
   const [credentials, setCredentials] = useState(null)
   const [reason, setReason] = useState('')
   const [idModal, setIdModal] = useState(false)
+  const [ifscMeta, setIfscMeta] = useState({ bank: '', branch: '' })
 
-  const { data: servant, isLoading } = useQuery({
+  const { data: servant, isLoading, isError, error } = useQuery({
     queryKey: ['servant', id],
     queryFn: async () => {
       const res = await api.get(`/agent/servants/${id}`)
       return res.data.data.servant
     },
+    enabled: !authLoading && !!user && !!localStorage.getItem('accessToken'),
+    retry: false,
   })
 
   const verify = async (status, rejectionReason, opts = {}) => {
-    const res = await api.patch(`/agent/servants/${id}/verify`, {
-      status,
-      reason: rejectionReason,
-      ...(opts.password ? { password: opts.password } : {}),
-      ...(opts.generatePassword ? { generatePassword: true } : {}),
-    })
-    qc.invalidateQueries({ queryKey: ['servant', id] })
-    qc.invalidateQueries({ queryKey: ['agent-servants'] })
-    qc.invalidateQueries({ queryKey: ['agent-registrations'] })
-    setRejectOpen(false)
-    setApproveOpen(false)
-    if (res.data?.data?.credentials) {
-      setCredentials(res.data.data.credentials)
+    try {
+      const res = await api.patch(`/agent/servants/${id}/verify`, {
+        status,
+        reason: rejectionReason,
+        ...(opts.password ? { password: opts.password } : {}),
+        ...(opts.generatePassword ? { generatePassword: true } : {}),
+      })
+      qc.invalidateQueries({ queryKey: ['servant', id] })
+      qc.invalidateQueries({ queryKey: ['agent-servants'] })
+      qc.invalidateQueries({ queryKey: ['agent-registrations'] })
+      setRejectOpen(false)
+      setApproveOpen(false)
+      if (res.data?.data?.credentials) {
+        setCredentials(res.data.data.credentials)
+      }
+      return res
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Request failed'
+      window.alert(msg)
+      throw err
     }
-    return res
   }
+
+  useEffect(() => {
+    const code = servant?.bankIfsc
+    if (!code || !isValidIfscFormat(code)) {
+      setIfscMeta({ bank: '', branch: '' })
+      return
+    }
+    let cancelled = false
+    lookupIfsc(code).then((result) => {
+      if (cancelled || !result.ok) return
+      const branch = [result.branch, result.city].filter(Boolean).join(' · ')
+      setIfscMeta({ bank: result.bank || '', branch })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [servant?.bankIfsc])
 
   const isAppRegistration =
     servant?.registrationSource === 'SELF' || servant?.user?.isActive === false
 
   const handleApproveClick = () => {
-    if (isAppRegistration && !servant?.user?.agentSetPassword) {
-      setApproveOpen(true)
-      return
-    }
-    if (isAppRegistration && servant?.user?.agentSetPassword) {
-      if (window.confirm('Approve this helper? They can sign in with the password you already set.')) {
-        verify('VERIFIED')
-      }
-      return
-    }
-    if (window.confirm('Approve this servant?')) {
-      verify('VERIFIED')
+    const message = isAppRegistration
+      ? servant?.user?.agentSetPassword
+        ? 'Approve this helper? They can sign in with the password you already set.'
+        : 'Approve this helper? A login password will be generated automatically.'
+      : 'Approve this servant?'
+    if (window.confirm(message)) {
+      void verify('VERIFIED', undefined, {
+        ...(isAppRegistration && !servant?.user?.agentSetPassword
+          ? { generatePassword: true }
+          : {}),
+      })
     }
   }
 
@@ -144,15 +174,28 @@ export default function ServantDetail() {
     setApproveLoading(true)
     try {
       await verify('VERIFIED', undefined, opts)
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Approval failed'
-      window.alert(msg)
     } finally {
       setApproveLoading(false)
     }
   }
 
-  if (isLoading) return <LoadingSkeleton />
+  if (isLoading || authLoading) return <LoadingSkeleton />
+  if (isError) {
+    const message =
+      error?.response?.data?.message ||
+      (error?.response?.status === 401
+        ? 'Session expired. Please sign in again.'
+        : 'Could not load servant profile.')
+    return (
+      <div className="mx-auto max-w-lg text-center">
+        <p className="text-lg font-semibold text-primary">Unable to load profile</p>
+        <p className="mt-2 text-sm text-on-surface-variant">{message}</p>
+        <Link to="/servants" className="mt-4 inline-block text-sm text-secondary hover:underline">
+          ← Back to servants
+        </Link>
+      </div>
+    )
+  }
   if (!servant) {
     return (
       <div className="mx-auto max-w-lg text-center">
@@ -242,6 +285,16 @@ export default function ServantDetail() {
                     🪪 {servant.idProofType.replace(/_/g, ' ')}
                   </span>
                 )}
+                {servant.aadhaarVerified ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                    ✓ Aadhaar verified
+                  </span>
+                ) : null}
+                {servant.phoneVerified ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">
+                    ✓ Mobile verified
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
@@ -295,11 +348,11 @@ export default function ServantDetail() {
                 <p className="text-sm text-on-surface-variant">No skills listed</p>
               )}
             </div>
-            {servant.zones?.length > 0 && (
-              <div className="mt-4 border-t border-outline-variant/30 pt-4">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
-                  Zones
-                </p>
+            <div className="mt-4 border-t border-outline-variant/30 pt-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+                Service zones
+              </p>
+              {servant.zones?.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {servant.zones.map((z) => (
                     <span
@@ -312,8 +365,15 @@ export default function ServantDetail() {
                     </span>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-on-surface-variant">
+                  No zones yet.{' '}
+                  <Link to={`/servants/${id}/edit`} className="text-primary underline">
+                    Add service zones
+                  </Link>
+                </p>
+              )}
+            </div>
           </SectionCard>
 
           {/* Availability */}
@@ -362,6 +422,24 @@ export default function ServantDetail() {
                 {servant.availabilityNotes}
               </p>
             )}
+          </SectionCard>
+
+          <SectionCard title="Aadhaar verification">
+            <AadhaarXmlVerify servantId={id} servant={servant} compact />
+          </SectionCard>
+
+          <SectionCard title="Bank details">
+            <BankDetailsReview
+              form={{
+                bankAccountHolder: servant.bankAccountHolder,
+                bankAccountNumber: servant.bankAccountNumber,
+                bankName: servant.bankName || ifscMeta.bank,
+                bankIfsc: servant.bankIfsc,
+                bankUpiId: servant.bankUpiId,
+              }}
+              maskAccount
+              ifscBranch={ifscMeta.branch}
+            />
           </SectionCard>
 
           {/* Bookings */}
@@ -487,6 +565,15 @@ export default function ServantDetail() {
                 >
                   ✓ Approve
                 </Button>
+                {isAppRegistration && !servant.user?.agentSetPassword ? (
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setApproveOpen(true)}
+                  >
+                    Approve with custom password
+                  </Button>
+                ) : null}
                 <Button
                   variant="secondary"
                   className="w-full"

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
@@ -7,6 +7,27 @@ import { VerifiedBadge } from '../components/ui/VerifiedBadge'
 import { Button } from '../components/ui/Button'
 import { SetPasswordModal } from '../components/SetPasswordModal'
 import { CredentialsBanner } from '../components/CredentialsBanner'
+import {
+  PageHeader,
+  StatCard,
+  Avatar,
+  FilterBar,
+  SelectFilter,
+  SearchInput,
+  LoadingSkeleton,
+  EmptyState,
+  DataTable,
+  TableRow,
+  MobileCard,
+  InfoBanner,
+  PasswordPill,
+} from '../components/admin/adminUi'
+
+const STATUS_OPTIONS = [
+  ['', 'All statuses'],
+  ['PENDING', 'Pending'],
+  ['UNDER_REVIEW', 'Under review'],
+]
 
 export default function AppRegistrationList() {
   const qc = useQueryClient()
@@ -37,6 +58,14 @@ export default function AppRegistrationList() {
   const rows = data?.servants || []
   const locationNotice = data?.locationNotice
 
+  const stats = useMemo(() => {
+    const pending = rows.filter((s) =>
+      ['PENDING', 'UNDER_REVIEW'].includes(s.verificationStatus),
+    ).length
+    const needPassword = rows.filter((s) => !s.user.agentSetPassword).length
+    return { total: rows.length, pending, needPassword }
+  }, [rows])
+
   const savePassword = async ({ password }) => {
     if (!passwordTarget) return
     setPasswordLoading(true)
@@ -57,105 +86,139 @@ export default function AppRegistrationList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-violet-900">App registrations</h2>
-          <p className="mt-1 max-w-xl text-sm text-on-surface-variant">
-            Helpers who signed up in the Servant app within 3 km of your agency location.
-            Set your office location in Profile to receive nearby requests.
-          </p>
-        </div>
-        <Link to="/servants">
-          <Button variant="secondary">View servants</Button>
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Inbox"
+        title="App registrations"
+        description="Helpers who signed up in the Servant app within your agency service radius."
+        action={
+          <Link to="/servants">
+            <Button variant="secondary">My servants</Button>
+          </Link>
+        }
+      />
 
       <CredentialsBanner credentials={credentials} onDone={() => setCredentials(null)} />
 
-      {locationNotice && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
-          {locationNotice}
+      {locationNotice && <InfoBanner variant="violet">{locationNotice}</InfoBanner>}
+
+      {!isLoading && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard label="Registrations" value={stats.total} accent="text-violet-700" />
+          <StatCard label="Pending review" value={stats.pending} accent="text-amber-600" />
+          <StatCard
+            label="Need password"
+            value={stats.needPassword}
+            accent="text-secondary"
+            sub="Set login before approval"
+          />
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3">
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-        >
-          <option value="">All statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="UNDER_REVIEW">Under Review</option>
-        </select>
-        <input
-          placeholder="Search name or email…"
+      <FilterBar
+        count={rows.length}
+        countLabel={rows.length === 1 ? 'registration' : 'registrations'}
+      >
+        <SelectFilter value={status} onChange={setStatus} options={STATUS_OPTIONS} />
+        <SearchInput
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          onChange={setSearch}
+          placeholder="Search name or email…"
         />
-      </div>
+      </FilterBar>
 
       {isLoading ? (
-        <p>Loading…</p>
+        <LoadingSkeleton cards={3} rows={4} />
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon="📱"
+          title="No app registrations yet"
+          description="Set your agency location and radius in Profile to receive nearby sign-ups."
+        />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-violet-100 bg-surface shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-violet-50">
-              <tr>
-                <th className="p-4">Name</th>
-                <th className="p-4">Email (Gmail / other)</th>
-                <th className="p-4">Phone</th>
-                <th className="p-4">Password</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-on-surface-variant">
-                    No app registrations yet.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((s) => (
-                  <tr key={s.id} className="border-b">
-                    <td className="p-4">
-                      <div className="flex flex-wrap items-center gap-2 font-medium">
-                        {s.user.name}
-                        {s.verificationStatus === 'VERIFIED' ? <VerifiedBadge /> : null}
+        <>
+          <div className="grid gap-4 lg:hidden">
+            {rows.map((s) => (
+              <MobileCard key={s.id}>
+                <div className="flex items-start gap-3">
+                  <Avatar name={s.user.name} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-primary">{s.user.name}</p>
+                      {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
+                    </div>
+                    <p className="truncate text-sm text-on-surface-variant">{s.user.email}</p>
+                    <p className="text-sm text-on-surface-variant">{s.user.phone || 'No phone'}</p>
+                  </div>
+                  <Badge status={s.verificationStatus} />
+                </div>
+                <div className="mt-3">
+                  <PasswordPill set={s.user.agentSetPassword} />
+                </div>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    variant="gradient"
+                    className="flex-1 text-sm"
+                    onClick={() => setPasswordTarget(s)}
+                  >
+                    {s.user.agentSetPassword ? 'Change password' : 'Set password'}
+                  </Button>
+                  <Link to={`/servants/${s.id}?from=registrations`} className="flex-1">
+                    <Button variant="secondary" className="w-full text-sm">
+                      Review
+                    </Button>
+                  </Link>
+                </div>
+              </MobileCard>
+            ))}
+          </div>
+
+          <DataTable
+            columns={['Applicant', 'Contact', 'Password', 'Status', 'Actions']}
+          >
+            {rows.map((s) => (
+              <TableRow key={s.id}>
+                <td className="px-4 py-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={s.user.name} />
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-primary">{s.user.name}</span>
+                        {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
                       </div>
-                    </td>
-                    <td className="p-4">{s.user.email}</td>
-                    <td className="p-4">{s.user.phone || '—'}</td>
-                    <td className="p-4">
-                      {s.user.agentSetPassword ? (
-                        <span className="text-emerald-700 font-medium">Set</span>
-                      ) : (
-                        <span className="text-amber-700">Not set</span>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <Badge status={s.verificationStatus} />
-                    </td>
-                    <td className="p-4 space-x-2">
-                      <Button
-                        variant="secondary"
-                        onClick={() => setPasswordTarget(s)}
-                      >
-                        {s.user.agentSetPassword ? 'Change password' : 'Set password'}
-                      </Button>
-                      <Link to={`/servants/${s.id}?from=registrations`}>
-                        <Button variant="secondary">Review</Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-4">
+                  <p className="text-sm">{s.user.email}</p>
+                  <p className="text-xs text-on-surface-variant">{s.user.phone || '—'}</p>
+                </td>
+                <td className="px-4 py-4">
+                  <PasswordPill set={s.user.agentSetPassword} />
+                </td>
+                <td className="px-4 py-4">
+                  <Badge status={s.verificationStatus} />
+                </td>
+                <td className="px-4 py-4">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPasswordTarget(s)}
+                      className="rounded-lg bg-secondary/10 px-3 py-1.5 text-xs font-semibold text-secondary hover:bg-secondary/15"
+                    >
+                      {s.user.agentSetPassword ? 'Password' : 'Set password'}
+                    </button>
+                    <Link
+                      to={`/servants/${s.id}?from=registrations`}
+                      className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
+                    >
+                      Review
+                    </Link>
+                  </div>
+                </td>
+              </TableRow>
+            ))}
+          </DataTable>
+        </>
       )}
 
       <SetPasswordModal

@@ -9,10 +9,26 @@ const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 const googleMapId = process.env.EXPO_PUBLIC_GOOGLE_MAP_ID || '';
 const apiBaseUrl =
   process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/v1';
+const easProjectId = appJson.expo.extra?.eas?.projectId;
+const buildProfile = process.env.EAS_BUILD_PROFILE;
+// Preview/dev APKs embed the JS bundle — skip OTA checks to avoid launch crashes.
+const otaUpdatesEnabled = buildProfile === 'production';
 
 export default ({ config }) => ({
   ...appJson.expo,
   ...config,
+  ...(otaUpdatesEnabled
+    ? {
+        runtimeVersion: { policy: 'appVersion' },
+        updates: {
+          enabled: true,
+          fallbackToCacheTimeout: 0,
+          url: `https://u.expo.dev/${easProjectId}`,
+        },
+      }
+    : {
+        updates: { enabled: false },
+      }),
   android: {
     ...appJson.expo.android,
     config: {

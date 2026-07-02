@@ -53,6 +53,13 @@ export function buildReportFromForm(form, skillsCatalog = [], files = {}) {
       idProofFile: files.idProof?.name || null,
       profilePhotoFile: files.profilePhoto?.name || null,
     },
+    bank: {
+      accountHolder: form.bankAccountHolder,
+      accountNumber: form.bankAccountNumber,
+      bankName: form.bankName,
+      ifsc: form.bankIfsc,
+      upiId: form.bankUpiId,
+    },
     verificationStatus: 'Draft (not yet submitted)',
     servantId: null,
   }
@@ -106,6 +113,13 @@ export function buildReportFromServant(servant) {
       idProofType: servant.idProofType,
       idProofFile: servant.idProofUrl ? 'Uploaded on server' : null,
       profilePhotoFile: servant.profilePhoto ? 'Uploaded on server' : null,
+    },
+    bank: {
+      accountHolder: servant.bankAccountHolder,
+      accountNumber: servant.bankAccountNumber,
+      bankName: servant.bankName,
+      ifsc: servant.bankIfsc,
+      upiId: servant.bankUpiId,
     },
     verificationStatus: servant.verificationStatus,
     verifiedAt: servant.verifiedAt
@@ -186,6 +200,15 @@ function reportHtml(data) {
     ${row('ID type', data.documents?.idProofType?.replace(/_/g, ' '))}
     ${row('ID proof', data.documents?.idProofFile)}
     ${row('Profile photo', data.documents?.profilePhotoFile)}
+  </table>
+
+  <h2>Bank details</h2>
+  <table>
+    ${row('Account holder', data.bank?.accountHolder)}
+    ${row('Account number', data.bank?.accountNumber)}
+    ${row('Bank name', data.bank?.bankName)}
+    ${row('IFSC', data.bank?.ifsc)}
+    ${row('UPI ID', data.bank?.upiId)}
   </table>
 
   ${

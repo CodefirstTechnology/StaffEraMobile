@@ -186,7 +186,7 @@ export default function ProfileScreen() {
         </View>
 
         {zones.length === 0 ? (
-          <Text style={styles.zoneEmpty}>{t('zones.empty')}</Text>
+          <Text style={styles.zoneEmpty}>{t('zones.emptyAgent')}</Text>
         ) : (
           <View style={styles.zoneChips}>
             {zones.map((z) => (
@@ -201,15 +201,43 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {zones.length > 0 ? (
+          <TouchableOpacity
+            style={styles.zoneBtn}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(main)/zones')}
+          >
+            <MaterialIcons name="map" size={22} color={Stitch.colors.primary} />
+            <View style={styles.zoneBtnTextWrap}>
+              <Text style={styles.zoneBtnTitle}>{t('zones.view')}</Text>
+              <Text style={styles.zoneBtnSub}>{t('zones.viewSub')}</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={Stitch.colors.onSurfaceVariant} />
+          </TouchableOpacity>
+        ) : null}
+      </GlassCard>
+
+      <GlassCard style={styles.sectionCard}>
+        <View style={styles.sectionHead}>
+          <View style={styles.sectionIcon}>
+            <MaterialIcons name="verified-user" size={20} color={Stitch.colors.secondary} />
+          </View>
+          <View style={styles.sectionHeadText}>
+            <Text style={styles.sectionTitle}>Aadhaar verification</Text>
+            <Text style={styles.sectionSub}>
+              Verify with Offline e-KYC from myAadhaar (free, UIDAI-signed)
+            </Text>
+          </View>
+        </View>
         <TouchableOpacity
           style={styles.zoneBtn}
           activeOpacity={0.85}
-          onPress={() => router.push('/(main)/zones')}
+          onPress={() => router.push('/(main)/profile/verify-aadhaar')}
         >
-          <MaterialIcons name="add-location-alt" size={22} color={Stitch.colors.primary} />
+          <MaterialIcons name="upload-file" size={22} color={Stitch.colors.primary} />
           <View style={styles.zoneBtnTextWrap}>
-            <Text style={styles.zoneBtnTitle}>{t('zones.manage')}</Text>
-            <Text style={styles.zoneBtnSub}>{t('zones.manageSub')}</Text>
+            <Text style={styles.zoneBtnTitle}>Verify Aadhaar</Text>
+            <Text style={styles.zoneBtnSub}>Upload ZIP + 4-digit share code</Text>
           </View>
           <MaterialIcons name="chevron-right" size={22} color={Stitch.colors.onSurfaceVariant} />
         </TouchableOpacity>

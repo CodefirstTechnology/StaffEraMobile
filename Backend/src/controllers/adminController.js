@@ -11,6 +11,7 @@ const {
   userWithRoleInclude
 } = require("../services/roleService");
 const { attachAnnualRevenueToAgents } = require("../services/agentRevenueService");
+const { DEFAULT_RADIUS_KM } = require("../services/locationService");
 
 const generateAgentPassword = () => {
   const part = crypto.randomBytes(4).toString("hex");
@@ -101,7 +102,7 @@ exports.getStats = async (req, res) => {
 exports.listUsers = async (req, res) => {
   const { role, search, isActive } = req.query;
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-  const limit = Math.min(100, parseInt(req.query.limit, 10) || 20);
+  const limit = Math.min(200, parseInt(req.query.limit, 10) || 100);
 
   const where = {
     ...roleWhereByCode(role),
@@ -110,7 +111,8 @@ exports.listUsers = async (req, res) => {
       ? {
           OR: [
             { name: { contains: search, mode: "insensitive" } },
-            { email: { contains: search, mode: "insensitive" } }
+            { email: { contains: search, mode: "insensitive" } },
+            { phone: { contains: search, mode: "insensitive" } }
           ]
         }
       : {})
@@ -123,10 +125,12 @@ exports.listUsers = async (req, res) => {
         id: true,
         name: true,
         email: true,
+        phone: true,
         roleId: true,
         isActive: true,
         createdAt: true,
-        role: { select: { id: true, code: true, label: true } }
+        role: { select: { id: true, code: true, label: true } },
+        houseOwner: { select: { city: true, address: true } }
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -251,7 +255,8 @@ exports.createAgent = async (req, res) => {
     city,
     latitude,
     longitude,
-    generatePassword
+    generatePassword,
+    serviceRadiusKm
   } = req.body;
   const email = normalizeEmail(req.body.email);
   const phone = normalizePhone(req.body.phone);
@@ -285,7 +290,11 @@ exports.createAgent = async (req, res) => {
           address: address.trim(),
           city: city?.trim() || null,
           latitude: parseFloat(latitude),
-          longitude: parseFloat(longitude)
+          longitude: parseFloat(longitude),
+          serviceRadiusKm:
+            serviceRadiusKm != null && serviceRadiusKm !== ""
+              ? parseFloat(serviceRadiusKm)
+              : DEFAULT_RADIUS_KM
         }
       }
     },
@@ -301,6 +310,59 @@ exports.createAgent = async (req, res) => {
     },
     201
   );
+};
+
+exports.updateAgent = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const existing = await prisma.agent.findUnique({
+    where: { id },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          isActive: true,
+          createdAt: true
+        }
+      },
+      _count: { select: { servants: true } }
+    }
+  });
+  if (!existing) throw new ApiError(404, "Agent not found");
+
+  const { agencyName, address, city, latitude, longitude, serviceRadiusKm } = req.body;
+
+  const agent = await prisma.agent.update({
+    where: { id },
+    data: {
+      ...(agencyName !== undefined && { agencyName: agencyName?.trim() || null }),
+      ...(address !== undefined && { address: address.trim() }),
+      ...(city !== undefined && { city: city?.trim() || null }),
+      ...(latitude !== undefined && { latitude: parseFloat(latitude) }),
+      ...(longitude !== undefined && { longitude: parseFloat(longitude) }),
+      ...(serviceRadiusKm !== undefined && {
+        serviceRadiusKm: parseFloat(serviceRadiusKm)
+      })
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          isActive: true,
+          createdAt: true
+        }
+      },
+      _count: { select: { servants: true } }
+    }
+  });
+
+  const [agentWithRevenue] = await attachAnnualRevenueToAgents([agent]);
+  sendSuccess(res, { agent: agentWithRevenue });
 };
 
 exports.toggleUser = async (req, res) => {

@@ -8,6 +8,13 @@ import { LoginPasswordFields } from '../components/LoginPasswordFields'
 import { SkillDropdown } from '../components/SkillDropdown'
 import { useSkills } from '../hooks/useSkills'
 import { uploadUrl } from '../lib/mediaUrl'
+import {
+  BankDetailsFields,
+  EMPTY_BANK_FORM,
+  validateBankDetails,
+} from '../components/BankDetailsFields'
+import { AadhaarXmlVerify } from '../components/AadhaarXmlVerify'
+import { ServiceZonesEditor } from '../components/ServiceZonesEditor'
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const ID_TYPES = ['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID']
@@ -53,6 +60,7 @@ export default function EditServant() {
   const [saving, setSaving] = useState(false)
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
+  const [bankAccountConfirm, setBankAccountConfirm] = useState('')
 
   const { data: servant, isLoading } = useQuery({
     queryKey: ['servant', id],
@@ -79,6 +87,7 @@ export default function EditServant() {
     skills: [],
     address: '',
     idProofType: 'AADHAR',
+    ...EMPTY_BANK_FORM,
   })
 
   useEffect(() => {
@@ -100,6 +109,11 @@ export default function EditServant() {
       skills: servant.skills?.map((s) => s.skillName) || [],
       address: servant.address || '',
       idProofType: servant.idProofType || 'AADHAR',
+      bankAccountHolder: servant.bankAccountHolder || '',
+      bankAccountNumber: '',
+      bankName: servant.bankName || '',
+      bankIfsc: servant.bankIfsc || '',
+      bankUpiId: servant.bankUpiId || '',
     })
   }, [servant])
 
@@ -118,9 +132,17 @@ export default function EditServant() {
       setError('Select at least one booking type: Session or Monthly')
       return
     }
+    const bankErr = validateBankDetails(form, bankAccountConfirm, {
+      existingAccountNumber: servant?.bankAccountNumber,
+    })
+    if (bankErr) {
+      setError(bankErr)
+      return
+    }
     setSaving(true)
     const fd = new FormData()
     Object.entries(form).forEach(([k, v]) => {
+      if (k === 'bankAccountNumber' && !v && servant?.bankAccountNumber) return
       if (k === 'skills' || k === 'workingDays') {
         fd.append(k, JSON.stringify(v))
       } else if (typeof v === 'boolean') {
@@ -354,6 +376,22 @@ export default function EditServant() {
         )}
       </div>
 
+      <AadhaarXmlVerify servantId={id} servant={servant} />
+
+      <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
+        <h3 className="font-semibold">Bank details</h3>
+        <p className="text-sm text-subtext">
+          Used for payouts to this helper. Collect from the servant if not filled during onboarding.
+        </p>
+        <BankDetailsFields
+          form={form}
+          update={update}
+          accountNumberConfirm={bankAccountConfirm}
+          onAccountNumberConfirmChange={setBankAccountConfirm}
+          existingAccountNumber={servant.bankAccountNumber}
+        />
+      </div>
+
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
         <h3 className="font-semibold">ID & Documents</h3>
         <Field label="ID proof type">
@@ -430,25 +468,7 @@ export default function EditServant() {
         )}
       </div>
 
-      {(servant.zones?.length > 0) && (
-        <div className="space-y-2 rounded-xl bg-surface p-6 shadow-sm">
-          <h3 className="font-semibold">Service zones</h3>
-          <p className="text-xs text-subtext">
-            Managed by the servant in the Servant app
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {servant.zones.map((z) => (
-              <span
-                key={z.id}
-                className="rounded-full bg-primary/10 px-3 py-1 text-xs text-primary"
-              >
-                {z.name}
-                {z.city ? ` · ${z.city}` : ''}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <ServiceZonesEditor servantId={id} zones={servant.zones || []} />
 
       {savedCredentials && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">

@@ -1,10 +1,470 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
 import { Button } from '../../components/ui/Button'
 import { AgentLocationPicker } from '../../components/AgentLocationPicker'
 import { LocationIcon } from '../../components/icons/LocationIcon'
 import { CredentialsBanner } from '../../components/CredentialsBanner'
+
+const emptyEditForm = () => ({
+  agencyName: '',
+  location: null,
+  serviceRadiusKm: '3',
+})
+
+function inputClass() {
+  return 'input-ghost w-full text-sm'
+}
+
+function fieldInputClass(invalid = false) {
+  return `${inputClass()}${invalid ? ' !border-error focus:!border-error' : ''}`
+}
+
+const REQUIRED = 'This field is required'
+
+const emptyCreateFieldErrors = () => ({
+  name: '',
+  email: '',
+  location: '',
+  manualAddress: '',
+  manualLatitude: '',
+  manualLongitude: '',
+  password: '',
+  serviceRadiusKm: '',
+})
+
+const emptyEditFieldErrors = () => ({
+  location: '',
+  serviceRadiusKm: '',
+})
+
+function FormField({ label, required, error, hint, className = '', children }) {
+  return (
+    <label className={`block space-y-1.5 ${className}`.trim()}>
+      <span className="text-sm font-medium text-on-background">
+        {label}
+        {required ? <span className="text-error"> *</span> : null}
+      </span>
+      {children}
+      {error ? (
+        <span className="text-xs font-medium text-error">{error}</span>
+      ) : hint ? (
+        <span className="text-xs text-on-surface-variant">{hint}</span>
+      ) : null}
+    </label>
+  )
+}
+
+function validateEmail(value) {
+  if (!value.trim()) return REQUIRED
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+    return 'Enter a valid email address'
+  }
+  return ''
+}
+
+function validateName(value) {
+  if (!value.length) return REQUIRED
+  if (!value.trim().length) return 'Name cannot contain only spaces'
+  if (value.trim().length < 2) return 'Name must be at least 2 characters'
+  return ''
+}
+
+function validateServiceRadius(value) {
+  const trimmed = String(value ?? '').trim()
+  if (!trimmed) return REQUIRED
+  const radius = Number(trimmed)
+  if (!Number.isFinite(radius)) return 'Enter a valid number'
+  if (radius < 1 || radius > 100) return 'Service radius must be between 1 and 100 km'
+  return ''
+}
+
+function validateCreateAgentFields({
+  name,
+  email,
+  locationMode,
+  location,
+  manualAddress,
+  manualLatitude,
+  manualLongitude,
+  generatePassword,
+  password,
+  serviceRadiusKm,
+}) {
+  const errors = emptyCreateFieldErrors()
+  errors.name = validateName(name)
+  errors.email = validateEmail(email)
+
+  if (locationMode === 'picker') {
+    if (
+      !location?.address?.trim() ||
+      location.latitude == null ||
+      location.longitude == null
+    ) {
+      errors.location = 'Pick the office location from search or GPS'
+    }
+  } else {
+    if (!manualAddress.trim()) errors.manualAddress = REQUIRED
+    if (!String(manualLatitude).trim()) errors.manualLatitude = REQUIRED
+    else if (!Number.isFinite(Number(manualLatitude))) {
+      errors.manualLatitude = 'Enter a valid latitude'
+    }
+    if (!String(manualLongitude).trim()) errors.manualLongitude = REQUIRED
+    else if (!Number.isFinite(Number(manualLongitude))) {
+      errors.manualLongitude = 'Enter a valid longitude'
+    }
+  }
+
+  if (!generatePassword) {
+    if (!password) errors.password = REQUIRED
+    else if (password.length < 6) errors.password = 'Password must be at least 6 characters'
+  }
+
+  errors.serviceRadiusKm = validateServiceRadius(serviceRadiusKm)
+  return errors
+}
+
+function validateEditAgentFields({ location, serviceRadiusKm }) {
+  const errors = emptyEditFieldErrors()
+  if (
+    !location?.address?.trim() ||
+    location.latitude == null ||
+    location.longitude == null
+  ) {
+    errors.location = 'Pick the office location from search or GPS'
+  }
+  errors.serviceRadiusKm = validateServiceRadius(serviceRadiusKm)
+  return errors
+}
+
+function hasFieldErrors(errors) {
+  return Object.values(errors).some(Boolean)
+}
+
+function updateFieldError(setter, field, value, validate) {
+  setter((prev) => ({
+    ...prev,
+    [field]: prev[field] ? validate(value) : '',
+  }))
+}
+
+function AgentAvatar({ name }) {
+  const initials = (name || '?')
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+  return (
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--gradient-start)] to-[var(--gradient-end)] text-sm font-bold text-white shadow-md">
+      {initials}
+    </span>
+  )
+}
+
+function StatusPill({ active }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+        active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+      }`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-gray-400'}`}
+      />
+      {active ? 'Active' : 'Inactive'}
+    </span>
+  )
+}
+
+function RadiusPill({ km }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-secondary/10 px-2.5 py-1 text-xs font-semibold text-secondary">
+      <span aria-hidden>◎</span>
+      {km ?? 3} km
+    </span>
+  )
+}
+
+function StatCard({ label, value, sub, accent = 'text-primary' }) {
+  return (
+    <div className="glass-card p-5">
+      <p className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
+        {label}
+      </p>
+      <p className={`mt-2 text-2xl font-bold ${accent}`}>{value}</p>
+      {sub && <p className="mt-1 text-xs text-on-surface-variant">{sub}</p>}
+    </div>
+  )
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="glass-card h-24" />
+        ))}
+      </div>
+      <div className="glass-card h-14" />
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="glass-card h-28" />
+      ))}
+    </div>
+  )
+}
+
+function AgentEditPanel({
+  agent,
+  form,
+  setForm,
+  fieldErrors,
+  setFieldErrors,
+  error,
+  saving,
+  onClose,
+  onSave,
+}) {
+  if (!agent) return null
+
+  const updateLocationError = (force = false) => {
+    setFieldErrors((prev) => {
+      const loc = form.location
+      const message =
+        !loc?.address?.trim() || loc.latitude == null || loc.longitude == null
+          ? 'Pick the office location from search or GPS'
+          : ''
+      return force || prev.location ? { ...prev, location: message } : prev
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <button
+        type="button"
+        aria-label="Close edit panel"
+        className="absolute inset-0 bg-primary/20 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <aside className="relative flex h-full w-full max-w-lg flex-col overflow-hidden border-l border-outline-variant/30 bg-white shadow-2xl">
+        <div className="border-b border-outline-variant/20 bg-gradient-to-r from-primary/5 to-secondary/5 px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <AgentAvatar name={agent.user.name} />
+              <div>
+                <h3 className="text-lg font-bold text-primary">Edit agent</h3>
+                <p className="text-sm text-on-surface-variant">{agent.user.email}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-outline-variant/40 px-3 py-1.5 text-sm text-on-surface-variant hover:bg-surface-low"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <StatusPill active={agent.user.isActive} />
+            <RadiusPill km={agent.serviceRadiusKm} />
+            <span className="rounded-full bg-surface-container px-2.5 py-1 text-xs font-medium text-on-surface-variant">
+              {agent._count?.servants ?? 0} servants
+            </span>
+          </div>
+        </div>
+
+        <form onSubmit={onSave} noValidate className="flex flex-1 flex-col overflow-y-auto px-6 py-5">
+          <div className="space-y-5">
+            <section className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary">
+                Agency
+              </h4>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-on-background">Agency name</span>
+                <input
+                  className={inputClass()}
+                  placeholder="e.g. Mumbai West Agency"
+                  value={form.agencyName}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, agencyName: e.target.value }))
+                  }
+                />
+              </label>
+            </section>
+
+            <section className="space-y-3 rounded-2xl border border-outline-variant/25 bg-surface-low/80 p-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary">
+                Location
+              </h4>
+              <AgentLocationPicker
+                label="Office / service area"
+                required
+                value={form.location}
+                error={fieldErrors.location}
+                onInteraction={() => updateLocationError(true)}
+                onChange={(loc) => {
+                  setForm((f) => ({ ...f, location: loc }))
+                  setFieldErrors((prev) => ({
+                    ...prev,
+                    location: prev.location
+                      ? !loc?.address?.trim() ||
+                        loc?.latitude == null ||
+                        loc?.longitude == null
+                        ? 'Pick the office location from search or GPS'
+                        : ''
+                      : '',
+                  }))
+                }}
+              />
+            </section>
+
+            <section className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary">
+                Coverage
+              </h4>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-on-background">
+                  Service radius (km)<span className="text-error"> *</span>
+                </span>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={1}
+                    max={50}
+                    step={0.5}
+                    className="flex-1 accent-secondary"
+                    value={form.serviceRadiusKm}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setForm((f) => ({ ...f, serviceRadiusKm: next }))
+                      updateFieldError(
+                        setFieldErrors,
+                        'serviceRadiusKm',
+                        next,
+                        validateServiceRadius,
+                      )
+                    }}
+                  />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className={`${fieldInputClass(!!fieldErrors.serviceRadiusKm)} w-20 text-center`}
+                    value={form.serviceRadiusKm}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setForm((f) => ({ ...f, serviceRadiusKm: next }))
+                      updateFieldError(
+                        setFieldErrors,
+                        'serviceRadiusKm',
+                        next,
+                        validateServiceRadius,
+                      )
+                    }}
+                    onBlur={() =>
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        serviceRadiusKm: validateServiceRadius(form.serviceRadiusKm),
+                      }))
+                    }
+                    aria-invalid={!!fieldErrors.serviceRadiusKm}
+                  />
+                </div>
+                {fieldErrors.serviceRadiusKm ? (
+                  <span className="text-xs font-medium text-error">
+                    {fieldErrors.serviceRadiusKm}
+                  </span>
+                ) : (
+                  <p className="text-xs text-on-surface-variant">
+                    Helpers within this distance appear in this agent&apos;s app registrations.
+                  </p>
+                )}
+              </label>
+            </section>
+
+            {error && (
+              <div className="rounded-xl border border-error/20 bg-red-50 px-4 py-3 text-sm text-error">
+                {error}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-auto flex gap-3 border-t border-outline-variant/20 pt-5">
+            <Button
+              type="submit"
+              variant="gradient"
+              className="flex-1"
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : 'Save changes'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </aside>
+    </div>
+  )
+}
+
+function AgentRowCard({ agent, isSelected, onEdit, onToggle }) {
+  return (
+    <article
+      className={`glass-card group p-5 transition-all hover:shadow-lg ${
+        isSelected ? 'ring-2 ring-secondary/40' : ''
+      }`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => onEdit(agent)}
+          className="flex min-w-0 flex-1 items-start gap-3 text-left"
+        >
+          <AgentAvatar name={agent.user.name} />
+          <div className="min-w-0">
+            <p className="font-semibold text-primary group-hover:text-secondary transition-colors">
+              {agent.user.name}
+            </p>
+            <p className="truncate text-sm text-on-surface-variant">{agent.user.email}</p>
+            {agent.agencyName && (
+              <p className="mt-1 text-sm font-medium text-on-background">{agent.agencyName}</p>
+            )}
+          </div>
+        </button>
+        <StatusPill active={agent.user.isActive} />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-outline-variant/20 pt-4">
+        <RadiusPill km={agent.serviceRadiusKm} />
+        <span className="rounded-full bg-surface-container px-2.5 py-1 text-xs font-medium text-on-surface-variant">
+          👥 {agent._count?.servants ?? 0} servants
+        </span>
+        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+          ₹{(agent.annualRevenue ?? 0).toLocaleString('en-IN')} / yr
+        </span>
+      </div>
+
+      {(agent.address || agent.city) && (
+        <div className="mt-3 flex items-start gap-2 text-sm text-on-surface-variant">
+          <LocationIcon size={15} className="mt-0.5 shrink-0 text-secondary" />
+          <span className="line-clamp-2">
+            {agent.address}
+            {agent.city ? ` · ${agent.city}` : ''}
+          </span>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="gradient" className="text-sm" onClick={() => onEdit(agent)}>
+          Edit agency
+        </Button>
+        <Button variant="secondary" className="text-sm" onClick={() => onToggle(agent.user.id)}>
+          {agent.user.isActive ? 'Deactivate' : 'Activate'}
+        </Button>
+      </div>
+    </article>
+  )
+}
 
 export default function AdminAgents() {
   const qc = useQueryClient()
@@ -26,6 +486,15 @@ export default function AdminAgents() {
   const [manualCity, setManualCity] = useState('')
   const [manualLatitude, setManualLatitude] = useState('')
   const [manualLongitude, setManualLongitude] = useState('')
+  const [serviceRadiusKm, setServiceRadiusKm] = useState('3')
+  const [fieldErrors, setFieldErrors] = useState(emptyCreateFieldErrors)
+  const [createFormKey, setCreateFormKey] = useState(0)
+
+  const [editingAgent, setEditingAgent] = useState(null)
+  const [editForm, setEditForm] = useState(emptyEditForm)
+  const [editFieldErrors, setEditFieldErrors] = useState(emptyEditFieldErrors)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-agents', search],
@@ -36,6 +505,15 @@ export default function AdminAgents() {
       return res.data.data.agents
     },
   })
+
+  const rows = data || []
+
+  const stats = useMemo(() => {
+    const active = rows.filter((a) => a.user.isActive).length
+    const servants = rows.reduce((sum, a) => sum + (a._count?.servants ?? 0), 0)
+    const revenue = rows.reduce((sum, a) => sum + (a.annualRevenue ?? 0), 0)
+    return { total: rows.length, active, servants, revenue }
+  }, [rows])
 
   const resetForm = () => {
     setName('')
@@ -50,7 +528,75 @@ export default function AdminAgents() {
     setManualCity('')
     setManualLatitude('')
     setManualLongitude('')
+    setServiceRadiusKm('3')
     setError('')
+    setFieldErrors(emptyCreateFieldErrors())
+  }
+
+  const openCreateForm = () => {
+    closeEdit()
+    resetForm()
+    setCreateFormKey((k) => k + 1)
+    setShowForm(true)
+  }
+
+  const closeCreateForm = () => {
+    resetForm()
+    setShowForm(false)
+  }
+
+  const openEdit = (agent) => {
+    resetForm()
+    setShowForm(false)
+    setEditingAgent(agent)
+    setEditError('')
+    setEditFieldErrors(emptyEditFieldErrors())
+    setEditForm({
+      agencyName: agent.agencyName || '',
+      location:
+        agent.address && agent.latitude != null && agent.longitude != null
+          ? {
+              address: agent.address,
+              city: agent.city,
+              latitude: agent.latitude,
+              longitude: agent.longitude,
+            }
+          : null,
+      serviceRadiusKm: String(agent.serviceRadiusKm ?? 3),
+    })
+  }
+
+  const closeEdit = () => {
+    setEditingAgent(null)
+    setEditForm(emptyEditForm())
+    setEditError('')
+    setEditFieldErrors(emptyEditFieldErrors())
+  }
+
+  const saveEdit = async (e) => {
+    e.preventDefault()
+    setEditError('')
+    const errors = validateEditAgentFields(editForm)
+    setEditFieldErrors(errors)
+    if (hasFieldErrors(errors)) return
+    setEditSaving(true)
+    try {
+      const radius = Number(editForm.serviceRadiusKm)
+      await api.patch(`/admin/agents/${editingAgent.id}`, {
+        agencyName: editForm.agencyName.trim() || undefined,
+        address: editForm.location.address,
+        city: editForm.location.city,
+        latitude: editForm.location.latitude,
+        longitude: editForm.location.longitude,
+        serviceRadiusKm: radius,
+      })
+      closeEdit()
+      qc.invalidateQueries({ queryKey: ['admin-agents'] })
+    } catch (err) {
+      setEditError(err.response?.data?.message || 'Failed to update agent')
+    } finally {
+      setEditSaving(false)
+    }
   }
 
   const toggleActive = async (userId) => {
@@ -63,6 +609,21 @@ export default function AdminAgents() {
     e.preventDefault()
     setError('')
 
+    const errors = validateCreateAgentFields({
+      name,
+      email,
+      locationMode,
+      location,
+      manualAddress,
+      manualLatitude,
+      manualLongitude,
+      generatePassword,
+      password,
+      serviceRadiusKm,
+    })
+    setFieldErrors(errors)
+    if (hasFieldErrors(errors)) return
+
     let address
     let city
     let latitude
@@ -73,17 +634,6 @@ export default function AdminAgents() {
       city = manualCity.trim() || undefined
       latitude = Number(manualLatitude)
       longitude = Number(manualLongitude)
-      if (!address || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-        setError('Enter address, latitude, and longitude for manual agent location.')
-        return
-      }
-    } else if (
-      !location?.address?.trim() ||
-      location.latitude == null ||
-      location.longitude == null
-    ) {
-      setError('Pick the agent area / office location from search or GPS.')
-      return
     } else {
       address = location.address
       city = location.city
@@ -104,6 +654,7 @@ export default function AdminAgents() {
         city,
         latitude,
         longitude,
+        serviceRadiusKm: Number(serviceRadiusKm) || 3,
       })
       setCredentials(res.data?.data?.credentials || null)
       resetForm()
@@ -117,242 +668,478 @@ export default function AdminAgents() {
     }
   }
 
-  const rows = data || []
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Field agents</h2>
-          <p className="mt-1 text-sm text-subtext">
-            Only admins can add agents. Each agent is assigned to a particular area.
+          <p className="text-xs font-semibold uppercase tracking-widest text-secondary">
+            Admin
+          </p>
+          <h2 className="mt-1 text-3xl font-bold text-primary">Field agents</h2>
+          <p className="mt-2 max-w-xl text-sm text-on-surface-variant">
+            Manage agency locations and service coverage. Click an agent to edit their area and
+            radius.
           </p>
         </div>
-        <Button onClick={() => setShowForm((v) => !v)}>
-          {showForm ? 'Cancel' : 'Add agent'}
+        <Button
+          variant="gradient"
+          onClick={() => {
+            if (showForm) closeCreateForm()
+            else openCreateForm()
+          }}
+        >
+          {showForm ? '✕ Cancel' : '+ Add agent'}
         </Button>
       </div>
 
-      <CredentialsBanner
-        credentials={credentials}
-        onDone={() => setCredentials(null)}
-      />
+      <CredentialsBanner credentials={credentials} onDone={() => setCredentials(null)} />
+
+      {!isLoading && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Total agents" value={stats.total} />
+          <StatCard label="Active" value={stats.active} accent="text-emerald-600" />
+          <StatCard label="Servants onboarded" value={stats.servants} accent="text-secondary" />
+          <StatCard
+            label="Annual revenue"
+            value={`₹${stats.revenue.toLocaleString('en-IN')}`}
+            accent="text-amber-700"
+          />
+        </div>
+      )}
 
       {showForm && (
-        <form
-          onSubmit={createAgent}
-          className="rounded-xl bg-surface p-6 shadow-sm space-y-4"
-        >
-          <h3 className="font-semibold text-primary">New agent</h3>
+        <form key={createFormKey} onSubmit={createAgent} noValidate className="glass-card space-y-5 p-6">
+          <div>
+            <h3 className="text-lg font-semibold text-primary">New field agent</h3>
+            <p className="text-sm text-on-surface-variant">
+              Create login credentials and assign an agency area.
+            </p>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block space-y-1">
-              <span className="text-sm font-medium">Full name *</span>
+            <FormField label="Full name" required error={fieldErrors.name}>
               <input
-                required
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                type="text"
+                className={fieldInputClass(!!fieldErrors.name)}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setName(next)
+                  updateFieldError(setFieldErrors, 'name', next, validateName)
+                }}
+                onBlur={() =>
+                  setFieldErrors((prev) => ({ ...prev, name: validateName(name) }))
+                }
+                aria-invalid={!!fieldErrors.name}
               />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-sm font-medium">Email *</span>
+            </FormField>
+            <FormField label="Email" required error={fieldErrors.email}>
               <input
-                required
                 type="email"
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                className={fieldInputClass(!!fieldErrors.email)}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setEmail(next)
+                  updateFieldError(setFieldErrors, 'email', next, validateEmail)
+                }}
+                onBlur={() =>
+                  setFieldErrors((prev) => ({ ...prev, email: validateEmail(email) }))
+                }
+                aria-invalid={!!fieldErrors.email}
               />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-sm font-medium">Phone</span>
+            </FormField>
+            <FormField label="Phone" hint="Optional">
               <input
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                type="tel"
+                className={inputClass()}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-sm font-medium">Agency name</span>
+            </FormField>
+            <FormField label="Agency name" hint="Optional">
               <input
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                type="text"
+                className={inputClass()}
                 value={agencyName}
                 onChange={(e) => setAgencyName(e.target.value)}
               />
-            </label>
+            </FormField>
           </div>
 
-          <div className="space-y-3">
+          <div className="rounded-2xl border border-outline-variant/25 bg-surface-low/60 p-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-secondary">
+              Agency location
+            </p>
             <div className="flex flex-wrap gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={locationMode === 'picker'}
-                  onChange={() => setLocationMode('picker')}
-                />
-                Search or GPS
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={locationMode === 'manual'}
-                  onChange={() => setLocationMode('manual')}
-                />
-                Manual coordinates
-              </label>
+              {['picker', 'manual'].map((mode) => (
+                <label key={mode} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    checked={locationMode === mode}
+                    onChange={() => {
+                      setLocationMode(mode)
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        location: '',
+                        manualAddress: '',
+                        manualLatitude: '',
+                        manualLongitude: '',
+                      }))
+                    }}
+                  />
+                  {mode === 'picker' ? 'Search or GPS' : 'Manual coordinates'}
+                </label>
+              ))}
             </div>
-
             {locationMode === 'picker' ? (
               <AgentLocationPicker
-                label="Agent area / office location"
+                label="Office location"
                 required
                 value={location}
-                onChange={setLocation}
+                error={fieldErrors.location}
+                onInteraction={() => {
+                  setFieldErrors((prev) => {
+                    if (!prev.location) return prev
+                    const invalid =
+                      !location?.address?.trim() ||
+                      location?.latitude == null ||
+                      location?.longitude == null
+                    return {
+                      ...prev,
+                      location: invalid ? 'Pick the office location from search or GPS' : '',
+                    }
+                  })
+                }}
+                onChange={(loc) => {
+                  setLocation(loc)
+                  setFieldErrors((prev) => ({
+                    ...prev,
+                    location: prev.location
+                      ? !loc?.address?.trim() ||
+                        loc?.latitude == null ||
+                        loc?.longitude == null
+                        ? 'Pick the office location from search or GPS'
+                        : ''
+                      : '',
+                  }))
+                }}
               />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-1 sm:col-span-2">
-                  <span className="text-sm font-medium">Address / area *</span>
+                <FormField
+                  label="Address"
+                  required
+                  error={fieldErrors.manualAddress}
+                  className="sm:col-span-2"
+                >
                   <input
-                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    className={fieldInputClass(!!fieldErrors.manualAddress)}
                     value={manualAddress}
-                    onChange={(e) => setManualAddress(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setManualAddress(next)
+                      updateFieldError(
+                        setFieldErrors,
+                        'manualAddress',
+                        next,
+                        (v) => (!v.trim() ? REQUIRED : ''),
+                      )
+                    }}
+                    aria-invalid={!!fieldErrors.manualAddress}
                   />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-medium">City</span>
+                </FormField>
+                <FormField label="City" hint="Optional">
                   <input
-                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    className={inputClass()}
                     value={manualCity}
                     onChange={(e) => setManualCity(e.target.value)}
                   />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-medium">Latitude *</span>
+                </FormField>
+                <FormField label="Latitude" required error={fieldErrors.manualLatitude}>
                   <input
-                    type="number"
-                    step="any"
-                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    type="text"
+                    inputMode="decimal"
+                    className={fieldInputClass(!!fieldErrors.manualLatitude)}
                     value={manualLatitude}
-                    onChange={(e) => setManualLatitude(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setManualLatitude(next)
+                      updateFieldError(setFieldErrors, 'manualLatitude', next, (v) => {
+                        if (!String(v).trim()) return REQUIRED
+                        if (!Number.isFinite(Number(v))) return 'Enter a valid latitude'
+                        return ''
+                      })
+                    }}
+                    aria-invalid={!!fieldErrors.manualLatitude}
                   />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-medium">Longitude *</span>
+                </FormField>
+                <FormField label="Longitude" required error={fieldErrors.manualLongitude}>
                   <input
-                    type="number"
-                    step="any"
-                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    type="text"
+                    inputMode="decimal"
+                    className={fieldInputClass(!!fieldErrors.manualLongitude)}
                     value={manualLongitude}
-                    onChange={(e) => setManualLongitude(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setManualLongitude(next)
+                      updateFieldError(setFieldErrors, 'manualLongitude', next, (v) => {
+                        if (!String(v).trim()) return REQUIRED
+                        if (!Number.isFinite(Number(v))) return 'Enter a valid longitude'
+                        return ''
+                      })
+                    }}
+                    aria-invalid={!!fieldErrors.manualLongitude}
                   />
-                </label>
+                </FormField>
               </div>
             )}
           </div>
 
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm">
+          <label className="block max-w-md space-y-1.5">
+            <span className="text-sm font-medium text-on-background">
+              Service radius (km)<span className="text-error"> *</span>
+            </span>
+            <div className="flex items-center gap-3">
               <input
-                type="checkbox"
-                checked={generatePassword}
-                onChange={(e) => setGeneratePassword(e.target.checked)}
+                type="range"
+                min={1}
+                max={50}
+                step={0.5}
+                className="flex-1 accent-secondary"
+                value={serviceRadiusKm}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setServiceRadiusKm(next)
+                  updateFieldError(
+                    setFieldErrors,
+                    'serviceRadiusKm',
+                    next,
+                    validateServiceRadius,
+                  )
+                }}
               />
-              Auto-generate login password
-            </label>
-            {!generatePassword && (
+              <input
+                type="text"
+                inputMode="decimal"
+                className={`${fieldInputClass(!!fieldErrors.serviceRadiusKm)} w-20 text-center`}
+                value={serviceRadiusKm}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setServiceRadiusKm(next)
+                  updateFieldError(
+                    setFieldErrors,
+                    'serviceRadiusKm',
+                    next,
+                    validateServiceRadius,
+                  )
+                }}
+                onBlur={() =>
+                  setFieldErrors((prev) => ({
+                    ...prev,
+                    serviceRadiusKm: validateServiceRadius(serviceRadiusKm),
+                  }))
+                }
+                aria-invalid={!!fieldErrors.serviceRadiusKm}
+              />
+            </div>
+            {fieldErrors.serviceRadiusKm ? (
+              <span className="text-xs font-medium text-error">
+                {fieldErrors.serviceRadiusKm}
+              </span>
+            ) : null}
+          </label>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={generatePassword}
+              onChange={(e) => {
+                setGeneratePassword(e.target.checked)
+                if (e.target.checked) {
+                  setFieldErrors((prev) => ({ ...prev, password: '' }))
+                }
+              }}
+            />
+            Auto-generate login password
+          </label>
+          {!generatePassword && (
+            <FormField label="Login password" required error={fieldErrors.password}>
               <input
                 type="password"
-                minLength={6}
-                placeholder="Login password (min 6 chars)"
-                className="w-full max-w-sm rounded-lg border px-3 py-2 text-sm"
+                placeholder="Min 6 characters"
+                className={`${fieldInputClass(!!fieldErrors.password)} max-w-sm`}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setPassword(next)
+                  updateFieldError(setFieldErrors, 'password', next, (v) => {
+                    if (!v) return REQUIRED
+                    if (v.length < 6) return 'Password must be at least 6 characters'
+                    return ''
+                  })
+                }}
+                aria-invalid={!!fieldErrors.password}
               />
-            )}
-          </div>
+            </FormField>
+          )}
 
-          {error && <p className="text-sm text-error">{error}</p>}
+          {error && (
+            <div className="rounded-xl border border-error/20 bg-red-50 px-4 py-3 text-sm text-error">
+              {error}
+            </div>
+          )}
 
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" variant="gradient" disabled={saving}>
             {saving ? 'Creating…' : 'Create agent'}
           </Button>
         </form>
       )}
 
-      <input
-        placeholder="Search by name, email, agency, or area…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full max-w-md rounded-lg border px-3 py-2 text-sm"
-      />
+      <div className="glass-card flex flex-wrap items-center gap-3 p-4">
+        <span className="text-lg opacity-60" aria-hidden>
+          🔍
+        </span>
+        <input
+          placeholder="Search by name, email, agency, or area…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className={`${inputClass()} max-w-md flex-1`}
+        />
+        {!isLoading && (
+          <span className="text-sm text-on-surface-variant">
+            {rows.length} agent{rows.length === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
 
       {isLoading ? (
-        <p>Loading…</p>
+        <LoadingSkeleton />
+      ) : rows.length === 0 ? (
+        <div className="glass-card flex flex-col items-center justify-center px-6 py-16 text-center">
+          <span className="text-5xl opacity-40" aria-hidden>
+            🗺
+          </span>
+          <p className="mt-4 text-lg font-semibold text-primary">No field agents yet</p>
+          <p className="mt-2 max-w-sm text-sm text-on-surface-variant">
+            Add your first agent to cover an area and onboard servants nearby.
+          </p>
+          <Button variant="gradient" className="mt-6" onClick={openCreateForm}>
+            + Add agent
+          </Button>
+        </div>
       ) : (
-        <table className="w-full rounded-xl bg-surface text-sm shadow-sm">
-          <thead className="border-b bg-gray-50">
-            <tr>
-              <th className="p-4 text-left">Name</th>
-              <th className="p-4 text-left">Agency</th>
-              <th className="p-4 text-left">Area</th>
-              <th className="p-4 text-left">Servants</th>
-              <th className="p-4 text-left">Annual revenue</th>
-              <th className="p-4 text-left">Status</th>
-              <th className="p-4 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="p-8 text-center text-subtext">
-                  No agents yet. Use &quot;Add agent&quot; to onboard a field agent for an area.
-                </td>
-              </tr>
-            ) : (
-              rows.map((a) => (
-                <tr key={a.id} className="border-b">
-                  <td className="p-4">
-                    <p className="font-medium">{a.user.name}</p>
-                    <p className="text-xs text-subtext">{a.user.email}</p>
-                  </td>
-                  <td className="p-4">{a.agencyName || '—'}</td>
-                  <td className="p-4">
-                    <div className="flex items-start gap-1.5">
-                      <LocationIcon size={14} className="mt-0.5 text-secondary" />
-                      <div>
-                        <p>{a.address || '—'}</p>
-                        {a.city && <p className="text-xs text-subtext">{a.city}</p>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">{a._count?.servants ?? 0}</td>
-                  <td className="p-4 font-medium text-amber-700">
-                    ₹{(a.annualRevenue ?? 0).toLocaleString('en-IN')}
-                    {a.annualCompletedBookings > 0 && (
-                      <p className="text-xs font-normal text-subtext">
-                        {a.annualCompletedBookings} job(s) in {a.revenueYear ?? new Date().getFullYear()}
-                      </p>
-                    )}
-                  </td>
-                  <td className="p-4">
-                    {a.user.isActive ? 'Active' : 'Inactive'}
-                  </td>
-                  <td className="p-4">
-                    <button
-                      type="button"
-                      onClick={() => toggleActive(a.user.id)}
-                      className="text-primary underline text-sm"
-                    >
-                      {a.user.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                  </td>
+        <>
+          <div className="grid gap-4 lg:hidden">
+            {rows.map((a) => (
+              <AgentRowCard
+                key={a.id}
+                agent={a}
+                isSelected={editingAgent?.id === a.id}
+                onEdit={openEdit}
+                onToggle={toggleActive}
+              />
+            ))}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-2xl border border-outline-variant/30 bg-white/80 shadow-[var(--shadow-card)] lg:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-outline-variant/30 bg-surface-low/80">
+                  {['Agent', 'Agency', 'Area', 'Radius', 'Servants', 'Revenue', 'Status', ''].map(
+                    (h) => (
+                      <th
+                        key={h || 'actions'}
+                        className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant"
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {rows.map((a) => (
+                  <tr
+                    key={a.id}
+                    className={`border-b border-outline-variant/15 transition-colors hover:bg-primary/3 ${
+                      editingAgent?.id === a.id ? 'bg-secondary/5' : ''
+                    }`}
+                  >
+                    <td className="px-4 py-4">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(a)}
+                        className="flex items-center gap-3 text-left"
+                      >
+                        <AgentAvatar name={a.user.name} />
+                        <div>
+                          <p className="font-semibold text-primary hover:text-secondary">
+                            {a.user.name}
+                          </p>
+                          <p className="text-xs text-on-surface-variant">{a.user.email}</p>
+                        </div>
+                      </button>
+                    </td>
+                    <td className="px-4 py-4 font-medium">{a.agencyName || '—'}</td>
+                    <td className="px-4 py-4 max-w-[200px]">
+                      <div className="flex items-start gap-1.5">
+                        <LocationIcon size={14} className="mt-0.5 shrink-0 text-secondary" />
+                        <div className="min-w-0">
+                          <p className="truncate">{a.address || '—'}</p>
+                          {a.city && (
+                            <p className="text-xs text-on-surface-variant">{a.city}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <RadiusPill km={a.serviceRadiusKm} />
+                    </td>
+                    <td className="px-4 py-4 font-medium">{a._count?.servants ?? 0}</td>
+                    <td className="px-4 py-4 font-semibold text-amber-700">
+                      ₹{(a.annualRevenue ?? 0).toLocaleString('en-IN')}
+                    </td>
+                    <td className="px-4 py-4">
+                      <StatusPill active={a.user.isActive} />
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(a)}
+                          className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleActive(a.user.id)}
+                          className="rounded-lg border border-outline-variant/40 px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-low"
+                        >
+                          {a.user.isActive ? 'Off' : 'On'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
+
+      <AgentEditPanel
+        agent={editingAgent}
+        form={editForm}
+        setForm={setEditForm}
+        fieldErrors={editFieldErrors}
+        setFieldErrors={setEditFieldErrors}
+        error={editError}
+        saving={editSaving}
+        onClose={closeEdit}
+        onSave={saveEdit}
+      />
     </div>
   )
 }

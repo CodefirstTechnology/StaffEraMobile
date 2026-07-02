@@ -128,6 +128,22 @@ model Servant {
   city               String?
   latitude           Float?
   longitude          Float?
+  bankAccountHolder  String?
+  bankAccountNumber  String?
+  bankName           String?
+  bankIfsc           String?
+  bankUpiId          String?
+  aadhaarVerified          Boolean   @default(false)
+  aadhaarVerificationType  String?
+  aadhaarVerifiedAt        DateTime?
+  aadhaarVerifiedName      String?
+  aadhaarVerifiedDob       String?
+  aadhaarVerifiedGender    String?
+  aadhaarVerifiedAddress   String?
+  aadhaarPhotoUrl          String?
+  aadhaarReferenceId       String?
+  aadhaarNameMatch         Boolean?
+  phoneVerified            Boolean   @default(false)
   bookings           Booking[]
   timeEntries        TimeEntry[]
   zones              Zone[]
@@ -172,17 +188,18 @@ model Skill {
 }
 
 model Agent {
-  id         Int       @id @default(autoincrement())
-  userId     Int       @unique
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agencyName String?
-  address    String?
-  city       String?
-  latitude   Float?
-  longitude  Float?
-  servants   Servant[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id              Int       @id @default(autoincrement())
+  userId          Int       @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agencyName      String?
+  address         String?
+  city            String?
+  latitude        Float?
+  longitude       Float?
+  serviceRadiusKm Float     @default(3)
+  servants        Servant[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model Booking {

@@ -16,18 +16,24 @@ import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
-import { LocationPicker } from '@/components/ui/LocationPicker';
-import {
-  AddressUnitFields,
-  type AddressUnitValue,
-} from '@/components/ui/AddressUnitFields';
+import { BookingLocationSection } from '@/components/ui/BookingLocationSection';
 import type { LocationValue } from '@/lib/locationTypes';
+import {
+  addressUnitFromProfile,
+  defaultBookingLocationMode,
+  homeLocationFromProfile,
+  type BookingLocationMode,
+} from '@/lib/homeLocation';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
 
 export default function NewBookingScreen() {
   const { t } = useTranslation();
   const { servantId } = useLocalSearchParams<{ servantId: string }>();
   const user = useAuthStore((s) => s.user);
+  const ho = user?.houseOwner;
+  const [locationMode, setLocationMode] = useState<BookingLocationMode>(() =>
+    defaultBookingLocationMode(ho),
+  );
   const [bookingType, setBookingType] = useState<'SESSION' | 'MONTHLY'>('SESSION');
   const [sessionDate, setSessionDate] = useState(new Date());
   const [sessionStart, setSessionStart] = useState('09:00');
@@ -38,37 +44,24 @@ export default function NewBookingScreen() {
     d.setMonth(d.getMonth() + 1);
     return d;
   });
-  const [location, setLocation] = useState<LocationValue | null>(null);
-  const [addressUnit, setAddressUnit] = useState<AddressUnitValue>({
-    flatNo: '',
-    building: '',
-    area: '',
-  });
+  const [location, setLocation] = useState<LocationValue | null>(() => homeLocationFromProfile(ho));
+  const [addressUnit, setAddressUnit] = useState(() => addressUnitFromProfile(ho));
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
 
   useEffect(() => {
-    const ho = user?.houseOwner;
-    if (ho?.latitude != null && ho?.longitude != null && ho.address) {
-      setLocation({
-        address: ho.address,
-        city: ho.city,
-        latitude: ho.latitude,
-        longitude: ho.longitude,
-        flatNo: ho.flatNo,
-        building: ho.building,
-        area: ho.area,
-      });
+    const profile = user?.houseOwner;
+    if (!profile) return;
+    if (defaultBookingLocationMode(profile) === 'home') {
+      const home = homeLocationFromProfile(profile);
+      if (home) {
+        setLocationMode('home');
+        setLocation(home);
+        setAddressUnit(addressUnitFromProfile(profile));
+      }
     }
-    if (ho) {
-      setAddressUnit({
-        flatNo: ho.flatNo || '',
-        building: ho.building || '',
-        area: ho.area || '',
-      });
-    }
-  }, [user?.houseOwner]);
+  }, [user?.houseOwner?.address, user?.houseOwner?.latitude, user?.houseOwner?.longitude]);
 
   const { data: servant } = useQuery({
     queryKey: ['servant', servantId],
@@ -210,12 +203,14 @@ export default function NewBookingScreen() {
         </>
       )}
 
-      <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
-      <LocationPicker
-        label={t('bookings.visitLocation')}
-        placeholder={t('bookings.visitLocationPlaceholder')}
-        value={location}
-        onChange={setLocation}
+      <BookingLocationSection
+        houseOwner={user?.houseOwner}
+        mode={locationMode}
+        onModeChange={setLocationMode}
+        location={location}
+        onLocationChange={setLocation}
+        addressUnit={addressUnit}
+        onAddressUnitChange={setAddressUnit}
       />
       <GhostInput label={t('bookings.notesOptional')} value={notes} onChangeText={setNotes} />
 

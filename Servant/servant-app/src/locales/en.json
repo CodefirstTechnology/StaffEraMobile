@@ -417,8 +417,13 @@
     "title": "Service zones",
     "addZone": "Add zone",
     "empty": "No zones yet — add where you work so nearby jobs reach you.",
+    "emptyAgent": "No service zones yet. Your agent will add areas where you can work.",
     "manage": "Manage service zones",
     "manageSub": "Add or edit areas on the map",
+    "view": "View service zones",
+    "viewSub": "Areas set by your agent",
+    "noZonesAgent": "No zones assigned yet. Contact your agent to add your service areas.",
+    "screenSubReadOnly": "These areas are set by your agent. Contact them to change your service zones.",
     "deleteZoneTitle": "Delete zone",
     "removeZone": "Remove \"{{name}}\"?",
     "editZone": "Edit zone",
@@ -443,7 +448,7 @@
     "experience": "Experience",
     "yourSkills": "Your skills",
     "aboutYou": "About you",
-    "serviceZonesSub": "Customers near these areas see your open requests"
+    "serviceZonesSub": "Set by your agent — customers near these areas see your open requests"
   },
   "workOtp": {
     "requestOtp": "I arrived — get OTP",

@@ -1,11 +1,17 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import api from '../lib/api'
+import api, { clearAuthSession } from '../lib/api'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const onSessionExpired = () => setUser(null)
+    window.addEventListener('auth:session-expired', onSessionExpired)
+    return () => window.removeEventListener('auth:session-expired', onSessionExpired)
+  }, [])
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken')
@@ -16,7 +22,10 @@ export function AuthProvider({ children }) {
     api
       .get('/auth/me')
       .then((res) => setUser(res.data.data.user))
-      .catch(() => localStorage.clear())
+      .catch(() => {
+        clearAuthSession()
+        setUser(null)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -36,7 +45,7 @@ export function AuthProvider({ children }) {
     } catch {
       /* ignore */
     }
-    localStorage.clear()
+    clearAuthSession()
     setUser(null)
   }
 

@@ -149,15 +149,6 @@ export default function HomeScreen() {
           />
         }
       >
-        <TouchableOpacity
-          style={styles.searchWrap}
-          activeOpacity={0.85}
-          onPress={() => openRequest()}
-        >
-          <MaterialIcons name="search" size={22} color={Stitch.colors.onSurfaceVariant} />
-          <Text style={styles.searchPlaceholder}>{t('home.searchPlaceholder')}</Text>
-        </TouchableOpacity>
-
         <LinearGradient
           colors={[Stitch.colors.secondary, Stitch.colors.gradientEnd]}
           start={{ x: 0, y: 0 }}
@@ -168,13 +159,11 @@ export default function HomeScreen() {
             <Text style={styles.heroBadgeText}>{t('home.fastBooking')}</Text>
           </View>
           <Text style={styles.heroTitle}>{t('home.requestInArea')}</Text>
-          <Text style={styles.heroSub}>
-            {searchLocation
-              ? nearbyCount > 0
-                ? t('home.helpersNearby', { count: nearbyCount })
-                : t('home.noHelpersNearby')
-              : t('home.enableLocation')}
-          </Text>
+          {searchLocation && nearbyCount === 0 ? (
+            <Text style={styles.heroSub}>{t('home.noHelpersNearby')}</Text>
+          ) : !searchLocation ? (
+            <Text style={styles.heroSub}>{t('home.enableLocation')}</Text>
+          ) : null}
           <TouchableOpacity
             style={[styles.heroBtn, !searchLocation && styles.heroBtnDisabled]}
             disabled={!searchLocation}
@@ -183,24 +172,6 @@ export default function HomeScreen() {
             <Text style={styles.heroBtnText}>{t('home.sendRequestNow')}</Text>
           </TouchableOpacity>
         </LinearGradient>
-
-        {searchLocation ? (
-          <GlassCard style={styles.countCard}>
-            <View style={styles.countRow}>
-              <View style={styles.countIcon}>
-                <MaterialIcons name="groups" size={28} color={Stitch.colors.secondary} />
-              </View>
-              <View style={styles.countBody}>
-                <Text style={styles.countValue}>
-                  {helpersLoading ? '…' : nearbyCount}
-                </Text>
-                <Text style={styles.countLabel}>
-                  {t('home.verifiedNearYou', { count: nearbyCount })}
-                </Text>
-              </View>
-            </View>
-          </GlassCard>
-        ) : null}
 
         <Text style={[styles.sectionTitle, styles.sectionTitleSpacing]}>{t('home.whatNeed')}</Text>
         <View style={styles.grid}>
@@ -282,21 +253,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Stitch.colors.background },
   scroll: { paddingHorizontal: Stitch.spacing.padding, paddingBottom: 100 },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Stitch.colors.surfaceLow,
-    borderRadius: Stitch.radius.lg,
-    paddingHorizontal: 14,
-    height: 48,
-    marginBottom: 20,
-  },
-  searchPlaceholder: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 16,
-    color: Stitch.colors.onSurfaceVariant + '99',
-  },
   hero: {
     borderRadius: Stitch.radius.xl,
     padding: 24,

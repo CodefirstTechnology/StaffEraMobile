@@ -47,7 +47,9 @@
     "typescript": "~5.9.2"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "node ./scripts/start-mobile.js",
+    "start:localhost": "expo start",
+    "start:tunnel": "expo start --tunnel -c",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",

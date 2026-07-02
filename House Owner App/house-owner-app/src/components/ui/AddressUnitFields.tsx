@@ -21,9 +21,9 @@ export function AddressUnitFields({ value, onChange }: Props) {
   return (
     <View style={styles.wrap}>
       <GhostInput
-        label={t('profile.flatNo')}
-        value={value.flatNo}
-        onChangeText={(txt) => set('flatNo', txt)}
+        label={t('profile.area')}
+        value={value.area}
+        onChangeText={(txt) => set('area', txt)}
       />
       <GhostInput
         label={t('profile.building')}
@@ -31,9 +31,9 @@ export function AddressUnitFields({ value, onChange }: Props) {
         onChangeText={(txt) => set('building', txt)}
       />
       <GhostInput
-        label={t('profile.area')}
-        value={value.area}
-        onChangeText={(txt) => set('area', txt)}
+        label={t('profile.flatNo')}
+        value={value.flatNo}
+        onChangeText={(txt) => set('flatNo', txt)}
       />
     </View>
   );

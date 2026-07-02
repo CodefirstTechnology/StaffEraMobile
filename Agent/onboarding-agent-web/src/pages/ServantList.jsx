@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '../lib/api'
@@ -6,11 +6,46 @@ import { uploadUrl } from '../lib/mediaUrl'
 import { Badge } from '../components/ui/Badge'
 import { VerifiedBadge } from '../components/ui/VerifiedBadge'
 import { Button } from '../components/ui/Button'
+import {
+  PageHeader,
+  StatCard,
+  Avatar,
+  FilterBar,
+  SelectFilter,
+  SearchInput,
+  LoadingSkeleton,
+  EmptyState,
+  DataTable,
+  TableRow,
+  MobileCard,
+  SkillChips,
+} from '../components/admin/adminUi'
 
 const CATEGORY_OPTIONS = [
-  { value: '', label: 'My servants' },
-  { value: 'onboarded', label: 'Agent onboarded' },
+  ['', 'My servants'],
+  ['onboarded', 'Agent onboarded'],
 ]
+
+const STATUS_OPTIONS = [
+  ['', 'All statuses'],
+  ['PENDING', 'Pending'],
+  ['UNDER_REVIEW', 'Under review'],
+  ['VERIFIED', 'Verified'],
+  ['REJECTED', 'Rejected'],
+]
+
+function ServantPhoto({ name, profilePhoto }) {
+  if (profilePhoto) {
+    return (
+      <img
+        src={uploadUrl(profilePhoto)}
+        alt=""
+        className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-sm ring-2 ring-white"
+      />
+    )
+  }
+  return <Avatar name={name} />
+}
 
 export default function ServantList() {
   const [searchParams] = useSearchParams()
@@ -19,8 +54,7 @@ export default function ServantList() {
   const [category, setCategory] = useState(searchParams.get('category') || '')
 
   useEffect(() => {
-    const fromUrl = searchParams.get('category') || ''
-    setCategory(fromUrl)
+    setCategory(searchParams.get('category') || '')
   }, [searchParams])
 
   const { data, isLoading } = useQuery({
@@ -38,122 +72,149 @@ export default function ServantList() {
     },
   })
 
+  const servants = data || []
+
+  const stats = useMemo(() => {
+    const verified = servants.filter((s) => s.verificationStatus === 'VERIFIED').length
+    const pending = servants.filter((s) =>
+      ['PENDING', 'UNDER_REVIEW'].includes(s.verificationStatus),
+    ).length
+    return { total: servants.length, verified, pending }
+  }, [servants])
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Servants</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Staff you onboarded and verified. App sign-ups are managed separately under{' '}
-            <Link to="/registrations" className="font-medium text-violet-700 hover:underline">
+      <PageHeader
+        eyebrow="Pipeline"
+        title="My servants"
+        description={
+          <>
+            Staff you onboarded and verified. App sign-ups live under{' '}
+            <Link to="/registrations" className="font-semibold text-secondary hover:underline">
               App registrations
             </Link>
             .
-          </p>
+          </>
+        }
+        action={
+          <Link to="/servants/new">
+            <Button variant="gradient">+ Onboard servant</Button>
+          </Link>
+        }
+      />
+
+      {!isLoading && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard label="Total" value={stats.total} />
+          <StatCard label="Verified" value={stats.verified} accent="text-emerald-600" />
+          <StatCard label="Pending review" value={stats.pending} accent="text-amber-600" />
         </div>
-        <Link to="/servants/new">
-          <Button>Onboard New Servant</Button>
-        </Link>
-      </div>
-      <div className="flex flex-wrap gap-3">
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-        >
-          {CATEGORY_OPTIONS.map((opt) => (
-            <option key={opt.value || 'all'} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-        >
-          <option value="">All statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="UNDER_REVIEW">Under Review</option>
-          <option value="VERIFIED">Verified</option>
-          <option value="REJECTED">Rejected</option>
-        </select>
-        <input
-          placeholder="Search by name…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-lg border border-gray-200 px-3 py-2 text-sm"
-        />
-      </div>
+      )}
+
+      <FilterBar
+        count={servants.length}
+        countLabel={servants.length === 1 ? 'servant' : 'servants'}
+      >
+        <SelectFilter value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+        <SelectFilter value={status} onChange={setStatus} options={STATUS_OPTIONS} />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by name…" />
+      </FilterBar>
+
       {isLoading ? (
-        <p>Loading…</p>
+        <LoadingSkeleton cards={3} rows={5} />
+      ) : servants.length === 0 ? (
+        <EmptyState
+          icon="👥"
+          title="No servants in this view"
+          description="Onboard a new helper or adjust your filters."
+        />
       ) : (
-        <div className="overflow-hidden rounded-xl bg-surface shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b bg-gray-50">
-              <tr>
-                <th className="p-4">Photo</th>
-                <th className="p-4">Name</th>
-                <th className="p-4">Phone</th>
-                <th className="p-4">Skills</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!isLoading && (data || []).length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-on-surface-variant">
-                    No servants in this category.
-                  </td>
-                </tr>
-              ) : null}
-              {(data || []).map((s) => (
-                <tr key={s.id} className="border-b">
-                  <td className="p-4">
-                    {s.profilePhoto ? (
-                      <img
-                        src={uploadUrl(s.profilePhoto)}
-                        alt=""
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        {s.user.name[0]}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-4">
+        <>
+          <div className="grid gap-4 lg:hidden">
+            {servants.map((s) => (
+              <MobileCard key={s.id}>
+                <div className="flex items-start gap-3">
+                  <ServantPhoto name={s.user.name} profilePhoto={s.profilePhoto} />
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
                         to={`/servants/${s.id}`}
-                        className="font-medium text-primary hover:underline"
+                        className="font-semibold text-primary hover:text-secondary"
                       >
                         {s.user.name}
                       </Link>
-                      {s.verificationStatus === 'VERIFIED' ? <VerifiedBadge /> : null}
+                      {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
                     </div>
-                  </td>
-                  <td className="p-4">{s.user.phone || '—'}</td>
-                  <td className="p-4">
-                    {s.skills?.map((sk) => sk.skillName).join(', ')}
-                  </td>
-                  <td className="p-4">
-                    <Badge status={s.verificationStatus} />
-                  </td>
-                  <td className="p-4 space-x-2">
-                    <Link to={`/servants/${s.id}`}>
-                      <Button variant="secondary">View</Button>
+                    <p className="text-sm text-on-surface-variant">{s.user.phone || 'No phone'}</p>
+                  </div>
+                  <Badge status={s.verificationStatus} />
+                </div>
+                <div className="mt-3">
+                  <SkillChips skills={s.skills} />
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <Link to={`/servants/${s.id}`} className="flex-1">
+                    <Button variant="gradient" className="w-full text-sm">
+                      View
+                    </Button>
+                  </Link>
+                  <Link to={`/servants/${s.id}/edit`} className="flex-1">
+                    <Button variant="secondary" className="w-full text-sm">
+                      Edit
+                    </Button>
+                  </Link>
+                </div>
+              </MobileCard>
+            ))}
+          </div>
+
+          <DataTable columns={['Servant', 'Phone', 'Skills', 'Status', 'Actions']}>
+            {servants.map((s) => (
+              <TableRow key={s.id}>
+                <td className="px-4 py-4">
+                  <div className="flex items-center gap-3">
+                    <ServantPhoto name={s.user.name} profilePhoto={s.profilePhoto} />
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to={`/servants/${s.id}`}
+                          className="font-semibold text-primary hover:text-secondary"
+                        >
+                          {s.user.name}
+                        </Link>
+                        {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
+                      </div>
+                      <p className="text-xs text-on-surface-variant">{s.user.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-4 text-on-surface-variant">{s.user.phone || '—'}</td>
+                <td className="px-4 py-4 max-w-[200px]">
+                  <SkillChips skills={s.skills} max={2} />
+                </td>
+                <td className="px-4 py-4">
+                  <Badge status={s.verificationStatus} />
+                </td>
+                <td className="px-4 py-4">
+                  <div className="flex gap-2">
+                    <Link
+                      to={`/servants/${s.id}`}
+                      className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
+                    >
+                      View
                     </Link>
-                    <Link to={`/servants/${s.id}/edit`}>
-                      <Button variant="secondary">Edit</Button>
+                    <Link
+                      to={`/servants/${s.id}/edit`}
+                      className="rounded-lg border border-outline-variant/40 px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-low"
+                    >
+                      Edit
                     </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </td>
+              </TableRow>
+            ))}
+          </DataTable>
+        </>
       )}
     </div>
   )

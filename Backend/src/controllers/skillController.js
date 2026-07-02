@@ -3,6 +3,22 @@ const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const { codeFromLabel, normalizeSkillCode } = require("../services/skillService");
 
+async function assertUniqueSortOrder(sortOrder, excludeId = null) {
+  const taken = await prisma.skill.findFirst({
+    where: {
+      sortOrder,
+      ...(excludeId != null ? { NOT: { id: excludeId } } : {})
+    },
+    select: { label: true }
+  });
+  if (taken) {
+    throw new ApiError(
+      400,
+      `Sort order ${sortOrder} is already used by "${taken.label}"`
+    );
+  }
+}
+
 exports.listActiveSkills = async (req, res) => {
   const skills = await prisma.skill.findMany({
     where: { isActive: true },
@@ -29,11 +45,14 @@ exports.adminCreateSkill = async (req, res) => {
   const existing = await prisma.skill.findUnique({ where: { code } });
   if (existing) throw new ApiError(400, "A skill with this code already exists");
 
+  const order = sortOrder ?? 0;
+  await assertUniqueSortOrder(order);
+
   const skill = await prisma.skill.create({
     data: {
       code,
       label: label.trim(),
-      sortOrder: sortOrder ?? 0
+      sortOrder: order
     }
   });
 
@@ -55,6 +74,10 @@ exports.adminUpdateSkill = async (req, res) => {
   if (nextCode && nextCode !== existing.code) {
     const codeTaken = await prisma.skill.findUnique({ where: { code: nextCode } });
     if (codeTaken) throw new ApiError(400, "A skill with this code already exists");
+  }
+
+  if (sortOrder !== undefined) {
+    await assertUniqueSortOrder(sortOrder, id);
   }
 
   const skill = await prisma.skill.update({

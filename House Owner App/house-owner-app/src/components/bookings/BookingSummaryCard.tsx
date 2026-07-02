@@ -60,7 +60,7 @@ export function BookingSummaryCard({
   const when = formatBookingWhen(booking);
   const visitType =
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
-  const canTrack = ['CONFIRMED', 'ACTIVE'].includes(booking.status);
+  const canTrack = booking.status === 'CONFIRMED';
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>

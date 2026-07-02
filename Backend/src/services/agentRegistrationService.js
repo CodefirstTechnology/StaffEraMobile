@@ -1,7 +1,6 @@
 const ApiError = require("../utils/ApiError");
 const { createNotification } = require("./notificationService");
 const {
-  DEFAULT_RADIUS_KM,
   findAgentsNearLocation,
   isServantNearAgent,
   agentHasLocation
@@ -12,8 +11,7 @@ const notifyNearbyAgentsOfRegistration = async (servant, { name, city, address }
 
   const nearbyAgents = await findAgentsNearLocation(
     servant.latitude,
-    servant.longitude,
-    { radiusKm: DEFAULT_RADIUS_KM }
+    servant.longitude
   );
 
   const areaLabel = city || address || "your area";

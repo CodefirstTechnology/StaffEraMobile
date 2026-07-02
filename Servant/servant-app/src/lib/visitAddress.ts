@@ -5,13 +5,15 @@ export type VisitAddressParts = {
   address?: string | null;
 };
 
+/** Lines for display: area → building → flat → street address */
 export function formatVisitAddressLines(parts: VisitAddressParts): string[] {
   const lines: string[] = [];
-  const flat = parts.flatNo?.trim();
+  const area = parts.area?.trim();
   const building = parts.building?.trim();
-  const unitParts = [flat && `Flat ${flat}`, building].filter(Boolean);
-  if (unitParts.length) lines.push(unitParts.join(' · '));
-  if (parts.area?.trim()) lines.push(parts.area.trim());
+  const flat = parts.flatNo?.trim();
+  if (area) lines.push(area);
+  if (building) lines.push(building);
+  if (flat) lines.push(`Flat ${flat}`);
   if (parts.address?.trim()) lines.push(parts.address.trim());
   return lines;
 }

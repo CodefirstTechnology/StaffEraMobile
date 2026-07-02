@@ -24,39 +24,70 @@ import {
 } from '@/components/ui/AddressUnitFields';
 import { updateHomeLocation } from '@/lib/geo';
 import { mapsDeepLink, type LocationValue } from '@/lib/locationTypes';
+import { hasSavedHomeAddress, type HouseOwnerProfile } from '@/lib/homeLocation';
+import { formatVisitAddressLines } from '@/lib/visitAddress';
+
+function profileFromHouseOwner(ho?: HouseOwnerProfile | null) {
+  const location: LocationValue | null =
+    ho?.latitude != null && ho?.longitude != null && ho.address
+      ? {
+          address: ho.address,
+          city: ho.city,
+          latitude: ho.latitude,
+          longitude: ho.longitude,
+          flatNo: ho.flatNo,
+          building: ho.building,
+          area: ho.area,
+        }
+      : null;
+  const addressUnit: AddressUnitValue = {
+    flatNo: ho?.flatNo || '',
+    building: ho?.building || '',
+    area: ho?.area || '',
+  };
+  return { location, addressUnit };
+}
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const { user, logout, setUser } = useAuthStore();
-  const [location, setLocation] = useState<LocationValue | null>(null);
-  const [addressUnit, setAddressUnit] = useState<AddressUnitValue>({
-    flatNo: '',
-    building: '',
-    area: '',
-  });
+  const ho = user?.houseOwner;
+  const hasSaved = hasSavedHomeAddress(ho);
+  const [editing, setEditing] = useState(!hasSaved);
+  const [location, setLocation] = useState<LocationValue | null>(
+    () => profileFromHouseOwner(ho).location,
+  );
+  const [addressUnit, setAddressUnit] = useState<AddressUnitValue>(
+    () => profileFromHouseOwner(ho).addressUnit,
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const ho = user?.houseOwner;
-    if (ho?.latitude != null && ho?.longitude != null && ho.address) {
-      setLocation({
-        address: ho.address,
-        city: ho.city,
-        latitude: ho.latitude,
-        longitude: ho.longitude,
-        flatNo: ho.flatNo,
-        building: ho.building,
-        area: ho.area,
-      });
-    }
-    if (ho) {
-      setAddressUnit({
-        flatNo: ho.flatNo || '',
-        building: ho.building || '',
-        area: ho.area || '',
-      });
+    const next = profileFromHouseOwner(user?.houseOwner);
+    setAddressUnit(next.addressUnit);
+    if (!editing) {
+      setLocation(next.location);
+      if (hasSavedHomeAddress(user?.houseOwner)) {
+        setEditing(false);
+      }
+    } else if (!location && next.location) {
+      setLocation(next.location);
     }
   }, [user?.houseOwner]);
+
+  const startEditing = () => {
+    const next = profileFromHouseOwner(user?.houseOwner);
+    setLocation(next.location);
+    setAddressUnit(next.addressUnit);
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    const next = profileFromHouseOwner(user?.houseOwner);
+    setLocation(next.location);
+    setAddressUnit(next.addressUnit);
+    setEditing(false);
+  };
 
   const saveLocation = async () => {
     if (!location) {
@@ -67,14 +98,15 @@ export default function ProfileScreen() {
     try {
       const { user: updatedUser } = await updateHomeLocation({
         address: location.address,
-        flatNo: addressUnit.flatNo.trim() || undefined,
-        building: addressUnit.building.trim() || undefined,
-        area: addressUnit.area.trim() || undefined,
+        flatNo: addressUnit.flatNo.trim(),
+        building: addressUnit.building.trim(),
+        area: addressUnit.area.trim(),
         city: location.city || undefined,
         latitude: location.latitude,
         longitude: location.longitude,
       });
       setUser(updatedUser as typeof user);
+      setEditing(false);
       Alert.alert(t('success.saved'), t('success.homeLocationUpdated'));
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
@@ -98,6 +130,31 @@ export default function ProfileScreen() {
 
   const initial = user?.name?.trim()?.[0]?.toUpperCase() || '?';
   const displayCity = user?.houseOwner?.city || location?.city;
+  const savedLines = formatVisitAddressLines({
+    flatNo: user?.houseOwner?.flatNo,
+    building: user?.houseOwner?.building,
+    area: user?.houseOwner?.area,
+    address: user?.houseOwner?.address,
+  });
+  const savedLocation =
+    user?.houseOwner?.latitude != null && user?.houseOwner?.longitude != null
+      ? {
+          latitude: user.houseOwner.latitude,
+          longitude: user.houseOwner.longitude,
+          address: user.houseOwner.address,
+        }
+      : null;
+
+  const openSavedMaps = () => {
+    if (!savedLocation) return;
+    Linking.openURL(
+      mapsDeepLink(
+        savedLocation.latitude,
+        savedLocation.longitude,
+        savedLocation.address || undefined,
+      ),
+    );
+  };
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
@@ -148,33 +205,94 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.sectionHeadText}>
             <Text style={styles.sectionTitle}>{t('profile.homeLocation')}</Text>
-            <Text style={styles.sectionSub}>{t('profile.homeLocationSub')}</Text>
+            <Text style={styles.sectionSub}>
+              {editing ? t('profile.homeLocationSub') : t('profile.homeLocationSavedSub')}
+            </Text>
           </View>
+          {hasSaved && !editing ? (
+            <TouchableOpacity style={styles.editChip} onPress={startEditing} hitSlop={8}>
+              <MaterialIcons name="edit" size={16} color={Stitch.colors.secondary} />
+              <Text style={styles.editChipText}>{t('common.edit')}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
-        <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
-        <LocationPicker
-          placeholder={t('auth.searchPlaceholder')}
-          value={location}
-          onChange={setLocation}
-          height={200}
-        />
-
-        {location ? (
-          <TouchableOpacity style={styles.mapsLink} onPress={openMaps} activeOpacity={0.85}>
-            <MaterialIcons name="map" size={18} color={Stitch.colors.primary} />
-            <Text style={styles.mapsLinkText}>{t('common.openMaps')}</Text>
-            <MaterialIcons name="open-in-new" size={16} color={Stitch.colors.onSurfaceVariant} />
-          </TouchableOpacity>
-        ) : null}
+        {editing ? (
+          <>
+            <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
+            <LocationPicker
+              placeholder={t('auth.searchPlaceholder')}
+              value={location}
+              onChange={setLocation}
+              height={200}
+            />
+            {location ? (
+              <TouchableOpacity style={styles.mapsLink} onPress={openMaps} activeOpacity={0.85}>
+                <MaterialIcons name="map" size={18} color={Stitch.colors.primary} />
+                <Text style={styles.mapsLinkText}>{t('common.openMaps')}</Text>
+                <MaterialIcons name="open-in-new" size={16} color={Stitch.colors.onSurfaceVariant} />
+              </TouchableOpacity>
+            ) : null}
+          </>
+        ) : hasSaved ? (
+          <View style={styles.savedCard}>
+            <View style={styles.savedBadge}>
+              <MaterialIcons name="check-circle" size={16} color={Stitch.colors.success} />
+              <Text style={styles.savedBadgeText}>{t('profile.homeAddressSaved')}</Text>
+            </View>
+            <Text style={styles.savedAddress}>
+              {savedLines.length > 0
+                ? savedLines.join('\n')
+                : user?.houseOwner?.address || '—'}
+            </Text>
+            {displayCity ? (
+              <View style={styles.savedCityRow}>
+                <MaterialIcons name="location-on" size={16} color={Stitch.colors.secondary} />
+                <Text style={styles.savedCity}>{displayCity}</Text>
+              </View>
+            ) : null}
+            {savedLocation ? (
+              <TouchableOpacity
+                style={styles.mapsLink}
+                onPress={openSavedMaps}
+                activeOpacity={0.85}
+              >
+                <MaterialIcons name="map" size={18} color={Stitch.colors.primary} />
+                <Text style={styles.mapsLinkText}>{t('common.openMaps')}</Text>
+                <MaterialIcons name="open-in-new" size={16} color={Stitch.colors.onSurfaceVariant} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : (
+          <>
+            <Text style={styles.emptyHome}>{t('profile.noHomeYet')}</Text>
+            <GradientButton
+              title={t('profile.addHomeLocation')}
+              onPress={startEditing}
+              style={styles.addHomeBtn}
+            />
+          </>
+        )}
       </GlassCard>
 
-      <GradientButton
-        title={saving ? t('common.saving') : t('profile.saveHomeLocation')}
-        onPress={saveLocation}
-        loading={saving}
-        style={styles.saveBtn}
-      />
+      {editing ? (
+        <View style={styles.editActions}>
+          <GradientButton
+            title={saving ? t('common.saving') : t('profile.saveHomeLocation')}
+            onPress={saveLocation}
+            loading={saving}
+            style={styles.saveBtn}
+          />
+          {hasSaved ? (
+            <GradientButton
+              title={t('common.cancel')}
+              variant="outline"
+              onPress={cancelEditing}
+              style={styles.cancelBtn}
+            />
+          ) : null}
+        </View>
+      ) : null}
 
       <GradientButton
         title={t('auth.signOut')}
@@ -290,6 +408,69 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 18,
   },
+  editChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Stitch.radius.pill,
+    backgroundColor: Stitch.colors.secondaryFixed,
+  },
+  editChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Stitch.colors.secondary,
+  },
+  savedCard: {
+    backgroundColor: Stitch.colors.surfaceLow,
+    borderRadius: Stitch.radius.lg,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Stitch.colors.outlineVariant + '44',
+  },
+  savedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: Stitch.colors.successBg,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Stitch.radius.pill,
+    marginBottom: 12,
+  },
+  savedBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Stitch.colors.success,
+  },
+  savedAddress: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Stitch.colors.onBackground,
+    lineHeight: 22,
+  },
+  savedCityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 10,
+  },
+  savedCity: {
+    fontSize: 14,
+    color: Stitch.colors.onSurfaceVariant,
+    fontWeight: '500',
+  },
+  emptyHome: {
+    fontSize: 14,
+    color: Stitch.colors.onSurfaceVariant,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  addHomeBtn: { marginTop: 0 },
+  editActions: { marginBottom: 12 },
+  cancelBtn: { marginTop: 0 },
   mapsLink: {
     flexDirection: 'row',
     alignItems: 'center',

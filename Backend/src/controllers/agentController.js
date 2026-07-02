@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const prisma = require("../config/prisma");
+const { isAadhaarVerificationRequired } = require("../config/features");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const { createNotification } = require("../services/notificationService");
@@ -15,7 +16,7 @@ const {
 const {
   agentHasLocation,
   boundingBoxForRadius,
-  DEFAULT_RADIUS_KM,
+  getAgentRadiusKm,
   filterServantsNearAgent
 } = require("../services/locationService");
 const { assertAgentCanAccessServant } = require("../services/agentRegistrationService");
@@ -171,7 +172,12 @@ exports.createServant = async (req, res) => {
     address,
     city,
     latitude,
-    longitude
+    longitude,
+    bankAccountHolder,
+    bankAccountNumber,
+    bankName,
+    bankIfsc,
+    bankUpiId
   } = req.body;
 
   const email = normalizeEmail(rawEmail);
@@ -228,10 +234,16 @@ exports.createServant = async (req, res) => {
           profilePhoto,
           verificationStatus: "PENDING",
           registrationSource: "AGENT",
+          phoneVerified: !!phone,
           address: address?.trim() || null,
           city: city?.trim() || null,
           latitude: latitude !== undefined && latitude !== "" ? parseFloat(latitude) : null,
           longitude: longitude !== undefined && longitude !== "" ? parseFloat(longitude) : null,
+          bankAccountHolder: bankAccountHolder?.trim() || null,
+          bankAccountNumber: bankAccountNumber?.trim() || null,
+          bankName: bankName?.trim() || null,
+          bankIfsc: bankIfsc?.trim()?.toUpperCase() || null,
+          bankUpiId: bankUpiId?.trim() || null,
           skills: {
             create: skillList.map((skillName) => ({ skillName }))
           }
@@ -279,16 +291,18 @@ exports.listServants = async (req, res) => {
 
   if (isRegistrationList && !scope.isAdmin && scope.agentId) {
     const agent = scope.agent || (await prisma.agent.findUnique({ where: { id: scope.agentId } }));
+    const agentRadiusKm = getAgentRadiusKm(agent);
+
     if (!agentHasLocation(agent)) {
       return sendSuccess(res, {
         servants: [],
         pagination: { page, limit, total: 0 },
         locationNotice:
-          `Set your agency location in Profile to receive registrations within ${DEFAULT_RADIUS_KM} km.`
+          `Set your agency location in Profile to receive registrations within ${agentRadiusKm} km.`
       });
     }
 
-    const box = boundingBoxForRadius(agent.latitude, agent.longitude, DEFAULT_RADIUS_KM);
+    const box = boundingBoxForRadius(agent.latitude, agent.longitude, agentRadiusKm);
     where = registrationWhereForScope(scope, {
       ...sharedFilters,
       ...box
@@ -300,14 +314,14 @@ exports.listServants = async (req, res) => {
       orderBy: { createdAt: "desc" }
     });
 
-    const filtered = filterServantsNearAgent(candidates, agent, DEFAULT_RADIUS_KM);
+    const filtered = filterServantsNearAgent(candidates, agent, agentRadiusKm);
     const total = filtered.length;
     const servants = filtered.slice((page - 1) * limit, page * limit);
 
     return sendSuccess(res, {
       servants,
       pagination: { page, limit, total },
-      locationNotice: `Showing registrations within ${DEFAULT_RADIUS_KM} km of your agency.`
+      locationNotice: `Showing registrations within ${agentRadiusKm} km of your agency.`
     });
   }
 
@@ -390,6 +404,11 @@ exports.updateServant = async (req, res) => {
     city,
     latitude,
     longitude,
+    bankAccountHolder,
+    bankAccountNumber,
+    bankName,
+    bankIfsc,
+    bankUpiId,
     password,
     generatePassword
   } = req.body;
@@ -491,7 +510,18 @@ exports.updateServant = async (req, res) => {
         }),
         ...(longitude !== undefined && {
           longitude: longitude === "" ? null : parseFloat(longitude)
-        })
+        }),
+        ...(bankAccountHolder !== undefined && {
+          bankAccountHolder: bankAccountHolder?.trim() || null
+        }),
+        ...(bankAccountNumber !== undefined && {
+          bankAccountNumber: bankAccountNumber?.trim() || null
+        }),
+        ...(bankName !== undefined && { bankName: bankName?.trim() || null }),
+        ...(bankIfsc !== undefined && {
+          bankIfsc: bankIfsc?.trim() ? bankIfsc.trim().toUpperCase() : null
+        }),
+        ...(bankUpiId !== undefined && { bankUpiId: bankUpiId?.trim() || null })
       },
       include: servantInclude
     });
@@ -562,15 +592,23 @@ exports.verifyServant = async (req, res) => {
   let loginPassword =
     password && String(password).trim().length >= 6 ? String(password).trim() : null;
 
+  if (
+    status === "VERIFIED" &&
+    !existing.aadhaarVerified &&
+    isAadhaarVerificationRequired()
+  ) {
+    throw new ApiError(
+      400,
+      "Aadhaar Offline XML verification is required before approving this servant"
+    );
+  }
+
   if (status === "VERIFIED" && isAppRegistration) {
     if (!loginPassword && generatePassword) {
       loginPassword = generateServantPassword();
     }
     if (!loginPassword && !existing.user.agentSetPassword) {
-      throw new ApiError(
-        400,
-        "Set a login password first (min 6 characters), or use generate password when approving"
-      );
+      loginPassword = generateServantPassword();
     }
   } else if (status === "VERIFIED" && password && String(password).length < 6) {
     throw new ApiError(400, "Password must be at least 6 characters when setting login");
@@ -659,7 +697,7 @@ exports.updateProfile = async (req, res) => {
     throw new ApiError(404, "Agent profile not found. Contact support to link your agency.");
   }
 
-  const { agencyName, address, city, latitude, longitude } = req.body;
+  const { agencyName, address, city, latitude, longitude, serviceRadiusKm } = req.body;
 
   const updated = await prisma.agent.update({
     where: { id: agent.id },
@@ -668,7 +706,10 @@ exports.updateProfile = async (req, res) => {
       address: address.trim(),
       city: city?.trim() || null,
       latitude: parseFloat(latitude),
-      longitude: parseFloat(longitude)
+      longitude: parseFloat(longitude),
+      ...(serviceRadiusKm !== undefined && {
+        serviceRadiusKm: parseFloat(serviceRadiusKm)
+      })
     }
   });
 
@@ -683,4 +724,89 @@ exports.updateProfile = async (req, res) => {
   });
 
   sendSuccess(res, { agent: updated, user: serializeUser(user) });
+};
+
+const getScopedServant = async (scope, servantId) => {
+  const servant = await prisma.servant.findFirst({
+    where: recordWhereForScope(scope, { id: servantId })
+  });
+  await assertScopedServantAccess(scope, servant);
+  return servant;
+};
+
+const getScopedServantZone = async (scope, servantId, zoneId) => {
+  const servant = await getScopedServant(scope, servantId);
+  const zone = await prisma.zone.findFirst({
+    where: { id: zoneId, servantId: servant.id }
+  });
+  if (!zone) throw new ApiError(404, "Zone not found");
+  return { servant, zone };
+};
+
+exports.listServantZones = async (req, res) => {
+  const scope = await resolveAgentScope(req.user);
+  const servantId = parseInt(req.params.id, 10);
+  await getScopedServant(scope, servantId);
+
+  const zones = await prisma.zone.findMany({
+    where: { servantId },
+    orderBy: { name: "asc" }
+  });
+
+  sendSuccess(res, { zones });
+};
+
+exports.createServantZone = async (req, res) => {
+  const scope = await resolveAgentScope(req.user);
+  const servantId = parseInt(req.params.id, 10);
+  await getScopedServant(scope, servantId);
+
+  const { name, description, city, latitude, longitude } = req.body;
+  if (!name?.trim()) throw new ApiError(400, "Zone name is required");
+
+  const zone = await prisma.zone.create({
+    data: {
+      servantId,
+      name: name.trim(),
+      description: description?.trim() || null,
+      city: city?.trim() || null,
+      latitude: latitude ?? undefined,
+      longitude: longitude ?? undefined
+    }
+  });
+
+  sendSuccess(res, { zone }, 201);
+};
+
+exports.updateServantZone = async (req, res) => {
+  const scope = await resolveAgentScope(req.user);
+  const servantId = parseInt(req.params.id, 10);
+  const zoneId = parseInt(req.params.zoneId, 10);
+  await getScopedServantZone(scope, servantId, zoneId);
+
+  const { name, description, city, latitude, longitude } = req.body;
+  const zone = await prisma.zone.update({
+    where: { id: zoneId },
+    data: {
+      ...(name !== undefined && { name: name.trim() }),
+      ...(description !== undefined && {
+        description: description?.trim() || null
+      }),
+      ...(city !== undefined && { city: city?.trim() || null }),
+      ...(latitude !== undefined && { latitude }),
+      ...(longitude !== undefined && { longitude })
+    }
+  });
+
+  sendSuccess(res, { zone });
+};
+
+exports.deleteServantZone = async (req, res) => {
+  const scope = await resolveAgentScope(req.user);
+  const servantId = parseInt(req.params.id, 10);
+  const zoneId = parseInt(req.params.zoneId, 10);
+  await getScopedServantZone(scope, servantId, zoneId);
+
+  await prisma.zone.delete({ where: { id: zoneId } });
+  sendSuccess(res, { message: "Zone deleted" });
 };

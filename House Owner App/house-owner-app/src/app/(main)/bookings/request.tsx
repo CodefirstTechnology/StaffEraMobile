@@ -15,15 +15,16 @@ import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
-import { LocationPicker } from '@/components/ui/LocationPicker';
-import {
-  AddressUnitFields,
-  type AddressUnitValue,
-} from '@/components/ui/AddressUnitFields';
+import { BookingLocationSection } from '@/components/ui/BookingLocationSection';
 import { TimeSlotPicker } from '@/components/ui/TimeSlotPicker';
 import type { LocationValue } from '@/lib/locationTypes';
-import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useAuthStore } from '@/store/authStore';
+import {
+  addressUnitFromProfile,
+  defaultBookingLocationMode,
+  homeLocationFromProfile,
+  type BookingLocationMode,
+} from '@/lib/homeLocation';
 import { useSkills } from '@/hooks/useSkills';
 import {
   formatSessionSlotsLabel,
@@ -44,7 +45,10 @@ export default function AreaBookingRequestScreen() {
   const { data: skills = [] } = useSkills();
   const requestedSkillFromRoute = skillParam ? String(skillParam).toUpperCase() : undefined;
   const [selectedSkill, setSelectedSkill] = useState(requestedSkillFromRoute || '');
-  const { location: liveLocation, loading: locLoading } = useLiveLocation();
+  const ho = user?.houseOwner;
+  const [locationMode, setLocationMode] = useState<BookingLocationMode>(() =>
+    defaultBookingLocationMode(ho),
+  );
   const [bookingType, setBookingType] = useState<'SESSION' | 'MONTHLY'>('SESSION');
   const [sessionDate, setSessionDate] = useState(new Date());
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>(() => getDefaultTimeSlotsForDate(new Date()));
@@ -54,12 +58,8 @@ export default function AreaBookingRequestScreen() {
     d.setMonth(d.getMonth() + 1);
     return d;
   });
-  const [location, setLocation] = useState<LocationValue | null>(null);
-  const [addressUnit, setAddressUnit] = useState<AddressUnitValue>({
-    flatNo: '',
-    building: '',
-    area: '',
-  });
+  const [location, setLocation] = useState<LocationValue | null>(() => homeLocationFromProfile(ho));
+  const [addressUnit, setAddressUnit] = useState(() => addressUnitFromProfile(ho));
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
@@ -69,18 +69,17 @@ export default function AreaBookingRequestScreen() {
   }, [requestedSkillFromRoute]);
 
   useEffect(() => {
-    if (liveLocation) setLocation(liveLocation);
-  }, [liveLocation]);
-
-  useEffect(() => {
-    const ho = user?.houseOwner;
-    if (!ho) return;
-    setAddressUnit({
-      flatNo: ho.flatNo || '',
-      building: ho.building || '',
-      area: ho.area || '',
-    });
-  }, [user?.houseOwner]);
+    const profile = user?.houseOwner;
+    if (!profile) return;
+    if (defaultBookingLocationMode(profile) === 'home') {
+      const home = homeLocationFromProfile(profile);
+      if (home) {
+        setLocationMode('home');
+        setLocation(home);
+        setAddressUnit(addressUnitFromProfile(profile));
+      }
+    }
+  }, [user?.houseOwner?.address, user?.houseOwner?.latitude, user?.houseOwner?.longitude]);
 
   useEffect(() => {
     const syncSlots = () =>
@@ -302,30 +301,25 @@ export default function AreaBookingRequestScreen() {
         </Text>
       )}
 
-      <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
-      <LocationPicker
-        label={t('bookings.liveLocationLabel')}
-        placeholder={
-          locLoading ? t('bookings.gettingLocation') : t('bookings.liveLocationPlaceholder')
-        }
-        value={location}
-        onChange={setLocation}
+      <BookingLocationSection
+        houseOwner={user?.houseOwner}
+        mode={locationMode}
+        onModeChange={setLocationMode}
+        location={location}
+        onLocationChange={setLocation}
+        addressUnit={addressUnit}
+        onAddressUnitChange={setAddressUnit}
       />
       <GhostInput label={t('bookings.notesOptional')} value={notes} onChangeText={setNotes} />
 
       <GradientButton
         title={
-          nearbyCount > 0
-            ? t('bookings.sendRequestToHelpers', {
-                skill: skillLabel || t('bookings.areaRequest'),
-                count: nearbyCount,
-              })
-            : selectedSkill
-              ? t('bookings.sendSkillRequest', { skill: skillLabel })
-              : t('bookings.selectCategoryToSend')
+          nearbyCount > 0 || selectedSkill
+            ? t('bookings.requestBooking')
+            : t('bookings.selectCategoryToSend')
         }
         onPress={submit}
-        loading={loading || locLoading}
+        loading={loading}
       />
     </ScrollView>
   );

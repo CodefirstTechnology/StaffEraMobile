@@ -12,20 +12,25 @@ type Props = {
   servant?: Coord | null;
   lastUpdated?: string | null;
   visitAddress?: VisitAddressParts | null;
+  workStarted?: boolean;
 };
 
-export function JobTrackingMap({ home, servant, lastUpdated, visitAddress }: Props) {
+export function JobTrackingMap({ home, servant, lastUpdated, visitAddress, workStarted = false }: Props) {
   if (!home) return null;
+
+  const hint = servant
+    ? workStarted
+      ? `Work in progress · ${lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-IN') : 'updating'}`
+      : `Helper on the way · ${lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-IN') : 'updating'}`
+    : workStarted
+      ? 'Waiting for helper location during work…'
+      : 'Waiting for helper to share location…';
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.sectionTitle}>Live tracking</Text>
       {visitAddress ? <VisitAddressBanner parts={visitAddress} title="Visit address" /> : null}
-      <Text style={styles.hint}>
-        {servant
-          ? `Helper location · ${lastUpdated ? new Date(lastUpdated).toLocaleTimeString('en-IN') : 'updating'}`
-          : 'Waiting for helper to share location…'}
-      </Text>
+      <Text style={styles.hint}>{hint}</Text>
       <TouchableOpacity
         style={styles.btn}
         onPress={() => Linking.openURL(mapsDeepLink(home.latitude, home.longitude, 'Your home'))}

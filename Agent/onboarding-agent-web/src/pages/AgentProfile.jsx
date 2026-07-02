@@ -92,12 +92,14 @@ export default function AgentProfile() {
   const isAdmin = user?.role === 'ADMIN'
   const [agencyName, setAgencyName] = useState('')
   const [location, setLocation] = useState(null)
+  const [serviceRadiusKm, setServiceRadiusKm] = useState('3')
   const [saving, setSaving] = useState(false)
   const [settingsError, setSettingsError] = useState('')
 
   useEffect(() => {
     if (!user?.agent) return
     setAgencyName(user.agent.agencyName || '')
+    setServiceRadiusKm(String(user.agent.serviceRadiusKm ?? 3))
     if (hasAgencyLocation(user.agent)) {
       setLocation({
         address: user.agent.address,
@@ -151,6 +153,11 @@ export default function AgentProfile() {
       setSettingsError('Agency location is required. Search or use GPS to pick your office area.')
       return
     }
+    const radius = Number(serviceRadiusKm)
+    if (!Number.isFinite(radius) || radius < 1 || radius > 100) {
+      setSettingsError('Service radius must be between 1 and 100 km.')
+      return
+    }
     setSaving(true)
     try {
       const res = await api.patch('/agent/profile', {
@@ -159,6 +166,7 @@ export default function AgentProfile() {
         city: location.city,
         latitude: location.latitude,
         longitude: location.longitude,
+        serviceRadiusKm: radius,
       })
       setUser(res.data.data.user)
     } catch (e) {
@@ -290,6 +298,11 @@ export default function AgentProfile() {
               />
               <InfoRow icon="🌆" label="City" value={user.agent.city || '—'} />
               <InfoRow
+                icon="📍"
+                label="Service radius"
+                value={`${user.agent.serviceRadiusKm ?? 3} km`}
+              />
+              <InfoRow
                 icon="🔢"
                 label="Agent profile ID"
                 value={`#${user.agent.id}`}
@@ -318,7 +331,7 @@ export default function AgentProfile() {
       {user.agent && (
         <SectionCard
           title="Agency settings"
-          description="Agency location is required. You receive app registrations within 3 km of this point."
+          description="Update your agency name, office location, and how far you receive app registrations."
         >
           <div className="space-y-4">
             <label className="block space-y-1.5">
@@ -336,6 +349,21 @@ export default function AgentProfile() {
               value={location}
               onChange={setLocation}
             />
+            <label className="block max-w-xs space-y-1.5">
+              <span className="text-sm font-medium text-gray-700">Service radius (km)</span>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                step={0.5}
+                className="w-full rounded-lg border px-3 py-2"
+                value={serviceRadiusKm}
+                onChange={(e) => setServiceRadiusKm(e.target.value)}
+              />
+              <span className="text-xs text-on-surface-variant">
+                Helpers who sign up within this distance of your agency appear in App registrations.
+              </span>
+            </label>
             {settingsError && (
               <p className="text-sm text-error">{settingsError}</p>
             )}
