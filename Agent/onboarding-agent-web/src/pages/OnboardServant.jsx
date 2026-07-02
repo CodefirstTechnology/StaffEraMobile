@@ -501,9 +501,9 @@ export default function OnboardServant() {
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">ID Verification</h3>
           <p className="text-sm text-subtext">
-            Upload ID photo and profile photo here. After the profile is created, verify Aadhaar
-            with Offline e-KYC XML (myAadhaar ZIP + share code) on the servant detail page — required
-            before approval.
+            Upload ID photo and profile photo here. After the profile is created, you can optionally
+            verify Aadhaar with Offline e-KYC XML (myAadhaar ZIP + share code) on the servant detail
+            page.
           </p>
           {error && <p className="text-error text-sm">{error}</p>}
           <Field label="ID proof type">

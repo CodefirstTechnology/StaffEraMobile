@@ -108,21 +108,27 @@ export default function ServantDetail() {
   })
 
   const verify = async (status, rejectionReason, opts = {}) => {
-    const res = await api.patch(`/agent/servants/${id}/verify`, {
-      status,
-      reason: rejectionReason,
-      ...(opts.password ? { password: opts.password } : {}),
-      ...(opts.generatePassword ? { generatePassword: true } : {}),
-    })
-    qc.invalidateQueries({ queryKey: ['servant', id] })
-    qc.invalidateQueries({ queryKey: ['agent-servants'] })
-    qc.invalidateQueries({ queryKey: ['agent-registrations'] })
-    setRejectOpen(false)
-    setApproveOpen(false)
-    if (res.data?.data?.credentials) {
-      setCredentials(res.data.data.credentials)
+    try {
+      const res = await api.patch(`/agent/servants/${id}/verify`, {
+        status,
+        reason: rejectionReason,
+        ...(opts.password ? { password: opts.password } : {}),
+        ...(opts.generatePassword ? { generatePassword: true } : {}),
+      })
+      qc.invalidateQueries({ queryKey: ['servant', id] })
+      qc.invalidateQueries({ queryKey: ['agent-servants'] })
+      qc.invalidateQueries({ queryKey: ['agent-registrations'] })
+      setRejectOpen(false)
+      setApproveOpen(false)
+      if (res.data?.data?.credentials) {
+        setCredentials(res.data.data.credentials)
+      }
+      return res
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Request failed'
+      window.alert(msg)
+      throw err
     }
-    return res
   }
 
   useEffect(() => {
@@ -146,18 +152,17 @@ export default function ServantDetail() {
     servant?.registrationSource === 'SELF' || servant?.user?.isActive === false
 
   const handleApproveClick = () => {
-    if (isAppRegistration && !servant?.user?.agentSetPassword) {
-      setApproveOpen(true)
-      return
-    }
-    if (isAppRegistration && servant?.user?.agentSetPassword) {
-      if (window.confirm('Approve this helper? They can sign in with the password you already set.')) {
-        verify('VERIFIED')
-      }
-      return
-    }
-    if (window.confirm('Approve this servant?')) {
-      verify('VERIFIED')
+    const message = isAppRegistration
+      ? servant?.user?.agentSetPassword
+        ? 'Approve this helper? They can sign in with the password you already set.'
+        : 'Approve this helper? A login password will be generated automatically.'
+      : 'Approve this servant?'
+    if (window.confirm(message)) {
+      void verify('VERIFIED', undefined, {
+        ...(isAppRegistration && !servant?.user?.agentSetPassword
+          ? { generatePassword: true }
+          : {}),
+      })
     }
   }
 
@@ -165,9 +170,6 @@ export default function ServantDetail() {
     setApproveLoading(true)
     try {
       await verify('VERIFIED', undefined, opts)
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Approval failed'
-      window.alert(msg)
     } finally {
       setApproveLoading(false)
     }
@@ -543,6 +545,15 @@ export default function ServantDetail() {
                 >
                   ✓ Approve
                 </Button>
+                {isAppRegistration && !servant.user?.agentSetPassword ? (
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setApproveOpen(true)}
+                  >
+                    Approve with custom password
+                  </Button>
+                ) : null}
                 <Button
                   variant="secondary"
                   className="w-full"

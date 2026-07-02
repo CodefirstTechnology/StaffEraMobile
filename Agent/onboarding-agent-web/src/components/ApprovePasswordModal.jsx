@@ -38,14 +38,22 @@ export function ApprovePasswordModal({ open, servant, onClose, onConfirm, loadin
           onPasswordChange={setPassword}
           hint="This helper registered from the Servant app. Set their password and share it so they can sign in."
         />
-        <div className="mt-6 flex gap-2">
+        <div className="mt-6 flex flex-wrap gap-2">
           <Button
             variant="success"
             className="flex-1"
             disabled={loading}
             onClick={handleApprove}
           >
-            {loading ? 'Saving…' : 'Approve & activate'}
+            {loading ? 'Saving…' : 'Approve with this password'}
+          </Button>
+          <Button
+            variant="secondary"
+            className="flex-1"
+            disabled={loading}
+            onClick={() => onConfirm({ generatePassword: true })}
+          >
+            {loading ? 'Saving…' : 'Generate & approve'}
           </Button>
           <Button variant="secondary" onClick={handleClose} disabled={loading}>
             Cancel

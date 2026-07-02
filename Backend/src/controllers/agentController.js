@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const prisma = require("../config/prisma");
+const { isAadhaarVerificationRequired } = require("../config/features");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const { createNotification } = require("../services/notificationService");
@@ -594,7 +595,7 @@ exports.verifyServant = async (req, res) => {
   if (
     status === "VERIFIED" &&
     !existing.aadhaarVerified &&
-    process.env.REQUIRE_AADHAAR_VERIFICATION !== "false"
+    isAadhaarVerificationRequired()
   ) {
     throw new ApiError(
       400,
@@ -607,10 +608,7 @@ exports.verifyServant = async (req, res) => {
       loginPassword = generateServantPassword();
     }
     if (!loginPassword && !existing.user.agentSetPassword) {
-      throw new ApiError(
-        400,
-        "Set a login password first (min 6 characters), or use generate password when approving"
-      );
+      loginPassword = generateServantPassword();
     }
   } else if (status === "VERIFIED" && password && String(password).length < 6) {
     throw new ApiError(400, "Password must be at least 6 characters when setting login");

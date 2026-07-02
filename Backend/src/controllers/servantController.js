@@ -1,3 +1,4 @@
+const { isAadhaarVerificationRequired } = require("../config/features");
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
@@ -39,8 +40,7 @@ exports.listServants = async (req, res) => {
   const { lat, lng } = await resolveHouseOwnerCoords(req.user.id, latitude, longitude);
   const radius = radiusKm != null ? Number(radiusKm) : DEFAULT_RADIUS_KM;
 
-  const requireAadhaar =
-    process.env.REQUIRE_AADHAAR_VERIFICATION !== "false";
+  const requireAadhaar = isAadhaarVerificationRequired();
 
   const where = {
     verificationStatus: "VERIFIED",
@@ -114,7 +114,7 @@ exports.getServant = async (req, res) => {
       throw new ApiError(404, "Servant not found");
     }
     if (
-      process.env.REQUIRE_AADHAAR_VERIFICATION !== "false" &&
+      isAadhaarVerificationRequired() &&
       !servant.aadhaarVerified
     ) {
       throw new ApiError(404, "Servant not found");

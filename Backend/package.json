@@ -6,8 +6,11 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "db:push": "prisma db push",
+    "db:setup": "prisma db push && prisma generate && node prisma/seed.js",
     "seed": "node prisma/seed.js",
     "seed:servants": "node prisma/seed-servants.js",
+    "seed:all": "node prisma/seed.js && node prisma/seed-servants.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

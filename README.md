@@ -19,11 +19,11 @@ Home-staffing marketplace: house owners book verified servants onboarded by agen
 cd Backend
 cp .env.example .env   # set DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET
 npm install
-npx prisma db push
-npx prisma generate
-node prisma/seed.js
+npm run db:setup       # sync schema + seed (roles, admin, agent, skills)
 npm start
 ```
+
+Optional demo servants: `npm run seed:servants` (password: `123456`)
 
 API: `http://localhost:5000/api/v1`
 
