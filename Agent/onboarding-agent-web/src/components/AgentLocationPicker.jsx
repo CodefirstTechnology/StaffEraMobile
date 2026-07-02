@@ -4,11 +4,20 @@ import { getPlaceDetails, reverseGeocode, searchPlaces } from '../lib/geo'
 
 const DEFAULT = { latitude: 19.076, longitude: 72.8777 }
 
-function inputClass() {
-  return 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm'
+function inputClass(invalid = false) {
+  return `w-full rounded-lg border px-3 py-2 text-sm transition-colors${
+    invalid ? ' border-error focus:border-error' : ' border-gray-200'
+  }`
 }
 
-export function AgentLocationPicker({ value, onChange, label = 'Agency location', required }) {
+export function AgentLocationPicker({
+  value,
+  onChange,
+  label = 'Agency location',
+  required,
+  error,
+  onInteraction,
+}) {
   const [query, setQuery] = useState(value?.address || '')
   const [predictions, setPredictions] = useState([])
   const [searching, setSearching] = useState(false)
@@ -19,8 +28,21 @@ export function AgentLocationPicker({ value, onChange, label = 'Agency location'
   })
 
   useEffect(() => {
-    if (value?.address) setQuery(value.address)
-  }, [value?.address])
+    if (value?.address) {
+      setQuery(value.address)
+      setAnchor({
+        latitude: value.latitude ?? DEFAULT.latitude,
+        longitude: value.longitude ?? DEFAULT.longitude,
+      })
+    } else if (value == null) {
+      setQuery('')
+      setPredictions([])
+      setAnchor({
+        latitude: DEFAULT.latitude,
+        longitude: DEFAULT.longitude,
+      })
+    }
+  }, [value])
 
   useEffect(() => {
     if (!query.trim() || query === value?.address) {
@@ -43,6 +65,7 @@ export function AgentLocationPicker({ value, onChange, label = 'Agency location'
 
   const apply = (location) => {
     onChange(location)
+    onInteraction?.()
     setQuery(location.address)
     setPredictions([])
     setAnchor({ latitude: location.latitude, longitude: location.longitude })
@@ -96,10 +119,14 @@ export function AgentLocationPicker({ value, onChange, label = 'Agency location'
       </label>
       <div className="flex gap-2">
         <input
-          className={inputClass()}
+          className={inputClass(!!error)}
           placeholder="Search office, area, or landmark"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            onInteraction?.()
+          }}
+          aria-invalid={!!error}
         />
         <button
           type="button"
@@ -129,7 +156,9 @@ export function AgentLocationPicker({ value, onChange, label = 'Agency location'
           ))}
         </ul>
       )}
-      {value?.address && value.latitude != null && value.longitude != null ? (
+      {error ? (
+        <p className="text-xs font-medium text-error">{error}</p>
+      ) : value?.address && value.latitude != null && value.longitude != null ? (
         <p className="flex items-start gap-1.5 text-xs text-subtext">
           <LocationIcon size={14} className="mt-0.5 text-secondary" />
           <span>

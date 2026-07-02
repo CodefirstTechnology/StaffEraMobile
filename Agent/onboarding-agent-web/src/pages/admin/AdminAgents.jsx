@@ -16,6 +16,138 @@ function inputClass() {
   return 'input-ghost w-full text-sm'
 }
 
+function fieldInputClass(invalid = false) {
+  return `${inputClass()}${invalid ? ' !border-error focus:!border-error' : ''}`
+}
+
+const REQUIRED = 'This field is required'
+
+const emptyCreateFieldErrors = () => ({
+  name: '',
+  email: '',
+  location: '',
+  manualAddress: '',
+  manualLatitude: '',
+  manualLongitude: '',
+  password: '',
+  serviceRadiusKm: '',
+})
+
+const emptyEditFieldErrors = () => ({
+  location: '',
+  serviceRadiusKm: '',
+})
+
+function FormField({ label, required, error, hint, className = '', children }) {
+  return (
+    <label className={`block space-y-1.5 ${className}`.trim()}>
+      <span className="text-sm font-medium text-on-background">
+        {label}
+        {required ? <span className="text-error"> *</span> : null}
+      </span>
+      {children}
+      {error ? (
+        <span className="text-xs font-medium text-error">{error}</span>
+      ) : hint ? (
+        <span className="text-xs text-on-surface-variant">{hint}</span>
+      ) : null}
+    </label>
+  )
+}
+
+function validateEmail(value) {
+  if (!value.trim()) return REQUIRED
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+    return 'Enter a valid email address'
+  }
+  return ''
+}
+
+function validateName(value) {
+  if (!value.length) return REQUIRED
+  if (!value.trim().length) return 'Name cannot contain only spaces'
+  if (value.trim().length < 2) return 'Name must be at least 2 characters'
+  return ''
+}
+
+function validateServiceRadius(value) {
+  const trimmed = String(value ?? '').trim()
+  if (!trimmed) return REQUIRED
+  const radius = Number(trimmed)
+  if (!Number.isFinite(radius)) return 'Enter a valid number'
+  if (radius < 1 || radius > 100) return 'Service radius must be between 1 and 100 km'
+  return ''
+}
+
+function validateCreateAgentFields({
+  name,
+  email,
+  locationMode,
+  location,
+  manualAddress,
+  manualLatitude,
+  manualLongitude,
+  generatePassword,
+  password,
+  serviceRadiusKm,
+}) {
+  const errors = emptyCreateFieldErrors()
+  errors.name = validateName(name)
+  errors.email = validateEmail(email)
+
+  if (locationMode === 'picker') {
+    if (
+      !location?.address?.trim() ||
+      location.latitude == null ||
+      location.longitude == null
+    ) {
+      errors.location = 'Pick the office location from search or GPS'
+    }
+  } else {
+    if (!manualAddress.trim()) errors.manualAddress = REQUIRED
+    if (!String(manualLatitude).trim()) errors.manualLatitude = REQUIRED
+    else if (!Number.isFinite(Number(manualLatitude))) {
+      errors.manualLatitude = 'Enter a valid latitude'
+    }
+    if (!String(manualLongitude).trim()) errors.manualLongitude = REQUIRED
+    else if (!Number.isFinite(Number(manualLongitude))) {
+      errors.manualLongitude = 'Enter a valid longitude'
+    }
+  }
+
+  if (!generatePassword) {
+    if (!password) errors.password = REQUIRED
+    else if (password.length < 6) errors.password = 'Password must be at least 6 characters'
+  }
+
+  errors.serviceRadiusKm = validateServiceRadius(serviceRadiusKm)
+  return errors
+}
+
+function validateEditAgentFields({ location, serviceRadiusKm }) {
+  const errors = emptyEditFieldErrors()
+  if (
+    !location?.address?.trim() ||
+    location.latitude == null ||
+    location.longitude == null
+  ) {
+    errors.location = 'Pick the office location from search or GPS'
+  }
+  errors.serviceRadiusKm = validateServiceRadius(serviceRadiusKm)
+  return errors
+}
+
+function hasFieldErrors(errors) {
+  return Object.values(errors).some(Boolean)
+}
+
+function updateFieldError(setter, field, value, validate) {
+  setter((prev) => ({
+    ...prev,
+    [field]: prev[field] ? validate(value) : '',
+  }))
+}
+
 function AgentAvatar({ name }) {
   const initials = (name || '?')
     .split(/\s+/)
@@ -82,8 +214,29 @@ function LoadingSkeleton() {
   )
 }
 
-function AgentEditPanel({ agent, form, setForm, error, saving, onClose, onSave }) {
+function AgentEditPanel({
+  agent,
+  form,
+  setForm,
+  fieldErrors,
+  setFieldErrors,
+  error,
+  saving,
+  onClose,
+  onSave,
+}) {
   if (!agent) return null
+
+  const updateLocationError = (force = false) => {
+    setFieldErrors((prev) => {
+      const loc = form.location
+      const message =
+        !loc?.address?.trim() || loc.latitude == null || loc.longitude == null
+          ? 'Pick the office location from search or GPS'
+          : ''
+      return force || prev.location ? { ...prev, location: message } : prev
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -120,7 +273,7 @@ function AgentEditPanel({ agent, form, setForm, error, saving, onClose, onSave }
           </div>
         </div>
 
-        <form onSubmit={onSave} className="flex flex-1 flex-col overflow-y-auto px-6 py-5">
+        <form onSubmit={onSave} noValidate className="flex flex-1 flex-col overflow-y-auto px-6 py-5">
           <div className="space-y-5">
             <section className="space-y-3">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-secondary">
@@ -147,7 +300,21 @@ function AgentEditPanel({ agent, form, setForm, error, saving, onClose, onSave }
                 label="Office / service area"
                 required
                 value={form.location}
-                onChange={(loc) => setForm((f) => ({ ...f, location: loc }))}
+                error={fieldErrors.location}
+                onInteraction={() => updateLocationError(true)}
+                onChange={(loc) => {
+                  setForm((f) => ({ ...f, location: loc }))
+                  setFieldErrors((prev) => ({
+                    ...prev,
+                    location: prev.location
+                      ? !loc?.address?.trim() ||
+                        loc?.latitude == null ||
+                        loc?.longitude == null
+                        ? 'Pick the office location from search or GPS'
+                        : ''
+                      : '',
+                  }))
+                }}
               />
             </section>
 
@@ -156,7 +323,9 @@ function AgentEditPanel({ agent, form, setForm, error, saving, onClose, onSave }
                 Coverage
               </h4>
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-on-background">Service radius (km)</span>
+                <span className="text-sm font-medium text-on-background">
+                  Service radius (km)<span className="text-error"> *</span>
+                </span>
                 <div className="flex items-center gap-3">
                   <input
                     type="range"
@@ -165,26 +334,50 @@ function AgentEditPanel({ agent, form, setForm, error, saving, onClose, onSave }
                     step={0.5}
                     className="flex-1 accent-secondary"
                     value={form.serviceRadiusKm}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, serviceRadiusKm: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setForm((f) => ({ ...f, serviceRadiusKm: next }))
+                      updateFieldError(
+                        setFieldErrors,
+                        'serviceRadiusKm',
+                        next,
+                        validateServiceRadius,
+                      )
+                    }}
                   />
                   <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    step={0.5}
-                    required
-                    className={`${inputClass()} w-20 text-center`}
+                    type="text"
+                    inputMode="decimal"
+                    className={`${fieldInputClass(!!fieldErrors.serviceRadiusKm)} w-20 text-center`}
                     value={form.serviceRadiusKm}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, serviceRadiusKm: e.target.value }))
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setForm((f) => ({ ...f, serviceRadiusKm: next }))
+                      updateFieldError(
+                        setFieldErrors,
+                        'serviceRadiusKm',
+                        next,
+                        validateServiceRadius,
+                      )
+                    }}
+                    onBlur={() =>
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        serviceRadiusKm: validateServiceRadius(form.serviceRadiusKm),
+                      }))
                     }
+                    aria-invalid={!!fieldErrors.serviceRadiusKm}
                   />
                 </div>
-                <p className="text-xs text-on-surface-variant">
-                  Helpers within this distance appear in this agent&apos;s app registrations.
-                </p>
+                {fieldErrors.serviceRadiusKm ? (
+                  <span className="text-xs font-medium text-error">
+                    {fieldErrors.serviceRadiusKm}
+                  </span>
+                ) : (
+                  <p className="text-xs text-on-surface-variant">
+                    Helpers within this distance appear in this agent&apos;s app registrations.
+                  </p>
+                )}
               </label>
             </section>
 
@@ -294,9 +487,12 @@ export default function AdminAgents() {
   const [manualLatitude, setManualLatitude] = useState('')
   const [manualLongitude, setManualLongitude] = useState('')
   const [serviceRadiusKm, setServiceRadiusKm] = useState('3')
+  const [fieldErrors, setFieldErrors] = useState(emptyCreateFieldErrors)
+  const [createFormKey, setCreateFormKey] = useState(0)
 
   const [editingAgent, setEditingAgent] = useState(null)
   const [editForm, setEditForm] = useState(emptyEditForm)
+  const [editFieldErrors, setEditFieldErrors] = useState(emptyEditFieldErrors)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
@@ -334,12 +530,27 @@ export default function AdminAgents() {
     setManualLongitude('')
     setServiceRadiusKm('3')
     setError('')
+    setFieldErrors(emptyCreateFieldErrors())
+  }
+
+  const openCreateForm = () => {
+    closeEdit()
+    resetForm()
+    setCreateFormKey((k) => k + 1)
+    setShowForm(true)
+  }
+
+  const closeCreateForm = () => {
+    resetForm()
+    setShowForm(false)
   }
 
   const openEdit = (agent) => {
+    resetForm()
+    setShowForm(false)
     setEditingAgent(agent)
     setEditError('')
-    setShowForm(false)
+    setEditFieldErrors(emptyEditFieldErrors())
     setEditForm({
       agencyName: agent.agencyName || '',
       location:
@@ -359,26 +570,18 @@ export default function AdminAgents() {
     setEditingAgent(null)
     setEditForm(emptyEditForm())
     setEditError('')
+    setEditFieldErrors(emptyEditFieldErrors())
   }
 
   const saveEdit = async (e) => {
     e.preventDefault()
     setEditError('')
-    if (
-      !editForm.location?.address?.trim() ||
-      editForm.location.latitude == null ||
-      editForm.location.longitude == null
-    ) {
-      setEditError('Pick the agent area / office location from search or GPS.')
-      return
-    }
-    const radius = Number(editForm.serviceRadiusKm)
-    if (!Number.isFinite(radius) || radius < 1 || radius > 100) {
-      setEditError('Service radius must be between 1 and 100 km.')
-      return
-    }
+    const errors = validateEditAgentFields(editForm)
+    setEditFieldErrors(errors)
+    if (hasFieldErrors(errors)) return
     setEditSaving(true)
     try {
+      const radius = Number(editForm.serviceRadiusKm)
       await api.patch(`/admin/agents/${editingAgent.id}`, {
         agencyName: editForm.agencyName.trim() || undefined,
         address: editForm.location.address,
@@ -406,6 +609,21 @@ export default function AdminAgents() {
     e.preventDefault()
     setError('')
 
+    const errors = validateCreateAgentFields({
+      name,
+      email,
+      locationMode,
+      location,
+      manualAddress,
+      manualLatitude,
+      manualLongitude,
+      generatePassword,
+      password,
+      serviceRadiusKm,
+    })
+    setFieldErrors(errors)
+    if (hasFieldErrors(errors)) return
+
     let address
     let city
     let latitude
@@ -416,17 +634,6 @@ export default function AdminAgents() {
       city = manualCity.trim() || undefined
       latitude = Number(manualLatitude)
       longitude = Number(manualLongitude)
-      if (!address || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-        setError('Enter address, latitude, and longitude for manual agent location.')
-        return
-      }
-    } else if (
-      !location?.address?.trim() ||
-      location.latitude == null ||
-      location.longitude == null
-    ) {
-      setError('Pick the agent area / office location from search or GPS.')
-      return
     } else {
       address = location.address
       city = location.city
@@ -477,8 +684,8 @@ export default function AdminAgents() {
         <Button
           variant="gradient"
           onClick={() => {
-            closeEdit()
-            setShowForm((v) => !v)
+            if (showForm) closeCreateForm()
+            else openCreateForm()
           }}
         >
           {showForm ? '✕ Cancel' : '+ Add agent'}
@@ -501,7 +708,7 @@ export default function AdminAgents() {
       )}
 
       {showForm && (
-        <form onSubmit={createAgent} className="glass-card space-y-5 p-6">
+        <form key={createFormKey} onSubmit={createAgent} noValidate className="glass-card space-y-5 p-6">
           <div>
             <h3 className="text-lg font-semibold text-primary">New field agent</h3>
             <p className="text-sm text-on-surface-variant">
@@ -510,23 +717,54 @@ export default function AdminAgents() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              ['Full name *', name, setName, 'text'],
-              ['Email *', email, setEmail, 'email'],
-              ['Phone', phone, setPhone, 'tel'],
-              ['Agency name', agencyName, setAgencyName, 'text'],
-            ].map(([label, val, set, type]) => (
-              <label key={label} className="block space-y-1.5">
-                <span className="text-sm font-medium">{label}</span>
-                <input
-                  required={label.includes('*')}
-                  type={type}
-                  className={inputClass()}
-                  value={val}
-                  onChange={(e) => set(e.target.value)}
-                />
-              </label>
-            ))}
+            <FormField label="Full name" required error={fieldErrors.name}>
+              <input
+                type="text"
+                className={fieldInputClass(!!fieldErrors.name)}
+                value={name}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setName(next)
+                  updateFieldError(setFieldErrors, 'name', next, validateName)
+                }}
+                onBlur={() =>
+                  setFieldErrors((prev) => ({ ...prev, name: validateName(name) }))
+                }
+                aria-invalid={!!fieldErrors.name}
+              />
+            </FormField>
+            <FormField label="Email" required error={fieldErrors.email}>
+              <input
+                type="email"
+                className={fieldInputClass(!!fieldErrors.email)}
+                value={email}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setEmail(next)
+                  updateFieldError(setFieldErrors, 'email', next, validateEmail)
+                }}
+                onBlur={() =>
+                  setFieldErrors((prev) => ({ ...prev, email: validateEmail(email) }))
+                }
+                aria-invalid={!!fieldErrors.email}
+              />
+            </FormField>
+            <FormField label="Phone" hint="Optional">
+              <input
+                type="tel"
+                className={inputClass()}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Agency name" hint="Optional">
+              <input
+                type="text"
+                className={inputClass()}
+                value={agencyName}
+                onChange={(e) => setAgencyName(e.target.value)}
+              />
+            </FormField>
           </div>
 
           <div className="rounded-2xl border border-outline-variant/25 bg-surface-low/60 p-4 space-y-3">
@@ -539,42 +777,129 @@ export default function AdminAgents() {
                   <input
                     type="radio"
                     checked={locationMode === mode}
-                    onChange={() => setLocationMode(mode)}
+                    onChange={() => {
+                      setLocationMode(mode)
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        location: '',
+                        manualAddress: '',
+                        manualLatitude: '',
+                        manualLongitude: '',
+                      }))
+                    }}
                   />
                   {mode === 'picker' ? 'Search or GPS' : 'Manual coordinates'}
                 </label>
               ))}
             </div>
             {locationMode === 'picker' ? (
-              <AgentLocationPicker label="Office location" required value={location} onChange={setLocation} />
+              <AgentLocationPicker
+                label="Office location"
+                required
+                value={location}
+                error={fieldErrors.location}
+                onInteraction={() => {
+                  setFieldErrors((prev) => {
+                    if (!prev.location) return prev
+                    const invalid =
+                      !location?.address?.trim() ||
+                      location?.latitude == null ||
+                      location?.longitude == null
+                    return {
+                      ...prev,
+                      location: invalid ? 'Pick the office location from search or GPS' : '',
+                    }
+                  })
+                }}
+                onChange={(loc) => {
+                  setLocation(loc)
+                  setFieldErrors((prev) => ({
+                    ...prev,
+                    location: prev.location
+                      ? !loc?.address?.trim() ||
+                        loc?.latitude == null ||
+                        loc?.longitude == null
+                        ? 'Pick the office location from search or GPS'
+                        : ''
+                      : '',
+                  }))
+                }}
+              />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-1.5 sm:col-span-2">
-                  <span className="text-sm font-medium">Address *</span>
-                  <input className={inputClass()} value={manualAddress} onChange={(e) => setManualAddress(e.target.value)} />
-                </label>
-                {[
-                  ['City', manualCity, setManualCity, 'text'],
-                  ['Latitude *', manualLatitude, setManualLatitude, 'number'],
-                  ['Longitude *', manualLongitude, setManualLongitude, 'number'],
-                ].map(([label, val, set, type]) => (
-                  <label key={label} className="block space-y-1.5">
-                    <span className="text-sm font-medium">{label}</span>
-                    <input
-                      type={type}
-                      step={type === 'number' ? 'any' : undefined}
-                      className={inputClass()}
-                      value={val}
-                      onChange={(e) => set(e.target.value)}
-                    />
-                  </label>
-                ))}
+                <FormField
+                  label="Address"
+                  required
+                  error={fieldErrors.manualAddress}
+                  className="sm:col-span-2"
+                >
+                  <input
+                    className={fieldInputClass(!!fieldErrors.manualAddress)}
+                    value={manualAddress}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setManualAddress(next)
+                      updateFieldError(
+                        setFieldErrors,
+                        'manualAddress',
+                        next,
+                        (v) => (!v.trim() ? REQUIRED : ''),
+                      )
+                    }}
+                    aria-invalid={!!fieldErrors.manualAddress}
+                  />
+                </FormField>
+                <FormField label="City" hint="Optional">
+                  <input
+                    className={inputClass()}
+                    value={manualCity}
+                    onChange={(e) => setManualCity(e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Latitude" required error={fieldErrors.manualLatitude}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className={fieldInputClass(!!fieldErrors.manualLatitude)}
+                    value={manualLatitude}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setManualLatitude(next)
+                      updateFieldError(setFieldErrors, 'manualLatitude', next, (v) => {
+                        if (!String(v).trim()) return REQUIRED
+                        if (!Number.isFinite(Number(v))) return 'Enter a valid latitude'
+                        return ''
+                      })
+                    }}
+                    aria-invalid={!!fieldErrors.manualLatitude}
+                  />
+                </FormField>
+                <FormField label="Longitude" required error={fieldErrors.manualLongitude}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className={fieldInputClass(!!fieldErrors.manualLongitude)}
+                    value={manualLongitude}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setManualLongitude(next)
+                      updateFieldError(setFieldErrors, 'manualLongitude', next, (v) => {
+                        if (!String(v).trim()) return REQUIRED
+                        if (!Number.isFinite(Number(v))) return 'Enter a valid longitude'
+                        return ''
+                      })
+                    }}
+                    aria-invalid={!!fieldErrors.manualLongitude}
+                  />
+                </FormField>
               </div>
             )}
           </div>
 
           <label className="block max-w-md space-y-1.5">
-            <span className="text-sm font-medium">Service radius (km)</span>
+            <span className="text-sm font-medium text-on-background">
+              Service radius (km)<span className="text-error"> *</span>
+            </span>
             <div className="flex items-center gap-3">
               <input
                 type="range"
@@ -583,38 +908,80 @@ export default function AdminAgents() {
                 step={0.5}
                 className="flex-1 accent-secondary"
                 value={serviceRadiusKm}
-                onChange={(e) => setServiceRadiusKm(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setServiceRadiusKm(next)
+                  updateFieldError(
+                    setFieldErrors,
+                    'serviceRadiusKm',
+                    next,
+                    validateServiceRadius,
+                  )
+                }}
               />
               <input
-                type="number"
-                min={1}
-                max={100}
-                step={0.5}
-                required
-                className={`${inputClass()} w-20 text-center`}
+                type="text"
+                inputMode="decimal"
+                className={`${fieldInputClass(!!fieldErrors.serviceRadiusKm)} w-20 text-center`}
                 value={serviceRadiusKm}
-                onChange={(e) => setServiceRadiusKm(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setServiceRadiusKm(next)
+                  updateFieldError(
+                    setFieldErrors,
+                    'serviceRadiusKm',
+                    next,
+                    validateServiceRadius,
+                  )
+                }}
+                onBlur={() =>
+                  setFieldErrors((prev) => ({
+                    ...prev,
+                    serviceRadiusKm: validateServiceRadius(serviceRadiusKm),
+                  }))
+                }
+                aria-invalid={!!fieldErrors.serviceRadiusKm}
               />
             </div>
+            {fieldErrors.serviceRadiusKm ? (
+              <span className="text-xs font-medium text-error">
+                {fieldErrors.serviceRadiusKm}
+              </span>
+            ) : null}
           </label>
 
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={generatePassword}
-              onChange={(e) => setGeneratePassword(e.target.checked)}
+              onChange={(e) => {
+                setGeneratePassword(e.target.checked)
+                if (e.target.checked) {
+                  setFieldErrors((prev) => ({ ...prev, password: '' }))
+                }
+              }}
             />
             Auto-generate login password
           </label>
           {!generatePassword && (
-            <input
-              type="password"
-              minLength={6}
-              placeholder="Login password (min 6 chars)"
-              className={`${inputClass()} max-w-sm`}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <FormField label="Login password" required error={fieldErrors.password}>
+              <input
+                type="password"
+                placeholder="Min 6 characters"
+                className={`${fieldInputClass(!!fieldErrors.password)} max-w-sm`}
+                value={password}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setPassword(next)
+                  updateFieldError(setFieldErrors, 'password', next, (v) => {
+                    if (!v) return REQUIRED
+                    if (v.length < 6) return 'Password must be at least 6 characters'
+                    return ''
+                  })
+                }}
+                aria-invalid={!!fieldErrors.password}
+              />
+            </FormField>
           )}
 
           {error && (
@@ -657,7 +1024,7 @@ export default function AdminAgents() {
           <p className="mt-2 max-w-sm text-sm text-on-surface-variant">
             Add your first agent to cover an area and onboard servants nearby.
           </p>
-          <Button variant="gradient" className="mt-6" onClick={() => setShowForm(true)}>
+          <Button variant="gradient" className="mt-6" onClick={openCreateForm}>
             + Add agent
           </Button>
         </div>
@@ -766,6 +1133,8 @@ export default function AdminAgents() {
         agent={editingAgent}
         form={editForm}
         setForm={setEditForm}
+        fieldErrors={editFieldErrors}
+        setFieldErrors={setEditFieldErrors}
         error={editError}
         saving={editSaving}
         onClose={closeEdit}

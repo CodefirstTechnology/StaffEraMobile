@@ -17,9 +17,17 @@ export function PageHeader({ eyebrow = 'Admin', title, description, action }) {
   )
 }
 
-export function StatCard({ label, value, sub, accent = 'text-primary' }) {
+export function StatCard({ label, value, sub, accent = 'text-primary', icon }) {
   return (
-    <div className="glass-card p-5">
+    <div className="glass-card group relative overflow-hidden p-5 transition-all hover:shadow-lg">
+      {icon ? (
+        <span
+          className="pointer-events-none absolute right-4 top-4 text-2xl opacity-25 transition-opacity group-hover:opacity-45"
+          aria-hidden
+        >
+          {icon}
+        </span>
+      ) : null}
       <p className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
         {label}
       </p>
