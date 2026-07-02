@@ -61,18 +61,38 @@ function validateLabel(value) {
   return ''
 }
 
-function validateSortOrder(value) {
+function validateSortOrder(value, existingSkills = [], excludeSkillId = null) {
   const trimmed = String(value ?? '').trim()
-  if (!trimmed) return ''
+  if (!trimmed) {
+    const order = 0
+    const conflict = existingSkills.find(
+      (s) => s.sortOrder === order && s.id !== excludeSkillId,
+    )
+    if (conflict) {
+      return `Sort order ${order} is already used by "${conflict.label}"`
+    }
+    return ''
+  }
 
-  if (/^-/.test(trimmed) || Number(trimmed) < 0) {
+  if (/^-/.test(trimmed)) {
     return 'Sort order must be 0 or greater'
   }
   if (/[.,]/.test(trimmed)) {
     return 'Sort order must be a whole number'
   }
+  if (/[^0-9]/.test(trimmed)) {
+    return 'Sort order can only contain numbers'
+  }
   if (!/^\d+$/.test(trimmed)) {
-    return 'Enter a valid whole number'
+    return 'Sort order can only contain numbers'
+  }
+
+  const order = Number(trimmed)
+  const conflict = existingSkills.find(
+    (s) => s.sortOrder === order && s.id !== excludeSkillId,
+  )
+  if (conflict) {
+    return `Sort order ${order} is already used by "${conflict.label}"`
   }
   return ''
 }
@@ -121,11 +141,25 @@ export default function AdminSkills() {
     setFieldErrors({ label: '', sortOrder: '' })
   }
 
+  const updateLabelError = (value, force = false) => {
+    setFieldErrors((prev) => ({
+      ...prev,
+      label: force || prev.label ? validateLabel(value) : '',
+    }))
+  }
+
+  const updateSortOrderError = (value, force = false) => {
+    setFieldErrors((prev) => ({
+      ...prev,
+      sortOrder: force || prev.sortOrder ? validateSortOrder(value, skills) : '',
+    }))
+  }
+
   const createSkill = async (e) => {
     e.preventDefault()
     setError('')
     const labelError = validateLabel(label)
-    const sortOrderError = validateSortOrder(sortOrder)
+    const sortOrderError = validateSortOrder(sortOrder, skills)
     setFieldErrors({ label: labelError, sortOrder: sortOrderError })
     if (labelError || sortOrderError) return
 
@@ -200,16 +234,11 @@ export default function AdminSkills() {
             <input
               value={label}
               onChange={(e) => {
-                setLabel(e.target.value)
-                if (fieldErrors.label) {
-                  setFieldErrors((prev) => ({ ...prev, label: '' }))
-                }
+                const next = e.target.value
+                setLabel(next)
+                updateLabelError(next)
               }}
-              onBlur={() => {
-                if (label.length) {
-                  setFieldErrors((prev) => ({ ...prev, label: validateLabel(label) }))
-                }
-              }}
+              onBlur={() => updateLabelError(label, true)}
               placeholder="e.g. Elderly care"
               className={fieldInputClass(!!fieldErrors.label)}
               aria-invalid={!!fieldErrors.label}
@@ -226,7 +255,7 @@ export default function AdminSkills() {
           <SkillField
             label="Sort order"
             error={fieldErrors.sortOrder}
-            hint="Optional — whole numbers only (0, 1, 2…). Leave empty for 0."
+            hint="Optional — must be unique. Leave empty for 0 if unused."
           >
             <input
               type="text"
@@ -235,17 +264,9 @@ export default function AdminSkills() {
               onChange={(e) => {
                 const next = e.target.value
                 setSortOrder(next)
-                setFieldErrors((prev) => ({
-                  ...prev,
-                  sortOrder: next.length ? validateSortOrder(next) : '',
-                }))
+                updateSortOrderError(next)
               }}
-              onBlur={() => {
-                setFieldErrors((prev) => ({
-                  ...prev,
-                  sortOrder: validateSortOrder(sortOrder),
-                }))
-              }}
+              onBlur={() => updateSortOrderError(sortOrder, true)}
               placeholder="0"
               className={fieldInputClass(!!fieldErrors.sortOrder)}
               aria-invalid={!!fieldErrors.sortOrder}
