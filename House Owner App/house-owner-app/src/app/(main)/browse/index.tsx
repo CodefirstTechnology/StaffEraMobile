@@ -167,7 +167,7 @@ export default function BrowseScreen() {
         }
       >
         <Text style={styles.broadcastTitle}>
-          {skillLabel ? t('browse.requestSkillHelp', { skill: skillLabel }) : t('bookings.requestHelpArea')}
+          {skillLabel ? t('bookings.requestBooking') : t('bookings.requestHelpArea')}
         </Text>
         <Text style={styles.broadcastSub}>{broadcastMessage}</Text>
         {skillLabel && searchLocation ? (
@@ -251,9 +251,7 @@ export default function BrowseScreen() {
         ) : null}
         <GradientButton
           title={
-            skillLabel
-              ? t('browse.requestSkillHelp', { skill: skillLabel })
-              : t('browse.sendAreaRequestBtn')
+            skillLabel ? t('bookings.requestBooking') : t('browse.sendAreaRequestBtn')
           }
           onPress={() =>
             router.push({

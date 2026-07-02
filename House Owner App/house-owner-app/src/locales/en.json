@@ -216,6 +216,7 @@
     "timeSlotRequired": "Select at least one time slot.",
     "locationRequiredShort": "Allow live location or pick your address on the map.",
     "requestHelpArea": "Request help in my area",
+    "requestBooking": "Request Booking",
     "requestCategory": "Request category",
     "whatHelpNeed": "What type of help do you need?",
     "visitDate": "Visit date",

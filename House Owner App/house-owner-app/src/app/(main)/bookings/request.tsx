@@ -315,14 +315,9 @@ export default function AreaBookingRequestScreen() {
 
       <GradientButton
         title={
-          nearbyCount > 0
-            ? t('bookings.sendRequestToHelpers', {
-                skill: skillLabel || t('bookings.areaRequest'),
-                count: nearbyCount,
-              })
-            : selectedSkill
-              ? t('bookings.sendSkillRequest', { skill: skillLabel })
-              : t('bookings.selectCategoryToSend')
+          nearbyCount > 0 || selectedSkill
+            ? t('bookings.requestBooking')
+            : t('bookings.selectCategoryToSend')
         }
         onPress={submit}
         loading={loading || locLoading}

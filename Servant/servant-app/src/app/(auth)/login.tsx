@@ -4,7 +4,6 @@ import { Link, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { getLoginErrorMessage } from '@/lib/getLoginErrorMessage';
-import { getApiBaseUrl } from '@/lib/apiConfig';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
@@ -58,12 +57,6 @@ export default function LoginScreen() {
         <Link href="/(auth)/register" asChild>
           <Text style={styles.link}>{t('auth.servantNewAccount')}</Text>
         </Link>
-        <Text style={styles.trust}>{t('auth.safeData')}</Text>
-        {__DEV__ ? (
-          <Text style={styles.apiHint} selectable>
-            API: {getApiBaseUrl()}
-          </Text>
-        ) : null}
       </ScrollView>
     </View>
   );
@@ -116,18 +109,5 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 15,
     fontWeight: '600',
-  },
-  trust: {
-    textAlign: 'center',
-    color: Stitch.colors.onSurfaceVariant,
-    marginTop: 24,
-    fontSize: 12,
-    opacity: 0.75,
-  },
-  apiHint: {
-    marginTop: 16,
-    fontSize: 11,
-    color: Stitch.colors.secondary,
-    textAlign: 'center',
   },
 });
