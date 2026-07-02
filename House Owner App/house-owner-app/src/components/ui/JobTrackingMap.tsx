@@ -18,6 +18,7 @@ type Props = {
   height?: number;
   lastUpdated?: string | null;
   visitAddress?: VisitAddressParts | null;
+  workStarted?: boolean;
 };
 
 function fitRegion(points: Coord[]): Region {
@@ -41,6 +42,7 @@ export function JobTrackingMap({
   height = 220,
   lastUpdated,
   visitAddress,
+  workStarted = false,
 }: Props) {
   const { t } = useTranslation();
   const mapRef = useRef<MapView>(null);
@@ -62,10 +64,16 @@ export function JobTrackingMap({
     Linking.openURL(mapsDeepLink(home.latitude, home.longitude, t('bookings.mapPinHome')));
 
   const caption = servant
-    ? t('bookings.trackingCaption', {
-        time: lastUpdated ? formatTime(lastUpdated) : '…',
-      })
-    : t('bookings.waitingHelperLocation');
+    ? workStarted
+      ? t('bookings.trackingCaptionActive', {
+          time: lastUpdated ? formatTime(lastUpdated) : '…',
+        })
+      : t('bookings.trackingCaption', {
+          time: lastUpdated ? formatTime(lastUpdated) : '…',
+        })
+    : workStarted
+      ? t('bookings.waitingHelperLocationActive')
+      : t('bookings.waitingHelperLocation');
 
   return (
     <View style={styles.wrap}>

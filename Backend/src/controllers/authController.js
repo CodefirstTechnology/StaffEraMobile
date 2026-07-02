@@ -47,7 +47,7 @@ const issueTokens = async (user) => {
 };
 
 exports.registerOwner = async (req, res) => {
-  const { name, password, address, city, latitude, longitude, preferredLanguage } = req.body;
+  const { name, password, address, flatNo, building, area, city, latitude, longitude, preferredLanguage } = req.body;
   const email = normalizeEmail(req.body.email);
   const phone = normalizePhone(req.body.phone);
 
@@ -69,6 +69,9 @@ exports.registerOwner = async (req, res) => {
       houseOwner: {
         create: {
           address,
+          flatNo: flatNo?.trim() || null,
+          building: building?.trim() || null,
+          area: area?.trim() || null,
           city,
           latitude: latitude ?? undefined,
           longitude: longitude ?? undefined
@@ -366,9 +369,9 @@ exports.updateLocation = async (req, res) => {
     where: { id: houseOwner.id },
     data: {
       ...(address !== undefined && { address }),
-      ...(flatNo !== undefined && { flatNo: flatNo || null }),
-      ...(building !== undefined && { building: building || null }),
-      ...(area !== undefined && { area: area || null }),
+      ...(flatNo !== undefined && { flatNo: String(flatNo).trim() || null }),
+      ...(building !== undefined && { building: String(building).trim() || null }),
+      ...(area !== undefined && { area: String(area).trim() || null }),
       ...(city !== undefined && { city }),
       ...(latitude !== undefined && { latitude }),
       ...(longitude !== undefined && { longitude })

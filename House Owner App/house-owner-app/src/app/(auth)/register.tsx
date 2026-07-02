@@ -8,6 +8,10 @@ import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
 import { LocationPicker } from '@/components/ui/LocationPicker';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
+import {
+  AddressUnitFields,
+  type AddressUnitValue,
+} from '@/components/ui/AddressUnitFields';
 import type { LocationValue } from '@/lib/locationTypes';
 
 export default function RegisterScreen() {
@@ -20,6 +24,11 @@ export default function RegisterScreen() {
     password: '',
     confirmPassword: '',
     city: '',
+  });
+  const [addressUnit, setAddressUnit] = useState<AddressUnitValue>({
+    flatNo: '',
+    building: '',
+    area: '',
   });
   const [homeLocation, setHomeLocation] = useState<LocationValue | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,6 +47,9 @@ export default function RegisterScreen() {
         password: form.password,
         city: homeLocation?.city || form.city,
         address: homeLocation?.address,
+        flatNo: addressUnit.flatNo.trim(),
+        building: addressUnit.building.trim(),
+        area: addressUnit.area.trim(),
         latitude: homeLocation?.latitude,
         longitude: homeLocation?.longitude,
       });
@@ -75,6 +87,7 @@ export default function RegisterScreen() {
         />
       ))}
 
+      <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />
       <LocationPicker
         label={t('auth.homeLocationOptional')}
         placeholder={t('auth.searchPlaceholder')}

@@ -55,6 +55,9 @@ const registerOwnerSchema = z.object({
     phone: z.preprocess(emptyToUndefined, z.string().optional()),
     password: z.string().min(6, "Password must be at least 6 characters"),
     address: z.preprocess(emptyToUndefined, z.string().optional()),
+    flatNo: z.string().optional(),
+    building: z.string().optional(),
+    area: z.string().optional(),
     city: z.preprocess(emptyToUndefined, z.string().optional()),
     latitude: z.coerce.number().min(-90).max(90).optional(),
     longitude: z.coerce.number().min(-180).max(180).optional(),
@@ -91,9 +94,9 @@ const resetPasswordSchema = z.object({
 const updateLocationSchema = z.object({
   body: z.object({
     address: z.preprocess(emptyToUndefined, z.string().optional()),
-    flatNo: z.preprocess(emptyToUndefined, z.string().optional()),
-    building: z.preprocess(emptyToUndefined, z.string().optional()),
-    area: z.preprocess(emptyToUndefined, z.string().optional()),
+    flatNo: z.string().optional(),
+    building: z.string().optional(),
+    area: z.string().optional(),
     city: z.preprocess(emptyToUndefined, z.string().optional()),
     latitude: z.coerce.number().min(-90).max(90).optional(),
     longitude: z.coerce.number().min(-180).max(180).optional()

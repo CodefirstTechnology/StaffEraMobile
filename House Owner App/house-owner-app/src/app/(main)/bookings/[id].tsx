@@ -63,7 +63,7 @@ export default function BookingDetailScreen() {
     },
   });
 
-  const trackLive = ['CONFIRMED', 'ACTIVE'].includes(booking?.status ?? '');
+  const trackLive = booking?.status === 'CONFIRMED';
   const { data: tracking } = useBookingTrackingPoll(bookingId, trackLive);
 
   const home =
@@ -171,7 +171,7 @@ export default function BookingDetailScreen() {
         )}
       </GlassCard>
 
-      {helperSharing && canTrack ? (
+      {helperSharing && canTrack && booking.status === 'CONFIRMED' ? (
         <View style={styles.onWayBanner}>
           <MaterialIcons name="directions-car" size={22} color={Stitch.colors.success} />
           <View style={styles.onWayTextWrap}>
