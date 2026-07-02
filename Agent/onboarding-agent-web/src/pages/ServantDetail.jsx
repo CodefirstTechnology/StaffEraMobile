@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 import { uploadUrl } from '../lib/mediaUrl'
 import {
   buildReportFromServant,
@@ -88,6 +89,7 @@ function LoadingSkeleton() {
 
 export default function ServantDetail() {
   const { id } = useParams()
+  const { user, loading: authLoading } = useAuth()
   const [searchParams] = useSearchParams()
   const fromRegistrations = searchParams.get('from') === 'registrations'
   const qc = useQueryClient()
@@ -99,12 +101,14 @@ export default function ServantDetail() {
   const [idModal, setIdModal] = useState(false)
   const [ifscMeta, setIfscMeta] = useState({ bank: '', branch: '' })
 
-  const { data: servant, isLoading } = useQuery({
+  const { data: servant, isLoading, isError, error } = useQuery({
     queryKey: ['servant', id],
     queryFn: async () => {
       const res = await api.get(`/agent/servants/${id}`)
       return res.data.data.servant
     },
+    enabled: !authLoading && !!user && !!localStorage.getItem('accessToken'),
+    retry: false,
   })
 
   const verify = async (status, rejectionReason, opts = {}) => {
@@ -175,7 +179,23 @@ export default function ServantDetail() {
     }
   }
 
-  if (isLoading) return <LoadingSkeleton />
+  if (isLoading || authLoading) return <LoadingSkeleton />
+  if (isError) {
+    const message =
+      error?.response?.data?.message ||
+      (error?.response?.status === 401
+        ? 'Session expired. Please sign in again.'
+        : 'Could not load servant profile.')
+    return (
+      <div className="mx-auto max-w-lg text-center">
+        <p className="text-lg font-semibold text-primary">Unable to load profile</p>
+        <p className="mt-2 text-sm text-on-surface-variant">{message}</p>
+        <Link to="/servants" className="mt-4 inline-block text-sm text-secondary hover:underline">
+          ← Back to servants
+        </Link>
+      </div>
+    )
+  }
   if (!servant) {
     return (
       <div className="mx-auto max-w-lg text-center">
