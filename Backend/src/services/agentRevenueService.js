@@ -96,6 +96,66 @@ const getAgentAnnualRevenue = async (agentId, year = new Date().getFullYear()) =
   };
 };
 
+const getEmptyAnnualRevenue = (year = new Date().getFullYear()) => {
+  const bounds = getYearBounds(year);
+  return {
+    year: bounds.year,
+    annualRevenue: 0,
+    annualCompletedBookings: 0,
+    totalServants: 0,
+    verifiedServants: 0,
+    revenueByMonth: buildMonthlySeries([], bounds.year),
+    servantRevenue: []
+  };
+};
+
+/** Platform-wide revenue (admin agent dashboard). Same shape as getAgentAnnualRevenue. */
+const getPlatformAnnualRevenue = async (year = new Date().getFullYear()) => {
+  const bounds = getYearBounds(year);
+  const bookingWhere = {
+    status: "COMPLETED",
+    updatedAt: { gte: bounds.start, lte: bounds.end }
+  };
+
+  const [bookings, servantCounts] = await Promise.all([
+    prisma.booking.findMany({
+      where: bookingWhere,
+      select: {
+        id: true,
+        totalAmount: true,
+        updatedAt: true,
+        servantId: true,
+        servant: {
+          select: {
+            id: true,
+            user: { select: { name: true } }
+          }
+        }
+      },
+      orderBy: { updatedAt: "desc" }
+    }),
+    prisma.servant.groupBy({
+      by: ["verificationStatus"],
+      _count: true
+    })
+  ]);
+
+  const totalServants = servantCounts.reduce((n, row) => n + row._count, 0);
+  const verifiedServants =
+    servantCounts.find((row) => row.verificationStatus === "VERIFIED")?._count || 0;
+
+  return {
+    year: bounds.year,
+    scope: "platform",
+    annualRevenue: sumAmount(bookings),
+    annualCompletedBookings: bookings.length,
+    totalServants,
+    verifiedServants,
+    revenueByMonth: buildMonthlySeries(bookings, bounds.year),
+    servantRevenue: buildServantBreakdown(bookings)
+  };
+};
+
 /** Attach annual revenue to a list of agent records (admin tables). */
 const attachAnnualRevenueToAgents = async (agents, year = new Date().getFullYear()) => {
   if (!agents.length) return agents;
@@ -136,5 +196,7 @@ const attachAnnualRevenueToAgents = async (agents, year = new Date().getFullYear
 module.exports = {
   getYearBounds,
   getAgentAnnualRevenue,
+  getPlatformAnnualRevenue,
+  getEmptyAnnualRevenue,
   attachAnnualRevenueToAgents
 };

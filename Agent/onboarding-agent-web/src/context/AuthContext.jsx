@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import api, { clearAuthSession } from '../lib/api'
+import { ensureValidAccessToken } from '../lib/authSession'
 
 const AuthContext = createContext(null)
 
@@ -14,19 +15,28 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken')
-    if (!token) {
-      setLoading(false)
-      return
-    }
-    api
-      .get('/auth/me')
-      .then((res) => setUser(res.data.data.user))
-      .catch(() => {
+    const restoreSession = async () => {
+      const accessToken = localStorage.getItem('accessToken')
+      const refreshToken = localStorage.getItem('refreshToken')
+
+      if (!accessToken && !refreshToken) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        await ensureValidAccessToken()
+        const res = await api.get('/auth/me')
+        setUser(res.data.data.user)
+      } catch {
         clearAuthSession()
         setUser(null)
-      })
-      .finally(() => setLoading(false))
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    restoreSession()
   }, [])
 
   const login = async (email, password) => {
@@ -38,12 +48,11 @@ export function AuthProvider({ children }) {
   }
 
   const logout = async () => {
+    const refreshToken = localStorage.getItem('refreshToken')
     try {
-      await api.post('/auth/logout', {
-        refreshToken: localStorage.getItem('refreshToken'),
-      })
+      await api.post('/auth/logout', { refreshToken })
     } catch {
-      /* ignore */
+      /* ignore — session cleared locally regardless */
     }
     clearAuthSession()
     setUser(null)

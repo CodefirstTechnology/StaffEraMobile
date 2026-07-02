@@ -27,7 +27,7 @@ router.post(
 );
 router.post("/login", validate(loginSchema), asyncHandler(authController.login));
 router.post("/refresh", validate(refreshSchema), asyncHandler(authController.refresh));
-router.post("/logout", authenticate, asyncHandler(authController.logout));
+router.post("/logout", asyncHandler(authController.logout));
 router.get("/me", authenticate, asyncHandler(authController.me));
 router.patch(
   "/me/location",

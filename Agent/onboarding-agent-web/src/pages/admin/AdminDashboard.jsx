@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useAdminQuery } from '../../hooks/useAuthenticatedQuery'
 import {
   LineChart,
   Line,
@@ -131,7 +131,7 @@ function BookingRowCard({ booking }) {
 }
 
 export default function AdminDashboard() {
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats, isLoading: statsLoading } = useAdminQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
       const res = await api.get('/admin/stats')
@@ -139,7 +139,7 @@ export default function AdminDashboard() {
     },
   })
 
-  const { data: agents, isLoading: agentsLoading } = useQuery({
+  const { data: agents, isLoading: agentsLoading } = useAdminQuery({
     queryKey: ['admin-agents-dashboard'],
     queryFn: async () => {
       const res = await api.get('/admin/agents', { params: { limit: 10 } })
@@ -147,7 +147,7 @@ export default function AdminDashboard() {
     },
   })
 
-  const { data: bookings, isLoading: bookingsLoading } = useQuery({
+  const { data: bookings, isLoading: bookingsLoading } = useAdminQuery({
     queryKey: ['admin-bookings-recent'],
     queryFn: async () => {
       const res = await api.get('/admin/bookings', { params: { limit: 10 } })
