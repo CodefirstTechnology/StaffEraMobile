@@ -4,10 +4,12 @@ const { optionalPhone } = require("./zodHelpers");
 const emptyToUndefined = (val) =>
   val === undefined || val === null || String(val).trim() === "" ? undefined : val;
 
+const MAX_RADIUS_KM = Number(process.env.MAX_SERVICE_RADIUS_KM) || 50;
+
 const radiusKmField = z.coerce
   .number()
   .min(1, "Radius must be at least 1 km")
-  .max(100, "Radius cannot exceed 100 km");
+  .max(MAX_RADIUS_KM, `Radius cannot exceed ${MAX_RADIUS_KM} km`);
 
 const updateAgentProfileSchema = z.object({
   body: z.object({

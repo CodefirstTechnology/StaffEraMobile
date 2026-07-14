@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../context/AuthContext'
+import { checkPasswordStrength } from '../lib/generatePassword'
 
 function emailMessage(value) {
   const email = String(value ?? '').trim()
@@ -72,12 +73,15 @@ export default function Login() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(schema),
     mode: 'onSubmit',
     reValidateMode: 'onChange',
   })
+
+  const passwordValue = watch('password')
 
   const emailInvalid = !!errors.email || !!error
   const passwordInvalid = !!errors.password || !!error
@@ -167,6 +171,14 @@ export default function Login() {
                 )}
               </button>
             </div>
+            {passwordValue && (
+              <div className="mt-1 flex items-center gap-1.5 ml-1">
+                <span className="text-xs text-on-surface-variant font-medium">Strength:</span>
+                <span className={`text-xs font-bold ${checkPasswordStrength(passwordValue).color}`}>
+                  {checkPasswordStrength(passwordValue).label}
+                </span>
+              </div>
+            )}
             {errors.password && (
               <p id="login-password-error" className="text-xs font-medium text-error mt-1.5 ml-1">
                 {errors.password.message}
