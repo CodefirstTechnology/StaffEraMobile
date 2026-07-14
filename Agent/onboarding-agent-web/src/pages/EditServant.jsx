@@ -5,6 +5,7 @@ import api from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { LoginPasswordFields } from '../components/LoginPasswordFields'
+import { validateServantPassword } from '../lib/generatePassword'
 import { SkillDropdown } from '../components/SkillDropdown'
 import { useSkills } from '../hooks/useSkills'
 import { uploadUrl } from '../lib/mediaUrl'
@@ -28,10 +29,13 @@ import {
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const ID_TYPES = ['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID']
 
-function Field({ label, children }) {
+function Field({ label, required, children }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <span className="text-sm font-medium text-gray-700">
+        {label}
+        {required ? <span className="text-error"> *</span> : null}
+      </span>
       {children}
     </label>
   )
@@ -72,6 +76,7 @@ export default function EditServant() {
   const [bankAccountConfirm, setBankAccountConfirm] = useState('')
   const [phoneError, setPhoneError] = useState('')
   const [skillsRateErrors, setSkillsRateErrors] = useState(emptySkillsRateErrors)
+  const [loginPasswordError, setLoginPasswordError] = useState('')
   const { showToast } = useToast()
 
   const { data: servant, isLoading } = useQuery({
@@ -176,7 +181,12 @@ export default function EditServant() {
     if (idProof) fd.append('idProof', idProof)
     try {
       let newCredentials = null
-      if (loginPassword.trim().length >= 6) {
+      if (loginPassword.trim()) {
+        const pwVal = validateServantPassword(loginPassword)
+        if (!pwVal.ok) {
+          setLoginPasswordError(pwVal.error)
+          return
+        }
         const pwRes = await api.patch(`/agent/servants/${id}/password`, {
           password: loginPassword.trim(),
         })
@@ -212,7 +222,7 @@ export default function EditServant() {
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
         <h3 className="font-semibold">Personal Info</h3>
-        <Field label="Full name">
+        <Field label="Full name" required>
           <input
             placeholder="Enter full name"
             value={form.name}
@@ -227,7 +237,7 @@ export default function EditServant() {
             className={`${inputClassName()} bg-gray-50 text-subtext`}
           />
         </Field>
-        <Field label="Mobile">
+        <Field label="Mobile" required>
           <input
             placeholder="Enter mobile number"
             value={form.phone}
@@ -244,7 +254,7 @@ export default function EditServant() {
           />
           {phoneError ? <p className="mt-1.5 text-sm text-error">{phoneError}</p> : null}
         </Field>
-        <Field label="Skill">
+        <Field label="Skill" required>
           <SkillDropdown
             skills={skills}
             skillsLoading={skillsLoading}
@@ -252,7 +262,7 @@ export default function EditServant() {
             onChange={(skillsSelected) => update('skills', skillsSelected)}
           />
         </Field>
-        <Field label="Address">
+        <Field label="Address" required>
           <textarea
             placeholder="Enter full residential address"
             value={form.address}
@@ -265,7 +275,11 @@ export default function EditServant() {
           <LoginPasswordFields
             email={servant.user?.email}
             password={loginPassword}
-            onPasswordChange={setLoginPassword}
+            onPasswordChange={(val) => {
+              setLoginPassword(val)
+              setLoginPasswordError('')
+            }}
+            error={loginPasswordError}
           />
         ) : null}
       </div>
@@ -381,7 +395,7 @@ export default function EditServant() {
                 ))}
               </div>
             </div>
-            <Field label="Hours per day">
+            <Field label="Hours per day" required>
               <input
                 type="number"
                 min="1"
@@ -452,8 +466,21 @@ export default function EditServant() {
         <Field label="Replace ID proof">
           <input
             type="file"
-            accept="image/*"
-            onChange={(e) => setIdProof(e.target.files?.[0] || null)}
+            accept="image/jpeg,image/png,image/webp,application/pdf"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null
+              if (file) {
+                const ext = file.name.split('.').pop().toLowerCase()
+                const allowed = ['jpg', 'jpeg', 'png', 'pdf']
+                if (!allowed.includes(ext) || file.type.includes('gif') || file.type.includes('video')) {
+                  showToast('ID proof must be a JPG, JPEG, PNG image or a PDF document', 'error')
+                  e.target.value = ''
+                  setIdProof(null)
+                  return
+                }
+              }
+              setIdProof(file)
+            }}
             className="w-full text-sm"
           />
         </Field>
@@ -470,8 +497,21 @@ export default function EditServant() {
         <Field label="Replace profile photo">
           <input
             type="file"
-            accept="image/*"
-            onChange={(e) => setProfilePhoto(e.target.files?.[0] || null)}
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null
+              if (file) {
+                const ext = file.name.split('.').pop().toLowerCase()
+                const allowed = ['jpg', 'jpeg', 'png']
+                if (!allowed.includes(ext) || file.type.includes('gif') || file.type.includes('video')) {
+                  showToast('Profile photo must be a JPG, JPEG or PNG image', 'error')
+                  e.target.value = ''
+                  setProfilePhoto(null)
+                  return
+                }
+              }
+              setProfilePhoto(file)
+            }}
             className="w-full text-sm"
           />
         </Field>

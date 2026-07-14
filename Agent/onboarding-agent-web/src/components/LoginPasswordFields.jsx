@@ -1,7 +1,7 @@
 import { Button } from './ui/Button'
 import { useToast } from '../context/ToastContext'
 import { copyText } from '../lib/copyToClipboard'
-import { generateServantPassword } from '../lib/generatePassword'
+import { generateServantPassword, checkPasswordStrength } from '../lib/generatePassword'
 
 export function LoginPasswordFields({ email, password, onPasswordChange, hint, error }) {
   const { showToast } = useToast()
@@ -35,6 +35,14 @@ export function LoginPasswordFields({ email, password, onPasswordChange, hint, e
           aria-describedby={error ? 'login-password-error' : undefined}
           className={`w-full rounded-lg border px-3 py-2 ${error ? 'border-error' : ''}`}
         />
+        {password && (
+          <div className="mt-1 flex items-center gap-1.5">
+            <span className="text-xs text-on-surface-variant font-medium">Strength:</span>
+            <span className={`text-xs font-bold ${checkPasswordStrength(password).color}`}>
+              {checkPasswordStrength(password).label}
+            </span>
+          </div>
+        )}
       </label>
       {error ? (
         <div

@@ -8,6 +8,7 @@ import { LocationIcon } from '../../components/icons/LocationIcon'
 import { CredentialsBanner } from '../../components/CredentialsBanner'
 import { validatePhoneOptional, digitsOnlyPhone } from '../../lib/phone'
 import { useToast } from '../../context/ToastContext'
+import { validateServantPassword, checkPasswordStrength } from '../../lib/generatePassword'
 
 const emptyEditForm = () => ({
   agencyName: '',
@@ -74,12 +75,12 @@ function validateName(value) {
   return ''
 }
 
-function validateServiceRadius(value) {
+function validateServiceRadius(value, maxRadius = 50) {
   const trimmed = String(value ?? '').trim()
   if (!trimmed) return REQUIRED
   const radius = Number(trimmed)
   if (!Number.isFinite(radius)) return 'Enter a valid number'
-  if (radius < 1 || radius > 100) return 'Service radius must be between 1 and 100 km'
+  if (radius < 1 || radius > maxRadius) return `Service radius must be between 1 and ${maxRadius} km`
   return ''
 }
 
@@ -99,21 +100,13 @@ function validateCreateAgentFields({
   generatePassword,
   password,
   serviceRadiusKm,
-}) {
+}, maxRadius = 50) {
   const errors = emptyCreateFieldErrors()
   errors.name = validateName(name)
   errors.email = validateEmail(email)
   errors.phone = validatePhone(phone)
 
-  if (locationMode === 'picker') {
-    if (
-      !location?.address?.trim() ||
-      location.latitude == null ||
-      location.longitude == null
-    ) {
-      errors.location = 'Pick the office location from search or GPS'
-    }
-  } else {
+  if (locationMode === 'manual') {
     if (!manualAddress.trim()) errors.manualAddress = REQUIRED
     if (!String(manualLatitude).trim()) errors.manualLatitude = REQUIRED
     else if (!Number.isFinite(Number(manualLatitude))) {
@@ -123,27 +116,37 @@ function validateCreateAgentFields({
     else if (!Number.isFinite(Number(manualLongitude))) {
       errors.manualLongitude = 'Enter a valid longitude'
     }
+  } else {
+    if (
+      !location?.address?.trim() ||
+      location.latitude == null ||
+      location.longitude == null
+    ) {
+      errors.location = 'Pick the office location from search or GPS'
+    }
   }
 
   if (!generatePassword) {
     if (!password) errors.password = REQUIRED
-    else if (password.length < 6) errors.password = 'Password must be at least 6 characters'
+    else {
+      const pwVal = validateServantPassword(password)
+      if (!pwVal.ok) {
+        errors.password = pwVal.error
+      }
+    }
   }
 
-  errors.serviceRadiusKm = validateServiceRadius(serviceRadiusKm)
+  errors.serviceRadiusKm = validateServiceRadius(serviceRadiusKm, maxRadius)
   return errors
 }
 
-function validateEditAgentFields({ location, serviceRadiusKm }) {
+function validateEditAgentFields({ location, serviceRadiusKm }, maxRadius = 50) {
   const errors = emptyEditFieldErrors()
-  if (
-    !location?.address?.trim() ||
-    location.latitude == null ||
-    location.longitude == null
-  ) {
-    errors.location = 'Pick the office location from search or GPS'
-  }
-  errors.serviceRadiusKm = validateServiceRadius(serviceRadiusKm)
+  errors.location =
+    !location?.address?.trim() || location.latitude == null || location.longitude == null
+      ? 'Pick the office location from search or GPS'
+      : ''
+  errors.serviceRadiusKm = validateServiceRadius(serviceRadiusKm, maxRadius)
   return errors
 }
 
@@ -234,6 +237,7 @@ function AgentEditPanel({
   saving,
   onClose,
   onSave,
+  maxRadius = 50,
 }) {
   if (!agent) return null
 
@@ -340,7 +344,7 @@ function AgentEditPanel({
                   <input
                     type="range"
                     min={1}
-                    max={50}
+                    max={maxRadius}
                     step={0.5}
                     className="flex-1 accent-secondary"
                     value={form.serviceRadiusKm}
@@ -351,7 +355,7 @@ function AgentEditPanel({
                         setFieldErrors,
                         'serviceRadiusKm',
                         next,
-                        validateServiceRadius,
+                        (v) => validateServiceRadius(v, maxRadius),
                       )
                     }}
                   />
@@ -361,19 +365,23 @@ function AgentEditPanel({
                     className={`${fieldInputClass(!!fieldErrors.serviceRadiusKm)} w-20 text-center`}
                     value={form.serviceRadiusKm}
                     onChange={(e) => {
-                      const next = e.target.value
+                      let next = e.target.value.replace(/[^0-9.]/g, '')
+                      const num = parseFloat(next)
+                      if (!isNaN(num) && num > maxRadius) {
+                        next = String(maxRadius)
+                      }
                       setForm((f) => ({ ...f, serviceRadiusKm: next }))
                       updateFieldError(
                         setFieldErrors,
                         'serviceRadiusKm',
                         next,
-                        validateServiceRadius,
+                        (v) => validateServiceRadius(v, maxRadius),
                       )
                     }}
                     onBlur={() =>
                       setFieldErrors((prev) => ({
                         ...prev,
-                        serviceRadiusKm: validateServiceRadius(form.serviceRadiusKm),
+                        serviceRadiusKm: validateServiceRadius(form.serviceRadiusKm, maxRadius),
                       }))
                     }
                     aria-invalid={!!fieldErrors.serviceRadiusKm}
@@ -468,7 +476,13 @@ function AgentRowCard({ agent, isSelected, onEdit, onToggle }) {
         <Button variant="gradient" className="text-sm" onClick={() => onEdit(agent)}>
           Edit agency
         </Button>
-        <Button variant="secondary" className="text-sm" onClick={() => onToggle(agent)}>
+        <Button
+          variant="secondary"
+          className="text-sm"
+          onClick={() => onToggle(agent)}
+          disabled={agent.user.roleId === 1 && agent.user.isActive}
+          title={agent.user.roleId === 1 && agent.user.isActive ? 'Admin users cannot be deactivated' : undefined}
+        >
           {agent.user.isActive ? 'Deactivate' : 'Activate'}
         </Button>
       </div>
@@ -487,6 +501,15 @@ export default function AdminAgents() {
   const [agentToToggle, setAgentToToggle] = useState(null)
   const [toggleLoading, setToggleLoading] = useState(false)
   const [toggleError, setToggleError] = useState('')
+
+  const { data: adminStats } = useQuery({
+    queryKey: ['admin-stats'],
+    queryFn: async () => {
+      const res = await api.get('/admin/stats')
+      return res.data.data
+    },
+  })
+  const MAX_RADIUS = adminStats?.maxServiceRadiusKm || Number(import.meta.env.VITE_MAX_SERVICE_RADIUS) || 50
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -590,7 +613,7 @@ export default function AdminAgents() {
   const saveEdit = async (e) => {
     e.preventDefault()
     setEditError('')
-    const errors = validateEditAgentFields(editForm)
+    const errors = validateEditAgentFields(editForm, MAX_RADIUS)
     setEditFieldErrors(errors)
     if (hasFieldErrors(errors)) return
     setEditSaving(true)
@@ -615,6 +638,10 @@ export default function AdminAgents() {
   }
 
   const requestToggle = (agent) => {
+    if (agent.user.roleId === 1 && agent.user.isActive) {
+      toast.error('Admin users cannot be deactivated')
+      return
+    }
     setToggleError('')
     setAgentToToggle(agent)
   }
@@ -658,7 +685,7 @@ export default function AdminAgents() {
       generatePassword,
       password,
       serviceRadiusKm,
-    })
+    }, MAX_RADIUS)
     setFieldErrors(errors)
     if (hasFieldErrors(errors)) return
 
@@ -953,7 +980,7 @@ export default function AdminAgents() {
               <input
                 type="range"
                 min={1}
-                max={50}
+                max={MAX_RADIUS}
                 step={0.5}
                 className="flex-1 accent-secondary"
                 value={serviceRadiusKm}
@@ -964,7 +991,7 @@ export default function AdminAgents() {
                     setFieldErrors,
                     'serviceRadiusKm',
                     next,
-                    validateServiceRadius,
+                    (v) => validateServiceRadius(v, MAX_RADIUS),
                   )
                 }}
               />
@@ -974,19 +1001,23 @@ export default function AdminAgents() {
                 className={`${fieldInputClass(!!fieldErrors.serviceRadiusKm)} w-20 text-center`}
                 value={serviceRadiusKm}
                 onChange={(e) => {
-                  const next = e.target.value
+                  let next = e.target.value.replace(/[^0-9.]/g, '')
+                  const num = parseFloat(next)
+                  if (!isNaN(num) && num > MAX_RADIUS) {
+                    next = String(MAX_RADIUS)
+                  }
                   setServiceRadiusKm(next)
                   updateFieldError(
                     setFieldErrors,
                     'serviceRadiusKm',
                     next,
-                    validateServiceRadius,
+                    (v) => validateServiceRadius(v, MAX_RADIUS),
                   )
                 }}
                 onBlur={() =>
                   setFieldErrors((prev) => ({
                     ...prev,
-                    serviceRadiusKm: validateServiceRadius(serviceRadiusKm),
+                    serviceRadiusKm: validateServiceRadius(serviceRadiusKm, MAX_RADIUS),
                   }))
                 }
                 aria-invalid={!!fieldErrors.serviceRadiusKm}
@@ -1027,12 +1058,20 @@ export default function AdminAgents() {
                   setPassword(next)
                   updateFieldError(setFieldErrors, 'password', next, (v) => {
                     if (!v) return REQUIRED
-                    if (v.length < 6) return 'Password must be at least 6 characters'
-                    return ''
+                    const pwVal = validateServantPassword(v)
+                    return pwVal.ok ? '' : pwVal.error
                   })
                 }}
                 aria-invalid={!!fieldErrors.password}
               />
+              {password && (
+                <div className="mt-1 flex items-center gap-1.5">
+                  <span className="text-xs text-on-surface-variant font-medium">Strength:</span>
+                  <span className={`text-xs font-bold ${checkPasswordStrength(password).color}`}>
+                    {checkPasswordStrength(password).label}
+                  </span>
+                </div>
+              )}
             </FormField>
           )}
 
@@ -1167,7 +1206,13 @@ export default function AdminAgents() {
                         <button
                           type="button"
                           onClick={() => requestToggle(a)}
-                          className="rounded-lg border border-outline-variant/40 px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-low"
+                          disabled={a.user.roleId === 1 && a.user.isActive}
+                          title={a.user.roleId === 1 && a.user.isActive ? 'Admin users cannot be deactivated' : undefined}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                            a.user.roleId === 1 && a.user.isActive
+                              ? 'border-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed bg-gray-50'
+                              : 'border-outline-variant/40 text-on-surface-variant hover:bg-surface-low'
+                          }`}
                         >
                           {a.user.isActive ? 'Off' : 'On'}
                         </button>
@@ -1191,6 +1236,7 @@ export default function AdminAgents() {
         saving={editSaving}
         onClose={closeEdit}
         onSave={saveEdit}
+        maxRadius={MAX_RADIUS}
       />
 
       <ConfirmDialog

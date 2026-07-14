@@ -162,7 +162,13 @@ export default function AdminUsers() {
                 <button
                   type="button"
                   onClick={() => toggle(u)}
-                  className="mt-4 w-full rounded-xl border border-outline-variant/40 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-low"
+                  disabled={u.role === 'ADMIN' && u.isActive}
+                  title={u.role === 'ADMIN' && u.isActive ? 'Admin users cannot be deactivated' : undefined}
+                  className={`mt-4 w-full rounded-xl border py-2 text-sm font-medium ${
+                    u.role === 'ADMIN' && u.isActive
+                      ? 'border-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed bg-gray-50'
+                      : 'border-outline-variant/40 text-on-surface-variant hover:bg-surface-low'
+                  }`}
                 >
                   {u.isActive ? 'Deactivate account' : 'Activate account'}
                 </button>
@@ -196,10 +202,14 @@ export default function AdminUsers() {
                   <button
                     type="button"
                     onClick={() => toggle(u)}
+                    disabled={u.role === 'ADMIN' && u.isActive}
+                    title={u.role === 'ADMIN' && u.isActive ? 'Admin users cannot be deactivated' : undefined}
                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                      u.isActive
-                        ? 'border border-outline-variant/40 text-on-surface-variant hover:bg-surface-low'
-                        : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                      u.role === 'ADMIN' && u.isActive
+                        ? 'border border-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed'
+                        : u.isActive
+                          ? 'border border-outline-variant/40 text-on-surface-variant hover:bg-surface-low'
+                          : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                     }`}
                   >
                     {u.isActive ? 'Deactivate' : 'Activate'}
