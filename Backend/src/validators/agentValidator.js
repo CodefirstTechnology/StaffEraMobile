@@ -4,6 +4,16 @@ const { optionalPhone } = require("./zodHelpers");
 const emptyToUndefined = (val) =>
   val === undefined || val === null || String(val).trim() === "" ? undefined : val;
 
+/** Preserves null so PATCH can clear optional string fields (e.g. agency name). */
+const clearableOptionalString = z.preprocess(
+  (val) => {
+    if (val === undefined) return undefined;
+    const trimmed = val === null ? "" : String(val).trim();
+    return trimmed === "" ? null : trimmed;
+  },
+  z.union([z.string(), z.null()]).optional()
+);
+
 const MAX_RADIUS_KM = Number(process.env.MAX_SERVICE_RADIUS_KM) || 50;
 
 const radiusKmField = z.coerce
