@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
+import { useToast } from '../../context/ToastContext'
 import {
   PageHeader,
   StatCard,
@@ -42,6 +43,7 @@ export default function AdminUsers() {
   const [role, setRole] = useState('')
   const [search, setSearch] = useState('')
   const qc = useQueryClient()
+  const toast = useToast()
 
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
@@ -68,10 +70,20 @@ export default function AdminUsers() {
   const users = data?.users || []
   const total = data?.pagination?.total ?? users.length
 
-  const toggle = async (id) => {
-    await api.patch(`/admin/users/${id}/toggle`)
-    qc.invalidateQueries({ queryKey: ['admin-users'] })
-    qc.invalidateQueries({ queryKey: ['admin-stats'] })
+  const toggle = async (user) => {
+    const wasActive = user.isActive
+    try {
+      await api.patch(`/admin/users/${user.id}/toggle`)
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      toast.success(
+        wasActive
+          ? `User "${displayName(user)}" deactivated`
+          : `User "${displayName(user)}" activated`,
+      )
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update user')
+    }
   }
 
   return (
@@ -149,7 +161,7 @@ export default function AdminUsers() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => toggle(u.id)}
+                  onClick={() => toggle(u)}
                   className="mt-4 w-full rounded-xl border border-outline-variant/40 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-low"
                 >
                   {u.isActive ? 'Deactivate account' : 'Activate account'}
@@ -183,7 +195,7 @@ export default function AdminUsers() {
                 <td className="px-4 py-4">
                   <button
                     type="button"
-                    onClick={() => toggle(u.id)}
+                    onClick={() => toggle(u)}
                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                       u.isActive
                         ? 'border border-outline-variant/40 text-on-surface-variant hover:bg-surface-low'

@@ -2,9 +2,11 @@ import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
 import { Button } from '../../components/ui/Button'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { AgentLocationPicker } from '../../components/AgentLocationPicker'
 import { LocationIcon } from '../../components/icons/LocationIcon'
 import { CredentialsBanner } from '../../components/CredentialsBanner'
+import { useToast } from '../../context/ToastContext'
 
 const emptyEditForm = () => ({
   agencyName: '',
@@ -458,7 +460,7 @@ function AgentRowCard({ agent, isSelected, onEdit, onToggle }) {
         <Button variant="gradient" className="text-sm" onClick={() => onEdit(agent)}>
           Edit agency
         </Button>
-        <Button variant="secondary" className="text-sm" onClick={() => onToggle(agent.user.id)}>
+        <Button variant="secondary" className="text-sm" onClick={() => onToggle(agent)}>
           {agent.user.isActive ? 'Deactivate' : 'Activate'}
         </Button>
       </div>
@@ -468,11 +470,15 @@ function AgentRowCard({ agent, isSelected, onEdit, onToggle }) {
 
 export default function AdminAgents() {
   const qc = useQueryClient()
+  const toast = useToast()
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [credentials, setCredentials] = useState(null)
+  const [agentToToggle, setAgentToToggle] = useState(null)
+  const [toggleLoading, setToggleLoading] = useState(false)
+  const [toggleError, setToggleError] = useState('')
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -592,6 +598,7 @@ export default function AdminAgents() {
       })
       closeEdit()
       qc.invalidateQueries({ queryKey: ['admin-agents'] })
+      toast.success(`Agent "${editingAgent.user.name}" updated`)
     } catch (err) {
       setEditError(err.response?.data?.message || 'Failed to update agent')
     } finally {
@@ -599,10 +606,32 @@ export default function AdminAgents() {
     }
   }
 
-  const toggleActive = async (userId) => {
-    await api.patch(`/admin/users/${userId}/toggle`)
-    qc.invalidateQueries({ queryKey: ['admin-agents'] })
-    qc.invalidateQueries({ queryKey: ['admin-stats'] })
+  const requestToggle = (agent) => {
+    setToggleError('')
+    setAgentToToggle(agent)
+  }
+
+  const confirmToggle = async () => {
+    if (!agentToToggle) return
+    setToggleLoading(true)
+    setToggleError('')
+    const wasActive = agentToToggle.user.isActive
+    const agentName = agentToToggle.user.name
+    try {
+      await api.patch(`/admin/users/${agentToToggle.user.id}/toggle`)
+      setAgentToToggle(null)
+      qc.invalidateQueries({ queryKey: ['admin-agents'] })
+      qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      toast.success(
+        wasActive
+          ? `Agent "${agentName}" deactivated`
+          : `Agent "${agentName}" activated`,
+      )
+    } catch (err) {
+      setToggleError(err.response?.data?.message || 'Failed to update agent status')
+    } finally {
+      setToggleLoading(false)
+    }
   }
 
   const createAgent = async (e) => {
@@ -661,6 +690,7 @@ export default function AdminAgents() {
       setShowForm(false)
       qc.invalidateQueries({ queryKey: ['admin-agents'] })
       qc.invalidateQueries({ queryKey: ['admin-stats'] })
+      toast.success(`Agent "${name.trim()}" added`)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create agent')
     } finally {
@@ -1037,7 +1067,7 @@ export default function AdminAgents() {
                 agent={a}
                 isSelected={editingAgent?.id === a.id}
                 onEdit={openEdit}
-                onToggle={toggleActive}
+                onToggle={requestToggle}
               />
             ))}
           </div>
@@ -1114,7 +1144,7 @@ export default function AdminAgents() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => toggleActive(a.user.id)}
+                          onClick={() => requestToggle(a)}
                           className="rounded-lg border border-outline-variant/40 px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-low"
                         >
                           {a.user.isActive ? 'Off' : 'On'}
@@ -1139,6 +1169,32 @@ export default function AdminAgents() {
         saving={editSaving}
         onClose={closeEdit}
         onSave={saveEdit}
+      />
+
+      <ConfirmDialog
+        open={!!agentToToggle}
+        title={
+          agentToToggle?.user.isActive ? 'Deactivate this user?' : 'Activate this user?'
+        }
+        description={
+          agentToToggle
+            ? agentToToggle.user.isActive
+              ? `Are you sure you want to deactivate ${agentToToggle.user.name}? They will no longer be able to sign in to the agent portal.`
+              : `Are you sure you want to activate ${agentToToggle.user.name}? They will be able to sign in to the agent portal again.`
+            : ''
+        }
+        confirmLabel={agentToToggle?.user.isActive ? 'Deactivate' : 'Activate'}
+        cancelLabel="Cancel"
+        variant={agentToToggle?.user.isActive ? 'danger' : 'gradient'}
+        loading={toggleLoading}
+        error={toggleError}
+        onConfirm={confirmToggle}
+        onClose={() => {
+          if (!toggleLoading) {
+            setAgentToToggle(null)
+            setToggleError('')
+          }
+        }}
       />
     </div>
   )
