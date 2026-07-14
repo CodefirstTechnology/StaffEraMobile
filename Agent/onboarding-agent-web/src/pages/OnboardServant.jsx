@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { PasswordInput } from '../components/ui/PasswordInput'
@@ -28,6 +31,8 @@ import {
   ServiceZonesEditor,
   createDraftZonesForServant,
 } from '../components/ServiceZonesEditor'
+import { generateServantPassword, validateServantPassword, checkPasswordStrength } from '../lib/generatePassword'
+import { copyText } from '../lib/copyToClipboard'
 
 const emptyPersonalErrors = () => ({
   name: '',
@@ -36,6 +41,7 @@ const emptyPersonalErrors = () => ({
   password: '',
   skills: '',
   address: '',
+  agentId: '',
 })
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
@@ -118,7 +124,23 @@ function ReviewChips({ items }) {
 
 export default function OnboardServant() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const toast = useToast()
   const { data: skills = [], isLoading: skillsLoading } = useSkills()
+  const [showPassword, setShowPassword] = useState(false)
+  const [showReviewPassword, setShowReviewPassword] = useState(false)
+
+  const { data: agents = [] } = useQuery({
+    queryKey: ['admin-agents-list'],
+    queryFn: async () => {
+      const res = await api.get('/admin/agents', {
+        params: { limit: 100 },
+      })
+      return res.data.data.agents
+    },
+    enabled: user?.role === 'ADMIN',
+  })
+
   const [step, setStep] = useState(1)
   const [submitError, setSubmitError] = useState('')
   const [personalErrors, setPersonalErrors] = useState(emptyPersonalErrors)
@@ -150,6 +172,7 @@ export default function OnboardServant() {
     skills: [],
     address: '',
     idProofType: 'AADHAR',
+    agentId: '',
     ...EMPTY_BANK_FORM,
   })
   const [profilePhoto, setProfilePhoto] = useState(null)
@@ -178,11 +201,15 @@ export default function OnboardServant() {
       errors.email = 'Enter a valid email address'
     }
     errors.phone = validatePhoneRequired(form.phone)
-    if (!form.password || form.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters'
+    const pwVal = validateServantPassword(form.password)
+    if (!pwVal.ok) {
+      errors.password = pwVal.error
     }
     if (!form.skills?.length) errors.skills = 'Select at least one skill'
     if (!form.address?.trim()) errors.address = 'Address is required'
+    if (user?.role === 'ADMIN' && !form.agentId) {
+      errors.agentId = 'Agent assignment is required'
+    }
     setPersonalErrors(errors)
     return !Object.values(errors).some(Boolean)
   }
@@ -339,6 +366,12 @@ export default function OnboardServant() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
+      <Link
+        to="/servants"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-secondary transition-colors"
+      >
+        ← Back to servants
+      </Link>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold">Onboard New Servant</h2>
         <span className="text-sm text-subtext">
@@ -364,24 +397,88 @@ export default function OnboardServant() {
       {step === 1 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Personal Info</h3>
-          {PERSONAL_FIELDS.map((f) => (
-            <Field key={f.key} label={f.label} required>
-              {f.key === 'password' ? (
-                <PasswordInput
-                  id="onboard-servant-password"
-                  name="onboard-servant-password"
-                  autoComplete="new-password"
-                  placeholder={f.placeholder}
-                  value={form[f.key]}
-                  invalid={!!personalErrors[f.key]}
-                  onChange={(e) => {
-                    update(f.key, e.target.value)
-                    clearPersonalError(f.key)
-                  }}
-                  aria-invalid={personalErrors[f.key] ? 'true' : undefined}
-                  className={inputClassName(!!personalErrors[f.key])}
-                />
-              ) : (
+          {user?.role === 'ADMIN' ? (
+            <Field label="Assign Agent" required>
+              <select
+                value={form.agentId}
+                onChange={(e) => {
+                  update('agentId', e.target.value)
+                  clearPersonalError('agentId')
+                }}
+                className={inputClassName(!!personalErrors.agentId)}
+              >
+                <option value="">Select an agent</option>
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.user.name} {agent.agencyName ? `(${agent.agencyName})` : ''}
+                  </option>
+                ))}
+              </select>
+              <FieldError message={personalErrors.agentId} />
+            </Field>
+          ) : (
+            <Field label="Agent">
+              <input
+                type="text"
+                value={user?.name || ''}
+                disabled
+                readOnly
+                className={`${inputClassName()} bg-gray-50 text-subtext`}
+              />
+            </Field>
+          )}
+          {PERSONAL_FIELDS.map((f) => {
+            if (f.key === 'password') {
+              return (
+                <Field key={f.key} label={f.label} required>
+                  <div className="relative flex items-center">
+                    <input
+                      placeholder={f.placeholder}
+                      value={form.password}
+                      onChange={(e) => {
+                        update('password', e.target.value)
+                        clearPersonalError('password')
+                      }}
+                      type={showPassword ? 'text' : 'password'}
+                      aria-invalid={personalErrors.password ? 'true' : undefined}
+                      className={`${inputClassName(!!personalErrors.password)} pr-32`}
+                    />
+                    <div className="absolute right-2 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="rounded-lg px-2.5 py-1 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors cursor-pointer"
+                      >
+                        {showPassword ? 'Hide' : 'Show'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newPassword = generateServantPassword()
+                          update('password', newPassword)
+                          clearPersonalError('password')
+                          setShowPassword(true)
+                        }}
+                        className="rounded-lg px-2.5 py-1 text-xs font-semibold bg-primary/10 hover:bg-primary/20 text-primary transition-colors cursor-pointer"
+                      >
+                        Generate
+                      </button>
+                    </div>
+                  </div>
+                  {form.password && (
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span className="text-xs text-on-surface-variant font-medium">Strength:</span>
+                      <span className={`text-xs font-bold ${checkPasswordStrength(form.password).color}`}>
+                        {checkPasswordStrength(form.password).label}
+                      </span>
+                    </div>
+                  )}
+                  <FieldError message={personalErrors.password} />
+                </Field>
+              )
+            }
+            return (
+              <Field key={f.key} label={f.label} required>
                 <input
                   placeholder={f.placeholder}
                   value={form[f.key]}
@@ -406,10 +503,10 @@ export default function OnboardServant() {
                   aria-invalid={personalErrors[f.key] ? 'true' : undefined}
                   className={inputClassName(!!personalErrors[f.key])}
                 />
-              )}
-              <FieldError message={personalErrors[f.key]} />
-            </Field>
-          ))}
+                <FieldError message={personalErrors[f.key]} />
+              </Field>
+            )
+          })}
           <Field label="Skill" required>
             <SkillDropdown
               skills={skills}
@@ -633,24 +730,52 @@ export default function OnboardServant() {
               ))}
             </select>
           </Field>
-          <Field label="ID proof document (required)">
+          <Field label="ID proof document" required>
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
               onChange={(e) => {
-                setIdProof(e.target.files?.[0] || null)
+                const file = e.target.files?.[0] || null
+                if (file) {
+                  const ext = file.name.split('.').pop().toLowerCase()
+                  const allowed = ['jpg', 'jpeg', 'png', 'pdf']
+                  if (!allowed.includes(ext) || file.type.includes('gif') || file.type.includes('video')) {
+                    setDocumentErrors((prev) => ({
+                      ...prev,
+                      idProof: 'ID proof must be a JPG, JPEG, PNG image or a PDF document',
+                    }))
+                    e.target.value = ''
+                    setIdProof(null)
+                    return
+                  }
+                }
+                setIdProof(file)
                 setDocumentErrors((prev) => ({ ...prev, idProof: '' }))
               }}
               className="w-full text-sm"
             />
             <FieldError message={documentErrors.idProof} />
           </Field>
-          <Field label="Profile photo (required)">
+          <Field label="Profile photo" required>
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => {
-                setProfilePhoto(e.target.files?.[0] || null)
+                const file = e.target.files?.[0] || null
+                if (file) {
+                  const ext = file.name.split('.').pop().toLowerCase()
+                  const allowed = ['jpg', 'jpeg', 'png']
+                  if (!allowed.includes(ext) || file.type.includes('gif') || file.type.includes('video')) {
+                    setDocumentErrors((prev) => ({
+                      ...prev,
+                      profilePhoto: 'Profile photo must be a JPG, JPEG or PNG image',
+                    }))
+                    e.target.value = ''
+                    setProfilePhoto(null)
+                    return
+                  }
+                }
+                setProfilePhoto(file)
                 setDocumentErrors((prev) => ({ ...prev, profilePhoto: '' }))
               }}
               className="w-full text-sm"
@@ -689,6 +814,15 @@ export default function OnboardServant() {
           </p>
 
           <ReviewSection title="Personal Info">
+            {user?.role === 'ADMIN' ? (
+              <ReviewItem label="Assigned Agent">
+                {agents.find((a) => String(a.id) === String(form.agentId))?.user?.name || '—'}
+              </ReviewItem>
+            ) : (
+              <ReviewItem label="Agent">
+                {user?.name || '—'}
+              </ReviewItem>
+            )}
             <ReviewItem label="Name">{form.name || '—'}</ReviewItem>
             <ReviewItem label="Email">{form.email || '—'}</ReviewItem>
             <ReviewItem label="Mobile">{form.phone || '—'}</ReviewItem>
@@ -703,7 +837,34 @@ export default function OnboardServant() {
             </ReviewItem>
             <ReviewItem label="Address">{form.address || '—'}</ReviewItem>
             <ReviewItem label="Password">
-              {form.password ? '•'.repeat(Math.min(form.password.length, 8)) : '—'}
+              <div className="flex items-center gap-2">
+                <span className="font-mono">
+                  {showReviewPassword ? form.password : '•'.repeat(Math.min(form.password.length, 8))}
+                </span>
+                {form.password && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowReviewPassword(!showReviewPassword)}
+                      className="text-xs font-semibold text-primary hover:text-secondary underline cursor-pointer"
+                    >
+                      {showReviewPassword ? 'Hide' : 'Show'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const ok = await copyText(form.password)
+                        if (ok) {
+                          toast.success('Password copied to clipboard')
+                        }
+                      }}
+                      className="text-xs font-semibold text-primary hover:text-secondary underline cursor-pointer"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
+              </div>
             </ReviewItem>
           </ReviewSection>
 

@@ -14,8 +14,18 @@ const { attachAnnualRevenueToAgents } = require("../services/agentRevenueService
 const { DEFAULT_RADIUS_KM } = require("../services/locationService");
 
 const generateAgentPassword = () => {
-  const part = crypto.randomBytes(4).toString("hex");
-  return `Ag${part}1`;
+  const spec = "!@#$%^&*";
+  const num = "0123456789";
+  const letters = "abcdefghijklmnopqrstuvwxyz";
+  const uppers = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const r = (chars, len) => {
+    let s = "";
+    for (let i = 0; i < len; i++) {
+      s += chars.charAt(crypto.randomBytes(1)[0] % chars.length);
+    }
+    return s;
+  };
+  return "Ag" + r(letters, 2) + r(uppers, 2) + r(num, 2) + r(spec, 2);
 };
 
 exports.getStats = async (req, res) => {
@@ -95,7 +105,8 @@ exports.getStats = async (req, res) => {
     totalRevenue: revenueAgg._sum.totalAmount || 0,
     bookingsThisMonth: monthBookings,
     revenueThisMonth: monthRevenue._sum.totalAmount || 0,
-    bookingsByMonth
+    bookingsByMonth,
+    maxServiceRadiusKm: Number(process.env.MAX_SERVICE_RADIUS_KM) || 50
   });
 };
 
@@ -230,7 +241,8 @@ exports.listAgents = async (req, res) => {
             email: true,
             phone: true,
             isActive: true,
-            createdAt: true
+            createdAt: true,
+            roleId: true
           }
         },
         _count: { select: { servants: true } }
@@ -324,7 +336,8 @@ exports.updateAgent = async (req, res) => {
           email: true,
           phone: true,
           isActive: true,
-          createdAt: true
+          createdAt: true,
+          roleId: true
         }
       },
       _count: { select: { servants: true } }
@@ -354,7 +367,8 @@ exports.updateAgent = async (req, res) => {
           email: true,
           phone: true,
           isActive: true,
-          createdAt: true
+          createdAt: true,
+          roleId: true
         }
       },
       _count: { select: { servants: true } }
@@ -369,6 +383,10 @@ exports.toggleUser = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new ApiError(404, "User not found");
+
+  if (user.roleId === ROLE_IDS.ADMIN && user.isActive) {
+    throw new ApiError(400, "Admin users cannot be deactivated");
+  }
 
   const updated = await prisma.user.update({
     where: { id },

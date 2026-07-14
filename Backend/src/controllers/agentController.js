@@ -53,8 +53,18 @@ const parseBool = (value, fallback = true) => {
 };
 
 const generateServantPassword = () => {
-  const part = crypto.randomBytes(4).toString("hex");
-  return `St${part}1`;
+  const spec = "!@#$%^&*";
+  const num = "0123456789";
+  const letters = "abcdefghijklmnopqrstuvwxyz";
+  const uppers = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const r = (chars, len) => {
+    let s = "";
+    for (let i = 0; i < len; i++) {
+      s += chars.charAt(crypto.randomBytes(1)[0] % chars.length);
+    }
+    return s;
+  };
+  return "St" + r(letters, 2) + r(uppers, 2) + r(num, 2) + r(spec, 2);
 };
 
 const getAgent = async (userId) => {
