@@ -15,7 +15,10 @@ import { LocationIcon } from '../components/icons/LocationIcon'
 import { SourceBadge } from '../components/ui/SourceBadge'
 import { Button } from '../components/ui/Button'
 import { ApprovePasswordModal } from '../components/ApprovePasswordModal'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SetLoginPasswordCard } from '../components/SetLoginPasswordCard'
+import { useToast } from '../context/ToastContext'
+import { copyText } from '../lib/copyToClipboard'
 import { BankDetailsReview } from '../components/BankDetailsFields'
 import { AadhaarXmlVerify } from '../components/AadhaarXmlVerify'
 import { isValidIfscFormat, lookupIfsc } from '../lib/ifscLookup'
@@ -95,11 +98,19 @@ export default function ServantDetail() {
   const qc = useQueryClient()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [approveOpen, setApproveOpen] = useState(false)
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false)
   const [approveLoading, setApproveLoading] = useState(false)
+  const [approveConfirmLoading, setApproveConfirmLoading] = useState(false)
+  const [approveModalError, setApproveModalError] = useState('')
+  const [approveConfirmError, setApproveConfirmError] = useState('')
+  const [rejectError, setRejectError] = useState('')
+  const [rejectLoading, setRejectLoading] = useState(false)
+  const [reviewActionError, setReviewActionError] = useState('')
   const [credentials, setCredentials] = useState(null)
   const [reason, setReason] = useState('')
   const [idModal, setIdModal] = useState(false)
   const [ifscMeta, setIfscMeta] = useState({ bank: '', branch: '' })
+  const { showToast } = useToast()
 
   const { data: servant, isLoading, isError, error } = useQuery({
     queryKey: ['servant', id],
@@ -124,13 +135,16 @@ export default function ServantDetail() {
       qc.invalidateQueries({ queryKey: ['agent-registrations'] })
       setRejectOpen(false)
       setApproveOpen(false)
+      setApproveConfirmOpen(false)
+      setRejectError('')
+      setApproveModalError('')
+      setApproveConfirmError('')
+      setReviewActionError('')
       if (res.data?.data?.credentials) {
         setCredentials(res.data.data.credentials)
       }
       return res
     } catch (err) {
-      const msg = err.response?.data?.message || 'Request failed'
-      window.alert(msg)
       throw err
     }
   }
@@ -156,27 +170,71 @@ export default function ServantDetail() {
     servant?.registrationSource === 'SELF' || servant?.user?.isActive === false
 
   const handleApproveClick = () => {
-    const message = isAppRegistration
-      ? servant?.user?.agentSetPassword
-        ? 'Approve this helper? They can sign in with the password you already set.'
-        : 'Approve this helper? A login password will be generated automatically.'
-      : 'Approve this servant?'
-    if (window.confirm(message)) {
-      void verify('VERIFIED', undefined, {
+    setApproveConfirmError('')
+    setReviewActionError('')
+    setApproveConfirmOpen(true)
+  }
+
+  const handleApproveConfirm = async () => {
+    setApproveConfirmLoading(true)
+    setApproveConfirmError('')
+    try {
+      await verify('VERIFIED', undefined, {
         ...(isAppRegistration && !servant?.user?.agentSetPassword
           ? { generatePassword: true }
           : {}),
       })
+    } catch (err) {
+      setApproveConfirmError(err.response?.data?.message || 'Request failed')
+    } finally {
+      setApproveConfirmLoading(false)
     }
   }
 
   const handleApproveWithPassword = async (opts) => {
     setApproveLoading(true)
+    setApproveModalError('')
     try {
       await verify('VERIFIED', undefined, opts)
+    } catch (err) {
+      setApproveModalError(err.response?.data?.message || 'Request failed')
     } finally {
       setApproveLoading(false)
     }
+  }
+
+  const handleReject = async () => {
+    setRejectLoading(true)
+    setRejectError('')
+    try {
+      await verify('REJECTED', reason)
+    } catch (err) {
+      setRejectError(err.response?.data?.message || 'Request failed')
+    } finally {
+      setRejectLoading(false)
+    }
+  }
+
+  const handleMarkUnderReview = async () => {
+    setReviewActionError('')
+    try {
+      await verify('UNDER_REVIEW')
+    } catch (err) {
+      setReviewActionError(err.response?.data?.message || 'Request failed')
+    }
+  }
+
+  const approveConfirmDescription = isAppRegistration
+    ? servant?.user?.agentSetPassword
+      ? 'They can sign in with the password you already set.'
+      : 'A login password will be generated automatically.'
+    : 'This helper will be marked as verified and can receive bookings.'
+
+  const handleCopyCredentials = async () => {
+    if (!credentials) return
+    const text = `Email: ${credentials.email}\nPassword: ${credentials.password}`
+    const ok = await copyText(text)
+    showToast(ok ? 'Copied' : 'Could not copy')
   }
 
   if (isLoading || authLoading) return <LoadingSkeleton />
@@ -558,6 +616,9 @@ export default function ServantDetail() {
 
             {canReview && (
               <div className="space-y-2">
+                {reviewActionError ? (
+                  <p className="rounded-lg bg-red-50 p-3 text-sm text-error">{reviewActionError}</p>
+                ) : null}
                 <Button
                   variant="success"
                   className="w-full"
@@ -569,7 +630,10 @@ export default function ServantDetail() {
                   <Button
                     variant="secondary"
                     className="w-full"
-                    onClick={() => setApproveOpen(true)}
+                    onClick={() => {
+                      setApproveModalError('')
+                      setApproveOpen(true)
+                    }}
                   >
                     Approve with custom password
                   </Button>
@@ -577,14 +641,17 @@ export default function ServantDetail() {
                 <Button
                   variant="secondary"
                   className="w-full"
-                  onClick={() => verify('UNDER_REVIEW')}
+                  onClick={handleMarkUnderReview}
                 >
                   Mark under review
                 </Button>
                 <Button
                   variant="danger"
                   className="w-full"
-                  onClick={() => setRejectOpen(true)}
+                  onClick={() => {
+                    setRejectError('')
+                    setRejectOpen(true)
+                  }}
                 >
                   Reject
                 </Button>
@@ -649,8 +716,31 @@ export default function ServantDetail() {
         open={approveOpen}
         servant={servant}
         loading={approveLoading}
-        onClose={() => setApproveOpen(false)}
+        actionError={approveModalError}
+        onActionErrorClear={() => setApproveModalError('')}
+        onClose={() => {
+          setApproveOpen(false)
+          setApproveModalError('')
+        }}
         onConfirm={handleApproveWithPassword}
+      />
+
+      <ConfirmDialog
+        open={approveConfirmOpen}
+        title={isAppRegistration ? 'Approve this helper?' : 'Approve this servant?'}
+        description={approveConfirmDescription}
+        confirmLabel="Approve"
+        cancelLabel="Cancel"
+        variant="success"
+        loading={approveConfirmLoading}
+        error={approveConfirmError}
+        onConfirm={handleApproveConfirm}
+        onClose={() => {
+          if (!approveConfirmLoading) {
+            setApproveConfirmOpen(false)
+            setApproveConfirmError('')
+          }
+        }}
       />
 
       {credentials && (
@@ -678,11 +768,7 @@ export default function ServantDetail() {
               <Button
                 variant="secondary"
                 className="flex-1"
-                onClick={() =>
-                  navigator.clipboard?.writeText(
-                    `Email: ${credentials.email}\nPassword: ${credentials.password}`,
-                  )
-                }
+                onClick={handleCopyCredentials}
               >
                 Copy all
               </Button>
@@ -707,20 +793,32 @@ export default function ServantDetail() {
             </p>
             <textarea
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(e) => {
+                setReason(e.target.value)
+                setRejectError('')
+              }}
               className="input-ghost mt-4 w-full resize-none"
               rows={4}
               placeholder="Explain why this profile was rejected…"
             />
+            {rejectError ? <p className="mt-3 text-sm text-error">{rejectError}</p> : null}
             <div className="mt-4 flex gap-2">
               <Button
                 variant="danger"
                 className="flex-1"
-                onClick={() => verify('REJECTED', reason)}
+                disabled={rejectLoading}
+                onClick={handleReject}
               >
-                Confirm reject
+                {rejectLoading ? 'Please wait…' : 'Confirm reject'}
               </Button>
-              <Button variant="secondary" onClick={() => setRejectOpen(false)}>
+              <Button
+                variant="secondary"
+                disabled={rejectLoading}
+                onClick={() => {
+                  setRejectOpen(false)
+                  setRejectError('')
+                }}
+              >
                 Cancel
               </Button>
             </div>

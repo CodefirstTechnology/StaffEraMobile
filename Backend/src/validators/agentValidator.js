@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { optionalPhone } = require("./zodHelpers");
 
 const emptyToUndefined = (val) =>
   val === undefined || val === null || String(val).trim() === "" ? undefined : val;
@@ -34,7 +35,7 @@ const createAgentSchema = z.object({
   body: z.object({
     name: z.string().min(2, "Agent name is required"),
     email: z.string().email("Valid email is required"),
-    phone: z.preprocess(emptyToUndefined, z.string().optional()),
+    phone: optionalPhone,
     password: z.preprocess(emptyToUndefined, z.string().min(6).optional()),
     generatePassword: z.preprocess(
       (v) => v === true || String(v).toLowerCase() === "true",

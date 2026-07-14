@@ -90,6 +90,7 @@
     "passwordRequired": "पासवर्ड आवश्यक",
     "nameMin": "नाम कम से कम 2 अक्षर",
     "passwordMin": "पासवर्ड कम से कम 6 अक्षर",
+    "phoneInvalid": "वैध 10 अंकों का फ़ोन नंबर दर्ज करें",
     "locationRequired": "स्थान आवश्यक",
     "pickHomeFirst": "पहले घर का स्थान चुनें।"
   },

@@ -1,24 +1,49 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from './ui/Button'
 import { LoginPasswordFields } from './LoginPasswordFields'
+import { validateServantPassword } from '../lib/generatePassword'
 
-export function ApprovePasswordModal({ open, servant, onClose, onConfirm, loading }) {
+export function ApprovePasswordModal({
+  open,
+  servant,
+  onClose,
+  onConfirm,
+  loading,
+  actionError = '',
+  onActionErrorClear,
+}) {
   const [password, setPassword] = useState('')
+  const [validationError, setValidationError] = useState('')
+
+  useEffect(() => {
+    if (!open) {
+      setPassword('')
+      setValidationError('')
+    }
+  }, [open])
 
   if (!open || !servant) return null
 
+  const handlePasswordChange = (value) => {
+    setPassword(value)
+    setValidationError('')
+    onActionErrorClear?.()
+  }
+
   const handleClose = () => {
     setPassword('')
+    setValidationError('')
+    onActionErrorClear?.()
     onClose()
   }
 
   const handleApprove = () => {
-    const trimmed = password.trim()
-    if (trimmed.length < 6) {
-      window.alert('Enter a password with at least 6 characters, or tap Generate password.')
+    const result = validateServantPassword(password)
+    if (!result.ok) {
+      setValidationError(result.error)
       return
     }
-    onConfirm({ password: trimmed })
+    onConfirm({ password: result.password })
   }
 
   return (
@@ -35,8 +60,9 @@ export function ApprovePasswordModal({ open, servant, onClose, onConfirm, loadin
         <LoginPasswordFields
           email={servant.user?.email}
           password={password}
-          onPasswordChange={setPassword}
+          onPasswordChange={handlePasswordChange}
           hint="This helper registered from the Servant app. Set their password and share it so they can sign in."
+          error={validationError || actionError}
         />
         <div className="mt-6 flex flex-wrap gap-2">
           <Button

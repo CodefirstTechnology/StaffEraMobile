@@ -16,10 +16,7 @@ import {
   EMPTY_BANK_FORM,
   validateBankDetails,
 } from '../components/BankDetailsFields'
-import {
-  ServiceZonesEditor,
-  createDraftZonesForServant,
-} from '../components/ServiceZonesEditor'
+import { validatePhoneRequired, digitsOnlyPhone } from '../lib/phone'
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 
@@ -122,6 +119,7 @@ export default function OnboardServant() {
   const [idProof, setIdProof] = useState(null)
   const [bankAccountConfirm, setBankAccountConfirm] = useState('')
   const [draftZones, setDraftZones] = useState([])
+  const [phoneError, setPhoneError] = useState('')
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }))
   const toggleDay = (d) =>
@@ -141,10 +139,12 @@ export default function OnboardServant() {
       setError('Email is required')
       return false
     }
-    if (!form.phone?.trim()) {
-      setError('Mobile number is required')
+    const phoneErr = validatePhoneRequired(form.phone)
+    if (phoneErr) {
+      setPhoneError(phoneErr)
       return false
     }
+    setPhoneError('')
     if (!form.password || form.password.length < 6) {
       setError('Password must be at least 6 characters')
       return false
@@ -316,10 +316,26 @@ export default function OnboardServant() {
               <input
                 placeholder={f.placeholder}
                 value={form[f.key]}
-                onChange={(e) => update(f.key, e.target.value)}
+                onChange={(e) => {
+                  const val =
+                    f.key === 'phone' ? digitsOnlyPhone(e.target.value) : e.target.value
+                  update(f.key, val)
+                  if (f.key === 'phone') setPhoneError('')
+                }}
+                onBlur={
+                  f.key === 'phone'
+                    ? () => setPhoneError(validatePhoneRequired(form.phone))
+                    : undefined
+                }
                 type={f.type}
-                className={inputClassName()}
+                inputMode={f.key === 'phone' ? 'numeric' : undefined}
+                pattern={f.key === 'phone' ? '[0-9]*' : undefined}
+                aria-invalid={f.key === 'phone' && phoneError ? 'true' : undefined}
+                className={`${inputClassName()}${f.key === 'phone' && phoneError ? ' border-error' : ''}`}
               />
+              {f.key === 'phone' && phoneError ? (
+                <p className="mt-1.5 text-sm text-error">{phoneError}</p>
+              ) : null}
             </Field>
           ))}
           <Field label="Skill">

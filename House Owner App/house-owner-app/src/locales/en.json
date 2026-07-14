@@ -91,6 +91,7 @@
     "passwordRequired": "Password required",
     "nameMin": "Name must be at least 2 characters",
     "passwordMin": "Password must be at least 6 characters",
+    "phoneInvalid": "Enter a valid 10-digit phone number",
     "locationRequired": "Location required",
     "pickHomeFirst": "Pick your home location first."
   },

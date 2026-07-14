@@ -15,6 +15,9 @@ import {
 } from '../components/BankDetailsFields'
 import { AadhaarXmlVerify } from '../components/AadhaarXmlVerify'
 import { ServiceZonesEditor } from '../components/ServiceZonesEditor'
+import { useToast } from '../context/ToastContext'
+import { copyText } from '../lib/copyToClipboard'
+import { validatePhoneRequired, digitsOnlyPhone } from '../lib/phone'
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const ID_TYPES = ['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID']
@@ -61,6 +64,8 @@ export default function EditServant() {
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
   const [bankAccountConfirm, setBankAccountConfirm] = useState('')
+  const [phoneError, setPhoneError] = useState('')
+  const { showToast } = useToast()
 
   const { data: servant, isLoading } = useQuery({
     queryKey: ['servant', id],
@@ -128,6 +133,12 @@ export default function EditServant() {
 
   const save = async () => {
     setError('')
+    const phoneErr = validatePhoneRequired(form.phone)
+    if (phoneErr) {
+      setPhoneError(phoneErr)
+      return
+    }
+    setPhoneError('')
     if (!form.offersSession && !form.offersMonthly) {
       setError('Select at least one booking type: Session or Monthly')
       return
@@ -210,9 +221,18 @@ export default function EditServant() {
           <input
             placeholder="Enter mobile number"
             value={form.phone}
-            onChange={(e) => update('phone', e.target.value)}
-            className={inputClassName()}
+            onChange={(e) => {
+              update('phone', digitsOnlyPhone(e.target.value))
+              setPhoneError('')
+            }}
+            onBlur={() => setPhoneError(validatePhoneRequired(form.phone))}
+            type="tel"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            aria-invalid={phoneError ? 'true' : undefined}
+            className={`${inputClassName()}${phoneError ? ' border-error' : ''}`}
           />
+          {phoneError ? <p className="mt-1.5 text-sm text-error">{phoneError}</p> : null}
         </Field>
         <Field label="Skill">
           <SkillDropdown
@@ -482,11 +502,11 @@ export default function EditServant() {
           <div className="mt-3 flex gap-2">
             <Button
               variant="secondary"
-              onClick={() =>
-                navigator.clipboard?.writeText(
-                  `Email: ${savedCredentials.email}\nPassword: ${savedCredentials.password}`,
-                )
-              }
+              onClick={async () => {
+                const text = `Email: ${savedCredentials.email}\nPassword: ${savedCredentials.password}`
+                const ok = await copyText(text)
+                showToast(ok ? 'Copied' : 'Could not copy')
+              }}
             >
               Copy all
             </Button>

@@ -35,6 +35,7 @@ export default function AppRegistrationList() {
   const [search, setSearch] = useState('')
   const [passwordTarget, setPasswordTarget] = useState(null)
   const [passwordLoading, setPasswordLoading] = useState(false)
+  const [passwordSaveError, setPasswordSaveError] = useState('')
   const [credentials, setCredentials] = useState(null)
 
   const { data, isLoading } = useQuery({
@@ -69,6 +70,7 @@ export default function AppRegistrationList() {
   const savePassword = async ({ password }) => {
     if (!passwordTarget) return
     setPasswordLoading(true)
+    setPasswordSaveError('')
     try {
       const res = await api.patch(`/agent/servants/${passwordTarget.id}/password`, {
         password,
@@ -77,11 +79,17 @@ export default function AppRegistrationList() {
       qc.invalidateQueries({ queryKey: ['servant', String(passwordTarget.id)] })
       setCredentials(res.data?.data?.credentials || null)
       setPasswordTarget(null)
+      setPasswordSaveError('')
     } catch (e) {
-      window.alert(e.response?.data?.message || 'Failed to save password')
+      setPasswordSaveError(e.response?.data?.message || 'Failed to save password')
     } finally {
       setPasswordLoading(false)
     }
+  }
+
+  const closePasswordModal = () => {
+    setPasswordTarget(null)
+    setPasswordSaveError('')
   }
 
   return (
@@ -225,7 +233,9 @@ export default function AppRegistrationList() {
         open={!!passwordTarget}
         registration={passwordTarget}
         loading={passwordLoading}
-        onClose={() => setPasswordTarget(null)}
+        saveError={passwordSaveError}
+        onSaveErrorClear={() => setPasswordSaveError('')}
+        onClose={closePasswordModal}
         onSaved={savePassword}
       />
     </div>

@@ -22,8 +22,15 @@ import { LocationPicker } from '@/components/ui/LocationPicker';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import type { LocationValue } from '@/lib/locationTypes';
 
-function digitsOnly(phone: string) {
-  return phone.replace(/\D/g, '');
+import { digitsOnlyPhone, getPhoneValidationKind } from '@/lib/phone';
+
+function phoneErrorMessage(
+  kind: ReturnType<typeof getPhoneValidationKind>,
+  t: (key: string) => string,
+) {
+  if (kind === 'required') return t('validation.mobileRequired');
+  if (kind === 'invalid') return t('auth.mobileInvalid');
+  return '';
 }
 
 export default function RegisterScreen() {
@@ -47,14 +54,26 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+
+  const validatePhoneField = (value: string) => {
+    const kind = getPhoneValidationKind(value, { required: true });
+    const msg = phoneErrorMessage(kind, t);
+    setPhoneError(msg);
+    return !kind;
+  };
 
   const validate = (): string | null => {
     const name = form.name.trim();
     if (name.length < 2) return t('validation.nameMin');
     const email = form.email.trim().toLowerCase();
     if (!email.includes('@') || !email.includes('.')) return t('validation.emailInvalid');
-    const phone = digitsOnly(form.phone);
-    if (phone.length < 10) return t('auth.mobileInvalid');
+    const phoneKind = getPhoneValidationKind(form.phone, { required: true });
+    if (phoneKind) {
+      setPhoneError(phoneErrorMessage(phoneKind, t));
+      return 'phone';
+    }
+    setPhoneError('');
     if (skillsLoading) return t('auth.skillsLoading');
     if (form.skills.length === 0) return t('auth.skillRequired');
     const address = homeLocation?.address?.trim() || form.addressText.trim();
@@ -66,12 +85,12 @@ export default function RegisterScreen() {
   const submit = async () => {
     const err = validate();
     if (err) {
-      Alert.alert(t('auth.registrationFailed'), err);
+      if (err !== 'phone') Alert.alert(t('auth.registrationFailed'), err);
       return;
     }
 
     const address = homeLocation?.address?.trim() || form.addressText.trim();
-    const phone = digitsOnly(form.phone);
+    const phone = digitsOnlyPhone(form.phone);
 
     setLoading(true);
     try {
@@ -138,7 +157,19 @@ export default function RegisterScreen() {
                 {...('keyboard' in f ? { keyboardType: f.keyboard } : {})}
                 autoCapitalize={f.key === 'email' ? 'none' : 'words'}
                 value={form[f.key]}
-                onChangeText={(v) => setForm((prev) => ({ ...prev, [f.key]: v }))}
+                error={f.key === 'phone' ? phoneError : undefined}
+                onChangeText={(v) => {
+                  const next = f.key === 'phone' ? digitsOnlyPhone(v) : v;
+                  setForm((prev) => ({ ...prev, [f.key]: next }));
+                  if (f.key === 'phone') setPhoneError('');
+                }}
+                onBlur={
+                  f.key === 'phone'
+                    ? () => {
+                        validatePhoneField(form.phone);
+                      }
+                    : undefined
+                }
               />
             ))}
 

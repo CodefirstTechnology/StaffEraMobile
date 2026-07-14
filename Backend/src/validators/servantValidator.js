@@ -1,5 +1,5 @@
 const { z } = require("zod");
-const { optionalNumber } = require("./zodHelpers");
+const { optionalNumber, requiredPhone, optionalPhone } = require("./zodHelpers");
 
 const bankDetailsFields = {
   bankAccountHolder: z.string().optional(),
@@ -29,7 +29,7 @@ const createServantSchema = z.object({
   body: z.object({
     name: z.string().min(2),
     email: z.string().email(),
-    phone: z.string().optional(),
+    phone: requiredPhone,
     password: z.string().min(6),
     bio: z.string().optional(),
     experience: optionalNumber(),
@@ -56,7 +56,7 @@ const createServantSchema = z.object({
 const updateServantSchema = z.object({
   body: z.object({
     name: z.string().min(2).optional(),
-    phone: z.string().optional(),
+    phone: optionalPhone,
     address: z.string().optional(),
     city: z.string().optional(),
     latitude: z.coerce.number().min(-90).max(90).optional(),

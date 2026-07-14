@@ -3,28 +3,36 @@ import api from '../lib/api'
 import { Button } from './ui/Button'
 import { LoginPasswordFields } from './LoginPasswordFields'
 import { CredentialsBanner } from './CredentialsBanner'
+import { validateServantPassword } from '../lib/generatePassword'
 
 export function SetLoginPasswordCard({ servantId, email, passwordAlreadySet, onSaved }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [credentials, setCredentials] = useState(null)
+  const [error, setError] = useState('')
+
+  const handlePasswordChange = (value) => {
+    setPassword(value)
+    setError('')
+  }
 
   const save = async () => {
-    const trimmed = password.trim()
-    if (trimmed.length < 6) {
-      window.alert('Enter a password with at least 6 characters, or tap Generate password.')
+    const result = validateServantPassword(password)
+    if (!result.ok) {
+      setError(result.error)
       return
     }
     setLoading(true)
+    setError('')
     try {
       const res = await api.patch(`/agent/servants/${servantId}/password`, {
-        password: trimmed,
+        password: result.password,
       })
       setCredentials(res.data?.data?.credentials || null)
       setPassword('')
       onSaved?.()
     } catch (e) {
-      window.alert(e.response?.data?.message || 'Failed to save password')
+      setError(e.response?.data?.message || 'Failed to save password')
     } finally {
       setLoading(false)
     }
@@ -46,7 +54,8 @@ export function SetLoginPasswordCard({ servantId, email, passwordAlreadySet, onS
           <LoginPasswordFields
             email={email}
             password={password}
-            onPasswordChange={setPassword}
+            onPasswordChange={handlePasswordChange}
+            error={error}
           />
           <Button className="mt-4 w-full" variant="success" disabled={loading} onClick={save}>
             {loading ? 'Saving…' : passwordAlreadySet ? 'Update password' : 'Save password'}

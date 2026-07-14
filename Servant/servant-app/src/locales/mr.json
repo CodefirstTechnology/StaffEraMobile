@@ -117,6 +117,7 @@
     "emailInvalid": "वैध ईमेल टाका",
     "passwordRequired": "पासवर्ड आवश्यक",
     "nameMin": "नाव किमान 2 अक्षरे",
+    "mobileRequired": "मोबाइल नंबर आवश्यक आहे",
     "passwordMin": "पासवर्ड किमान 6 अक्षरे",
     "locationRequired": "स्थान आवश्यक",
     "pickHomeFirst": "प्रथम घराचे स्थान निवडा."
