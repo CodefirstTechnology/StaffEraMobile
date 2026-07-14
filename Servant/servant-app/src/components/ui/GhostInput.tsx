@@ -3,9 +3,9 @@ import { View, TextInput, Text, StyleSheet, TextInputProps, Pressable } from 're
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 
-type Props = TextInputProps & { label: string };
+type Props = TextInputProps & { label: string; error?: string };
 
-export function GhostInput({ label, style, secureTextEntry, ...props }: Props) {
+export function GhostInput({ label, style, secureTextEntry, error, ...props }: Props) {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const isPassword = secureTextEntry === true;
 
@@ -16,7 +16,7 @@ export function GhostInput({ label, style, secureTextEntry, ...props }: Props) {
         <TextInput
           placeholderTextColor={Stitch.colors.onSurfaceVariant + '99'}
           secureTextEntry={isPassword ? !passwordVisible : secureTextEntry}
-          style={[styles.input, isPassword && styles.inputWithIcon, style]}
+          style={[styles.input, isPassword && styles.inputWithIcon, error ? styles.inputError : null, style]}
           {...props}
         />
         {isPassword ? (
@@ -34,6 +34,7 @@ export function GhostInput({ label, style, secureTextEntry, ...props }: Props) {
           </Pressable>
         ) : null}
       </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
@@ -56,6 +57,15 @@ const styles = StyleSheet.create({
     color: Stitch.colors.onBackground,
     borderWidth: 1,
     borderColor: 'transparent',
+  },
+  inputError: {
+    borderColor: Stitch.colors.error,
+  },
+  error: {
+    fontSize: 12,
+    color: Stitch.colors.error,
+    marginTop: 6,
+    marginLeft: 4,
   },
   inputWithIcon: { paddingRight: 48 },
   eyeBtn: {

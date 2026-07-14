@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { optionalPhone, requiredPhone } = require("./zodHelpers");
 
 const emptyToUndefined = (val) =>
   val === undefined || val === null || String(val).trim() === "" ? undefined : val;
@@ -32,10 +33,7 @@ const registerServantSchema = z.object({
   body: z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
-    phone: z.preprocess(
-      (val) => String(val ?? "").replace(/\D/g, ""),
-      z.string().min(10, "Mobile number must be at least 10 digits")
-    ),
+    phone: requiredPhone,
     address: z.string().min(5, "Address is required"),
     skills: z.preprocess(parseSkillsBody, z.array(z.string()).min(1, "Select at least one skill")),
     city: z.preprocess(emptyToUndefined, z.string().optional()),
@@ -52,7 +50,7 @@ const registerOwnerSchema = z.object({
   body: z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
-    phone: z.preprocess(emptyToUndefined, z.string().optional()),
+    phone: optionalPhone,
     password: z.string().min(6, "Password must be at least 6 characters"),
     address: z.preprocess(emptyToUndefined, z.string().optional()),
     flatNo: z.string().optional(),

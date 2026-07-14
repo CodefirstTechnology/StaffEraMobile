@@ -82,9 +82,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   register: async (payload) => {
     const body = payload as Record<string, string | number | undefined>;
     const lang = useLanguageStore.getState().language;
+    const phoneDigits = String(body.phone ?? '').replace(/\D/g, '');
     const { data } = await api.post('/auth/register-owner', {
       ...body,
       email: String(body.email).trim().toLowerCase(),
+      phone: phoneDigits || undefined,
       preferredLanguage: lang,
     });
     await setToken('accessToken', data.data.accessToken);

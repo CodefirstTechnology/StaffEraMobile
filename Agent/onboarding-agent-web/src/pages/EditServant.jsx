@@ -15,6 +15,15 @@ import {
 } from '../components/BankDetailsFields'
 import { AadhaarXmlVerify } from '../components/AadhaarXmlVerify'
 import { ServiceZonesEditor } from '../components/ServiceZonesEditor'
+import { useToast } from '../context/ToastContext'
+import { copyText } from '../lib/copyToClipboard'
+import { validatePhoneRequired, digitsOnlyPhone } from '../lib/phone'
+import {
+  emptySkillsRateErrors,
+  sanitizeNonNegativeInput,
+  validateSkillsRateFields,
+  SKILLS_RATE_FIELDS,
+} from '../lib/nonNegativeNumber'
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const ID_TYPES = ['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID']
@@ -61,6 +70,9 @@ export default function EditServant() {
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
   const [bankAccountConfirm, setBankAccountConfirm] = useState('')
+  const [phoneError, setPhoneError] = useState('')
+  const [skillsRateErrors, setSkillsRateErrors] = useState(emptySkillsRateErrors)
+  const { showToast } = useToast()
 
   const { data: servant, isLoading } = useQuery({
     queryKey: ['servant', id],
@@ -128,6 +140,15 @@ export default function EditServant() {
 
   const save = async () => {
     setError('')
+    const phoneErr = validatePhoneRequired(form.phone)
+    if (phoneErr) {
+      setPhoneError(phoneErr)
+      return
+    }
+    setPhoneError('')
+    const rateErrors = validateSkillsRateFields(form, { required: false })
+    setSkillsRateErrors(rateErrors)
+    if (Object.values(rateErrors).some(Boolean)) return
     if (!form.offersSession && !form.offersMonthly) {
       setError('Select at least one booking type: Session or Monthly')
       return
@@ -210,9 +231,18 @@ export default function EditServant() {
           <input
             placeholder="Enter mobile number"
             value={form.phone}
-            onChange={(e) => update('phone', e.target.value)}
-            className={inputClassName()}
+            onChange={(e) => {
+              update('phone', digitsOnlyPhone(e.target.value))
+              setPhoneError('')
+            }}
+            onBlur={() => setPhoneError(validatePhoneRequired(form.phone))}
+            type="tel"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            aria-invalid={phoneError ? 'true' : undefined}
+            className={`${inputClassName()}${phoneError ? ' border-error' : ''}`}
           />
+          {phoneError ? <p className="mt-1.5 text-sm text-error">{phoneError}</p> : null}
         </Field>
         <Field label="Skill">
           <SkillDropdown
@@ -242,15 +272,32 @@ export default function EditServant() {
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
         <h3 className="font-semibold">Rates & experience</h3>
-        <Field label="Years of experience">
-          <input
-            placeholder="e.g. 3"
-            type="number"
-            value={form.experience}
-            onChange={(e) => update('experience', e.target.value)}
-            className={inputClassName()}
-          />
-        </Field>
+        {SKILLS_RATE_FIELDS.map(({ key, label }) => (
+          <Field key={key} label={key === 'hourlyRate' || key === 'monthlyRate' ? `${label} (₹)` : label}>
+            <input
+              placeholder={key === 'experience' ? 'e.g. 3' : key === 'hourlyRate' ? 'e.g. 150' : 'e.g. 15000'}
+              type="number"
+              min={0}
+              step={key === 'experience' ? 1 : 'any'}
+              value={form[key]}
+              onChange={(e) => {
+                update(key, sanitizeNonNegativeInput(e.target.value))
+                setSkillsRateErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
+              }}
+                onBlur={() =>
+                  setSkillsRateErrors((prev) => ({
+                    ...prev,
+                    [key]: validateSkillsRateFields(form, { required: false })[key],
+                  }))
+                }
+              aria-invalid={skillsRateErrors[key] ? 'true' : undefined}
+              className={`${inputClassName()}${skillsRateErrors[key] ? ' border-error' : ''}`}
+            />
+            {skillsRateErrors[key] ? (
+              <p className="text-sm text-error">{skillsRateErrors[key]}</p>
+            ) : null}
+          </Field>
+        ))}
         <Field label="Bio">
           <textarea
             placeholder="Short description about the servant"
@@ -258,24 +305,6 @@ export default function EditServant() {
             onChange={(e) => update('bio', e.target.value)}
             className={inputClassName()}
             rows={3}
-          />
-        </Field>
-        <Field label="Hourly rate (₹)">
-          <input
-            placeholder="e.g. 150"
-            type="number"
-            value={form.hourlyRate}
-            onChange={(e) => update('hourlyRate', e.target.value)}
-            className={inputClassName()}
-          />
-        </Field>
-        <Field label="Monthly rate (₹)">
-          <input
-            placeholder="e.g. 15000"
-            type="number"
-            value={form.monthlyRate}
-            onChange={(e) => update('monthlyRate', e.target.value)}
-            className={inputClassName()}
           />
         </Field>
       </div>
@@ -482,11 +511,11 @@ export default function EditServant() {
           <div className="mt-3 flex gap-2">
             <Button
               variant="secondary"
-              onClick={() =>
-                navigator.clipboard?.writeText(
-                  `Email: ${savedCredentials.email}\nPassword: ${savedCredentials.password}`,
-                )
-              }
+              onClick={async () => {
+                const text = `Email: ${savedCredentials.email}\nPassword: ${savedCredentials.password}`
+                const ok = await copyText(text)
+                showToast(ok ? 'Copied' : 'Could not copy')
+              }}
             >
               Copy all
             </Button>

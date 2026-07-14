@@ -5,6 +5,30 @@ const emptyToUndefined = (value) => {
   return value;
 };
 
+const phoneDigitsOnly = (val) => String(val ?? "").replace(/\D/g, "");
+
+/** Required mobile — digits only, 10–15 characters. */
+const requiredPhone = z.preprocess(
+  (val) => phoneDigitsOnly(val),
+  z
+    .string()
+    .min(10, "Mobile number must be at least 10 digits")
+    .max(15, "Mobile number is too long")
+);
+
+/** Optional mobile — empty allowed; otherwise digits only, 10–15 characters. */
+const optionalPhone = z.preprocess(
+  (val) => {
+    const digits = phoneDigitsOnly(val);
+    return digits || undefined;
+  },
+  z
+    .string()
+    .min(10, "Mobile number must be at least 10 digits")
+    .max(15, "Mobile number is too long")
+    .optional()
+);
+
 const optionalNumber = (schema = z.number()) =>
   z.preprocess(
     emptyToUndefined,
@@ -16,9 +40,16 @@ const optionalNumber = (schema = z.number()) =>
 const optionalInt = () => optionalNumber(z.number().int());
 const optionalPositiveInt = () => optionalNumber(z.number().int().positive());
 
+const optionalNonNegativeNumber = () =>
+  optionalNumber(z.number().min(0, "Must be 0 or greater"));
+
 module.exports = {
   emptyToUndefined,
+  phoneDigitsOnly,
+  requiredPhone,
+  optionalPhone,
   optionalNumber,
   optionalInt,
-  optionalPositiveInt
+  optionalPositiveInt,
+  optionalNonNegativeNumber,
 };

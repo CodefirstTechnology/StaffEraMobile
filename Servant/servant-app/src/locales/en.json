@@ -117,6 +117,7 @@
     "emailInvalid": "Enter a valid email",
     "passwordRequired": "Password required",
     "nameMin": "Name must be at least 2 characters",
+    "mobileRequired": "Mobile number is required",
     "passwordMin": "Password must be at least 6 characters",
     "locationRequired": "Location required",
     "pickHomeFirst": "Pick your home location first."

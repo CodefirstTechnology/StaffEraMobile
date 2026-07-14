@@ -16,10 +16,26 @@ import {
   EMPTY_BANK_FORM,
   validateBankDetails,
 } from '../components/BankDetailsFields'
+import { validatePhoneRequired, digitsOnlyPhone } from '../lib/phone'
+import {
+  emptySkillsRateErrors,
+  sanitizeNonNegativeInput,
+  validateSkillsRateFields,
+  SKILLS_RATE_FIELDS,
+} from '../lib/nonNegativeNumber'
 import {
   ServiceZonesEditor,
   createDraftZonesForServant,
 } from '../components/ServiceZonesEditor'
+
+const emptyPersonalErrors = () => ({
+  name: '',
+  email: '',
+  phone: '',
+  password: '',
+  skills: '',
+  address: '',
+})
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 
@@ -40,10 +56,13 @@ const PERSONAL_FIELDS = [
   { key: 'password', label: 'Password', placeholder: 'Create login password', type: 'password' },
 ]
 
-function Field({ label, children }) {
+function Field({ label, required, children }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <span className="text-sm font-medium text-gray-700">
+        {label}
+        {required ? <span className="text-error"> *</span> : null}
+      </span>
       {children}
     </label>
   )
@@ -53,8 +72,13 @@ function FieldLabel({ children }) {
   return <span className="text-sm font-medium text-gray-700">{children}</span>
 }
 
-function inputClassName() {
-  return 'w-full rounded-lg border px-3 py-2'
+function inputClassName(invalid = false) {
+  return `w-full rounded-lg border px-3 py-2${invalid ? ' border-error' : ''}`
+}
+
+function FieldError({ message }) {
+  if (!message) return null
+  return <p className="text-sm text-error">{message}</p>
 }
 
 function ReviewItem({ label, children }) {
@@ -95,7 +119,16 @@ export default function OnboardServant() {
   const navigate = useNavigate()
   const { data: skills = [], isLoading: skillsLoading } = useSkills()
   const [step, setStep] = useState(1)
-  const [error, setError] = useState('')
+  const [submitError, setSubmitError] = useState('')
+  const [personalErrors, setPersonalErrors] = useState(emptyPersonalErrors)
+  const [availabilityErrors, setAvailabilityErrors] = useState({
+    bookingTypes: '',
+    hoursPerDay: '',
+  })
+  const [zonesError, setZonesError] = useState('')
+  const [documentErrors, setDocumentErrors] = useState({ idProof: '', profilePhoto: '' })
+  const [skillsRateErrors, setSkillsRateErrors] = useState(emptySkillsRateErrors)
+  const [bankError, setBankError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
     name: '',
@@ -123,6 +156,9 @@ export default function OnboardServant() {
   const [bankAccountConfirm, setBankAccountConfirm] = useState('')
   const [draftZones, setDraftZones] = useState([])
 
+  const clearPersonalError = (key) =>
+    setPersonalErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
+
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }))
   const toggleDay = (d) =>
     setForm((f) => ({
@@ -133,72 +169,83 @@ export default function OnboardServant() {
     }))
 
   const validatePersonal = () => {
-    if (!form.name?.trim()) {
-      setError('Full name is required')
-      return false
-    }
+    const errors = emptyPersonalErrors()
+    if (!form.name?.trim()) errors.name = 'Full name is required'
     if (!form.email?.trim()) {
-      setError('Email is required')
-      return false
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      errors.email = 'Enter a valid email address'
     }
-    if (!form.phone?.trim()) {
-      setError('Mobile number is required')
-      return false
-    }
+    errors.phone = validatePhoneRequired(form.phone)
     if (!form.password || form.password.length < 6) {
-      setError('Password must be at least 6 characters')
-      return false
+      errors.password = 'Password must be at least 6 characters'
     }
-    if (!form.skills?.length) {
-      setError('Select at least one skill')
-      return false
-    }
-    if (!form.address?.trim()) {
-      setError('Address is required')
-      return false
-    }
-    return true
+    if (!form.skills?.length) errors.skills = 'Select at least one skill'
+    if (!form.address?.trim()) errors.address = 'Address is required'
+    setPersonalErrors(errors)
+    return !Object.values(errors).some(Boolean)
+  }
+
+  const validateSkillsRates = () => {
+    const errors = validateSkillsRateFields(form, { required: true })
+    setSkillsRateErrors(errors)
+    return !Object.values(errors).some(Boolean)
+  }
+
+  const hoursPerDayError = () => {
+    if (!form.offersMonthly) return ''
+    const trimmed = String(form.hoursPerDay ?? '').trim()
+    if (!trimmed) return 'Hours per day is required'
+    const num = Number(trimmed)
+    if (!Number.isFinite(num) || num < 1) return 'Hours per day must be at least 1'
+    if (num > 24) return 'Hours per day cannot exceed 24'
+    return ''
   }
 
   const validateAvailability = () => {
+    const errors = { bookingTypes: '', hoursPerDay: '' }
     if (!form.offersSession && !form.offersMonthly) {
-      setError('Select at least one booking type: Session or Monthly')
-      return false
+      errors.bookingTypes = 'Select at least one booking type: Session or Monthly'
     }
-    return true
+    errors.hoursPerDay = hoursPerDayError()
+    setAvailabilityErrors(errors)
+    return !Object.values(errors).some(Boolean)
   }
 
   const validateZones = () => {
     if (!draftZones.length) {
-      setError('Add at least one service zone')
+      setZonesError('Add at least one service zone')
       return false
     }
+    setZonesError('')
     return true
   }
 
   const validateDocuments = () => {
+    const errors = { idProof: '', profilePhoto: '' }
     if (!idProof) {
-      setError('ID proof document is required (JPEG, PNG, or WebP, max 5 MB)')
-      return false
+      errors.idProof = 'ID proof document is required (JPEG, PNG, or WebP, max 5 MB)'
     }
     if (!profilePhoto) {
-      setError('Profile photo is required (JPEG, PNG, or WebP, max 5 MB)')
-      return false
+      errors.profilePhoto = 'Profile photo is required (JPEG, PNG, or WebP, max 5 MB)'
     }
-    return true
+    setDocumentErrors(errors)
+    return !errors.idProof && !errors.profilePhoto
   }
 
   const validateBank = () => {
     const bankErr = validateBankDetails(form, bankAccountConfirm)
     if (bankErr) {
-      setError(bankErr)
+      setBankError(bankErr)
       return false
     }
+    setBankError('')
     return true
   }
 
   const validateForReview = () => {
     if (!validatePersonal()) return false
+    if (!validateSkillsRates()) return false
     if (!validateAvailability()) return false
     if (!validateZones()) return false
     if (!validateDocuments()) return false
@@ -209,22 +256,27 @@ export default function OnboardServant() {
   const reportDraft = () => buildReportFromForm(form, skills, { idProof, profilePhoto })
 
   const handleDownloadReport = () => {
-    setError('')
+    setSubmitError('')
     downloadOnboardingReport(reportDraft(), 'onboarding-draft')
   }
 
   const handlePrintReport = () => {
-    setError('')
+    setSubmitError('')
     printOnboardingReport(reportDraft())
   }
 
   const goNext = () => {
-    setError('')
+    setSubmitError('')
     if (step === 1 && !validatePersonal()) return
+    if (step === 2 && !validateSkillsRates()) return
     if (step === 3 && !validateAvailability()) return
     if (step === 4 && !validateZones()) return
     if (step === 5) {
       if (!validateDocuments()) return
+      if (!validateSkillsRates()) {
+        setStep(2)
+        return
+      }
       if (!validatePersonal()) {
         setStep(1)
         return
@@ -239,9 +291,10 @@ export default function OnboardServant() {
   }
 
   const submit = async () => {
-    setError('')
+    setSubmitError('')
     if (!validateForReview()) {
       if (!validatePersonal()) setStep(1)
+      else if (!validateSkillsRates()) setStep(2)
       else if (!validateAvailability()) setStep(3)
       else if (!validateZones()) setStep(4)
       else if (!validateDocuments()) setStep(5)
@@ -277,7 +330,7 @@ export default function OnboardServant() {
       )
       navigate(`/servants/${servant.id}`)
     } catch (e) {
-      setError(e.response?.data?.message || 'Failed to create servant')
+      setSubmitError(e.response?.data?.message || 'Failed to create servant')
     } finally {
       setSubmitting(false)
     }
@@ -310,34 +363,60 @@ export default function OnboardServant() {
       {step === 1 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Personal Info</h3>
-          {error && <p className="text-error text-sm">{error}</p>}
           {PERSONAL_FIELDS.map((f) => (
-            <Field key={f.key} label={f.label}>
+            <Field key={f.key} label={f.label} required>
               <input
                 placeholder={f.placeholder}
                 value={form[f.key]}
-                onChange={(e) => update(f.key, e.target.value)}
+                onChange={(e) => {
+                  const val =
+                    f.key === 'phone' ? digitsOnlyPhone(e.target.value) : e.target.value
+                  update(f.key, val)
+                  clearPersonalError(f.key)
+                }}
+                onBlur={
+                  f.key === 'phone'
+                    ? () =>
+                        setPersonalErrors((prev) => ({
+                          ...prev,
+                          phone: validatePhoneRequired(form.phone),
+                        }))
+                    : undefined
+                }
                 type={f.type}
-                className={inputClassName()}
+                inputMode={f.key === 'phone' ? 'numeric' : undefined}
+                pattern={f.key === 'phone' ? '[0-9]*' : undefined}
+                aria-invalid={personalErrors[f.key] ? 'true' : undefined}
+                className={inputClassName(!!personalErrors[f.key])}
               />
+              <FieldError message={personalErrors[f.key]} />
             </Field>
           ))}
-          <Field label="Skill">
+          <Field label="Skill" required>
             <SkillDropdown
               skills={skills}
               skillsLoading={skillsLoading}
               value={form.skills}
-              onChange={(skillsSelected) => update('skills', skillsSelected)}
+              onChange={(skillsSelected) => {
+                update('skills', skillsSelected)
+                clearPersonalError('skills')
+              }}
             />
+            <FieldError message={personalErrors.skills} />
           </Field>
-          <Field label="Address">
+          <Field label="Address" required>
             <textarea
               placeholder="Enter full residential address"
               value={form.address}
-              onChange={(e) => update('address', e.target.value)}
-              className={inputClassName()}
+              onChange={(e) => {
+                update('address', e.target.value)
+                clearPersonalError('address')
+              }}
+              aria-invalid={personalErrors.address ? 'true' : undefined}
+              className={inputClassName(!!personalErrors.address)}
               rows={3}
             />
+            <FieldError message={personalErrors.address} />
           </Field>
         </div>
       )}
@@ -345,15 +424,34 @@ export default function OnboardServant() {
       {step === 2 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Skills & Rates</h3>
-          <Field label="Years of experience">
-            <input
-              placeholder="e.g. 3"
-              type="number"
-              value={form.experience}
-              onChange={(e) => update('experience', e.target.value)}
-              className={inputClassName()}
-            />
-          </Field>
+          {SKILLS_RATE_FIELDS.map(({ key, label }) => (
+            <Field
+              key={key}
+              required
+              label={key === 'hourlyRate' || key === 'monthlyRate' ? `${label} (₹)` : label}
+            >
+              <input
+                placeholder={key === 'experience' ? 'e.g. 3' : key === 'hourlyRate' ? 'e.g. 150' : 'e.g. 15000'}
+                type="number"
+                min={0}
+                step={key === 'experience' ? 1 : 'any'}
+                value={form[key]}
+                onChange={(e) => {
+                  update(key, sanitizeNonNegativeInput(e.target.value))
+                  setSkillsRateErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
+                }}
+                onBlur={() =>
+                  setSkillsRateErrors((prev) => ({
+                    ...prev,
+                    [key]: validateSkillsRateFields(form, { required: true })[key],
+                  }))
+                }
+                aria-invalid={skillsRateErrors[key] ? 'true' : undefined}
+                className={inputClassName(!!skillsRateErrors[key])}
+              />
+              <FieldError message={skillsRateErrors[key]} />
+            </Field>
+          ))}
           <Field label="Bio">
             <textarea
               placeholder="Short description about the servant"
@@ -361,24 +459,6 @@ export default function OnboardServant() {
               onChange={(e) => update('bio', e.target.value)}
               className={inputClassName()}
               rows={3}
-            />
-          </Field>
-          <Field label="Hourly rate (₹)">
-            <input
-              placeholder="e.g. 150"
-              type="number"
-              value={form.hourlyRate}
-              onChange={(e) => update('hourlyRate', e.target.value)}
-              className={inputClassName()}
-            />
-          </Field>
-          <Field label="Monthly rate (₹)">
-            <input
-              placeholder="e.g. 15000"
-              type="number"
-              value={form.monthlyRate}
-              onChange={(e) => update('monthlyRate', e.target.value)}
-              className={inputClassName()}
             />
           </Field>
         </div>
@@ -390,7 +470,6 @@ export default function OnboardServant() {
           <p className="text-sm text-subtext">
             Choose which booking types this servant accepts and set the schedule for each.
           </p>
-          {error && <p className="text-error text-sm">{error}</p>}
 
           <div className="space-y-2">
             <FieldLabel>Booking types offered</FieldLabel>
@@ -399,7 +478,10 @@ export default function OnboardServant() {
                 <input
                   type="checkbox"
                   checked={form.offersSession}
-                  onChange={(e) => update('offersSession', e.target.checked)}
+                  onChange={(e) => {
+                    update('offersSession', e.target.checked)
+                    setAvailabilityErrors((prev) => ({ ...prev, bookingTypes: '' }))
+                  }}
                 />
                 Session (one visit)
               </label>
@@ -407,11 +489,15 @@ export default function OnboardServant() {
                 <input
                   type="checkbox"
                   checked={form.offersMonthly}
-                  onChange={(e) => update('offersMonthly', e.target.checked)}
+                  onChange={(e) => {
+                    update('offersMonthly', e.target.checked)
+                    setAvailabilityErrors((prev) => ({ ...prev, bookingTypes: '' }))
+                  }}
                 />
                 Monthly contract
               </label>
             </div>
+            <FieldError message={availabilityErrors.bookingTypes} />
           </div>
 
           {form.offersSession && (
@@ -458,16 +544,27 @@ export default function OnboardServant() {
                   ))}
                 </div>
               </div>
-              <Field label="Hours per day">
+              <Field label="Hours per day" required>
                 <input
                   type="number"
-                  min="1"
-                  max="24"
+                  min={1}
+                  max={24}
                   placeholder="e.g. 8"
                   value={form.hoursPerDay}
-                  onChange={(e) => update('hoursPerDay', e.target.value)}
-                  className={inputClassName()}
+                  onChange={(e) => {
+                    update('hoursPerDay', sanitizeNonNegativeInput(e.target.value))
+                    setAvailabilityErrors((prev) => ({ ...prev, hoursPerDay: '' }))
+                  }}
+                  onBlur={() =>
+                    setAvailabilityErrors((prev) => ({
+                      ...prev,
+                      hoursPerDay: hoursPerDayError(),
+                    }))
+                  }
+                  aria-invalid={availabilityErrors.hoursPerDay ? 'true' : undefined}
+                  className={inputClassName(!!availabilityErrors.hoursPerDay)}
                 />
+                <FieldError message={availabilityErrors.hoursPerDay} />
               </Field>
               <Field label="Monthly availability notes">
                 <textarea
@@ -485,15 +582,15 @@ export default function OnboardServant() {
 
       {step === 4 && (
         <div className="space-y-2">
-          {error && <p className="text-error text-sm">{error}</p>}
           <ServiceZonesEditor
             draftMode
             draftZones={draftZones}
             onDraftChange={(zones) => {
               setDraftZones(zones)
-              if (zones.length) setError('')
+              if (zones.length) setZonesError('')
             }}
           />
+          <FieldError message={zonesError} />
         </div>
       )}
 
@@ -505,7 +602,6 @@ export default function OnboardServant() {
             verify Aadhaar with Offline e-KYC XML (myAadhaar ZIP + share code) on the servant detail
             page.
           </p>
-          {error && <p className="text-error text-sm">{error}</p>}
           <Field label="ID proof type">
             <select
               value={form.idProofType}
@@ -523,17 +619,25 @@ export default function OnboardServant() {
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => setIdProof(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                setIdProof(e.target.files?.[0] || null)
+                setDocumentErrors((prev) => ({ ...prev, idProof: '' }))
+              }}
               className="w-full text-sm"
             />
+            <FieldError message={documentErrors.idProof} />
           </Field>
           <Field label="Profile photo (required)">
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => setProfilePhoto(e.target.files?.[0] || null)}
+              onChange={(e) => {
+                setProfilePhoto(e.target.files?.[0] || null)
+                setDocumentErrors((prev) => ({ ...prev, profilePhoto: '' }))
+              }}
               className="w-full text-sm"
             />
+            <FieldError message={documentErrors.profilePhoto} />
           </Field>
         </div>
       )}
@@ -545,13 +649,16 @@ export default function OnboardServant() {
             Payment account for salary and booking payouts. You can add or update these later from
             the servant profile.
           </p>
-          {error && <p className="text-error text-sm">{error}</p>}
           <BankDetailsFields
             form={form}
             update={update}
             accountNumberConfirm={bankAccountConfirm}
-            onAccountNumberConfirmChange={setBankAccountConfirm}
+            onAccountNumberConfirmChange={(value) => {
+              setBankAccountConfirm(value)
+              setBankError('')
+            }}
           />
+          <FieldError message={bankError} />
         </div>
       )}
 
@@ -650,7 +757,7 @@ export default function OnboardServant() {
             <BankDetailsReview form={form} />
           </ReviewSection>
 
-          {error && <p className="text-error text-sm">{error}</p>}
+          {submitError && <FieldError message={submitError} />}
 
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
             <p className="mb-3 text-sm font-medium text-primary">Before you submit</p>
@@ -687,7 +794,7 @@ export default function OnboardServant() {
           variant="secondary"
           disabled={step === 1 || submitting}
           onClick={() => {
-            setError('')
+            setSubmitError('')
             setStep((s) => s - 1)
           }}
         >

@@ -1,23 +1,48 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from './ui/Button'
 import { LoginPasswordFields } from './LoginPasswordFields'
+import { validateServantPassword } from '../lib/generatePassword'
 
-export function SetPasswordModal({ open, registration, onClose, onSaved, loading }) {
+export function SetPasswordModal({
+  open,
+  registration,
+  onClose,
+  onSaved,
+  loading,
+  saveError = '',
+  onSaveErrorClear,
+}) {
   const [password, setPassword] = useState('')
+  const [validationError, setValidationError] = useState('')
+
+  useEffect(() => {
+    if (!open) {
+      setPassword('')
+      setValidationError('')
+    }
+  }, [open])
 
   if (!open || !registration) return null
 
+  const handlePasswordChange = (value) => {
+    setPassword(value)
+    setValidationError('')
+    onSaveErrorClear?.()
+  }
+
   const handleSave = () => {
-    const trimmed = password.trim()
-    if (trimmed.length < 6) {
-      window.alert('Enter a password with at least 6 characters, or tap Generate password.')
+    const result = validateServantPassword(password)
+    if (!result.ok) {
+      setValidationError(result.error)
       return
     }
-    onSaved({ password: trimmed })
+    onSaved({ password: result.password })
   }
 
   const handleClose = () => {
     setPassword('')
+    setValidationError('')
+    onSaveErrorClear?.()
     onClose()
   }
 
@@ -33,7 +58,8 @@ export function SetPasswordModal({ open, registration, onClose, onSaved, loading
         <LoginPasswordFields
           email={registration.user?.email}
           password={password}
-          onPasswordChange={setPassword}
+          onPasswordChange={handlePasswordChange}
+          error={validationError || saveError}
         />
         <div className="mt-4 flex gap-2">
           <Button variant="success" className="flex-1" disabled={loading} onClick={handleSave}>

@@ -13,6 +13,15 @@ import {
   type AddressUnitValue,
 } from '@/components/ui/AddressUnitFields';
 import type { LocationValue } from '@/lib/locationTypes';
+import { digitsOnlyPhone, getPhoneValidationKind } from '@/lib/phone';
+
+function phoneErrorMessage(
+  kind: ReturnType<typeof getPhoneValidationKind>,
+  t: (key: string) => string,
+) {
+  if (kind === 'invalid') return t('validation.phoneInvalid');
+  return '';
+}
 
 export default function RegisterScreen() {
   const { t } = useTranslation();
@@ -32,18 +41,27 @@ export default function RegisterScreen() {
   });
   const [homeLocation, setHomeLocation] = useState<LocationValue | null>(null);
   const [loading, setLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState('');
+
+  const validatePhoneField = (value: string) => {
+    const kind = getPhoneValidationKind(value, { required: false });
+    const msg = phoneErrorMessage(kind, t);
+    setPhoneError(msg);
+    return !kind;
+  };
 
   const submit = async () => {
     if (form.password !== form.confirmPassword) {
       Alert.alert(t('auth.passwordMismatch'));
       return;
     }
+    if (!validatePhoneField(form.phone)) return;
     setLoading(true);
     try {
       await register({
         name: form.name,
         email: form.email,
-        phone: form.phone,
+        phone: digitsOnlyPhone(form.phone) || undefined,
         password: form.password,
         city: homeLocation?.city || form.city,
         address: homeLocation?.address,
@@ -83,7 +101,19 @@ export default function RegisterScreen() {
           {...('keyboard' in f ? { keyboardType: f.keyboard } : {})}
           autoCapitalize={f.key === 'email' ? 'none' : 'words'}
           value={form[f.key]}
-          onChangeText={(v) => setForm((prev) => ({ ...prev, [f.key]: v }))}
+          error={f.key === 'phone' ? phoneError : undefined}
+          onChangeText={(v) => {
+            const next = f.key === 'phone' ? digitsOnlyPhone(v) : v;
+            setForm((prev) => ({ ...prev, [f.key]: next }));
+            if (f.key === 'phone') setPhoneError('');
+          }}
+          onBlur={
+            f.key === 'phone'
+              ? () => {
+                  validatePhoneField(form.phone);
+                }
+              : undefined
+          }
         />
       ))}
 

@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { AgentLocationPicker } from '../../components/AgentLocationPicker'
 import { LocationIcon } from '../../components/icons/LocationIcon'
 import { CredentialsBanner } from '../../components/CredentialsBanner'
+import { validatePhoneOptional, digitsOnlyPhone } from '../../lib/phone'
 import { useToast } from '../../context/ToastContext'
 
 const emptyEditForm = () => ({
@@ -27,6 +28,7 @@ const REQUIRED = 'This field is required'
 const emptyCreateFieldErrors = () => ({
   name: '',
   email: '',
+  phone: '',
   location: '',
   manualAddress: '',
   manualLatitude: '',
@@ -81,9 +83,14 @@ function validateServiceRadius(value) {
   return ''
 }
 
+function validatePhone(value) {
+  return validatePhoneOptional(value)
+}
+
 function validateCreateAgentFields({
   name,
   email,
+  phone,
   locationMode,
   location,
   manualAddress,
@@ -96,6 +103,7 @@ function validateCreateAgentFields({
   const errors = emptyCreateFieldErrors()
   errors.name = validateName(name)
   errors.email = validateEmail(email)
+  errors.phone = validatePhone(phone)
 
   if (locationMode === 'picker') {
     if (
@@ -641,6 +649,7 @@ export default function AdminAgents() {
     const errors = validateCreateAgentFields({
       name,
       email,
+      phone,
       locationMode,
       location,
       manualAddress,
@@ -675,7 +684,7 @@ export default function AdminAgents() {
       const res = await api.post('/admin/agents', {
         name: name.trim(),
         email: email.trim(),
-        phone: phone.trim() || undefined,
+        phone: digitsOnlyPhone(phone) || undefined,
         agencyName: agencyName.trim() || undefined,
         password: generatePassword ? undefined : password,
         generatePassword,
@@ -779,12 +788,22 @@ export default function AdminAgents() {
                 aria-invalid={!!fieldErrors.email}
               />
             </FormField>
-            <FormField label="Phone" hint="Optional">
+            <FormField label="Phone" hint="Optional" error={fieldErrors.phone}>
               <input
                 type="tel"
-                className={inputClass()}
+                className={fieldInputClass(!!fieldErrors.phone)}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                onChange={(e) => {
+                  const next = digitsOnlyPhone(e.target.value)
+                  setPhone(next)
+                  updateFieldError(setFieldErrors, 'phone', next, validatePhone)
+                }}
+                onBlur={() =>
+                  setFieldErrors((prev) => ({ ...prev, phone: validatePhone(phone) }))
+                }
+                aria-invalid={!!fieldErrors.phone}
               />
             </FormField>
             <FormField label="Agency name" hint="Optional">
@@ -980,8 +999,9 @@ export default function AdminAgents() {
             ) : null}
           </label>
 
-          <label className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2">
             <input
+              id="generate-agent-password"
               type="checkbox"
               checked={generatePassword}
               onChange={(e) => {
@@ -991,8 +1011,10 @@ export default function AdminAgents() {
                 }
               }}
             />
-            Auto-generate login password
-          </label>
+            <label htmlFor="generate-agent-password" className="text-sm cursor-pointer">
+              Auto-generate login password
+            </label>
+          </div>
           {!generatePassword && (
             <FormField label="Login password" required error={fieldErrors.password}>
               <input
