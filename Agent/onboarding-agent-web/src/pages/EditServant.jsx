@@ -466,7 +466,7 @@ export default function EditServant() {
         <Field label="Replace ID proof">
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp,application/pdf"
+            accept="image/jpeg,image/png,application/pdf"
             onChange={(e) => {
               const file = e.target.files?.[0] || null
               if (file) {
@@ -497,7 +497,7 @@ export default function EditServant() {
         <Field label="Replace profile photo">
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png"
             onChange={(e) => {
               const file = e.target.files?.[0] || null
               if (file) {
