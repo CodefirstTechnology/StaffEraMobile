@@ -969,8 +969,9 @@ export default function AdminAgents() {
             ) : null}
           </label>
 
-          <label className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2">
             <input
+              id="generate-agent-password"
               type="checkbox"
               checked={generatePassword}
               onChange={(e) => {
@@ -980,8 +981,10 @@ export default function AdminAgents() {
                 }
               }}
             />
-            Auto-generate login password
-          </label>
+            <label htmlFor="generate-agent-password" className="text-sm cursor-pointer">
+              Auto-generate login password
+            </label>
+          </div>
           {!generatePassword && (
             <FormField label="Login password" required error={fieldErrors.password}>
               <input

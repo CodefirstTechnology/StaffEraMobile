@@ -18,6 +18,12 @@ import {
 } from '../components/BankDetailsFields'
 import { validatePhoneRequired, digitsOnlyPhone } from '../lib/phone'
 import {
+  emptySkillsRateErrors,
+  sanitizeNonNegativeInput,
+  validateSkillsRateFields,
+  SKILLS_RATE_FIELDS,
+} from '../lib/nonNegativeNumber'
+import {
   ServiceZonesEditor,
   createDraftZonesForServant,
 } from '../components/ServiceZonesEditor'
@@ -50,10 +56,13 @@ const PERSONAL_FIELDS = [
   { key: 'password', label: 'Password', placeholder: 'Create login password', type: 'password' },
 ]
 
-function Field({ label, children }) {
+function Field({ label, required, children }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <span className="text-sm font-medium text-gray-700">
+        {label}
+        {required ? <span className="text-error"> *</span> : null}
+      </span>
       {children}
     </label>
   )
@@ -112,9 +121,13 @@ export default function OnboardServant() {
   const [step, setStep] = useState(1)
   const [submitError, setSubmitError] = useState('')
   const [personalErrors, setPersonalErrors] = useState(emptyPersonalErrors)
-  const [availabilityError, setAvailabilityError] = useState('')
+  const [availabilityErrors, setAvailabilityErrors] = useState({
+    bookingTypes: '',
+    hoursPerDay: '',
+  })
   const [zonesError, setZonesError] = useState('')
   const [documentErrors, setDocumentErrors] = useState({ idProof: '', profilePhoto: '' })
+  const [skillsRateErrors, setSkillsRateErrors] = useState(emptySkillsRateErrors)
   const [bankError, setBankError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
@@ -173,13 +186,30 @@ export default function OnboardServant() {
     return !Object.values(errors).some(Boolean)
   }
 
+  const validateSkillsRates = () => {
+    const errors = validateSkillsRateFields(form, { required: true })
+    setSkillsRateErrors(errors)
+    return !Object.values(errors).some(Boolean)
+  }
+
+  const hoursPerDayError = () => {
+    if (!form.offersMonthly) return ''
+    const trimmed = String(form.hoursPerDay ?? '').trim()
+    if (!trimmed) return 'Hours per day is required'
+    const num = Number(trimmed)
+    if (!Number.isFinite(num) || num < 1) return 'Hours per day must be at least 1'
+    if (num > 24) return 'Hours per day cannot exceed 24'
+    return ''
+  }
+
   const validateAvailability = () => {
+    const errors = { bookingTypes: '', hoursPerDay: '' }
     if (!form.offersSession && !form.offersMonthly) {
-      setAvailabilityError('Select at least one booking type: Session or Monthly')
-      return false
+      errors.bookingTypes = 'Select at least one booking type: Session or Monthly'
     }
-    setAvailabilityError('')
-    return true
+    errors.hoursPerDay = hoursPerDayError()
+    setAvailabilityErrors(errors)
+    return !Object.values(errors).some(Boolean)
   }
 
   const validateZones = () => {
@@ -215,6 +245,7 @@ export default function OnboardServant() {
 
   const validateForReview = () => {
     if (!validatePersonal()) return false
+    if (!validateSkillsRates()) return false
     if (!validateAvailability()) return false
     if (!validateZones()) return false
     if (!validateDocuments()) return false
@@ -237,10 +268,15 @@ export default function OnboardServant() {
   const goNext = () => {
     setSubmitError('')
     if (step === 1 && !validatePersonal()) return
+    if (step === 2 && !validateSkillsRates()) return
     if (step === 3 && !validateAvailability()) return
     if (step === 4 && !validateZones()) return
     if (step === 5) {
       if (!validateDocuments()) return
+      if (!validateSkillsRates()) {
+        setStep(2)
+        return
+      }
       if (!validatePersonal()) {
         setStep(1)
         return
@@ -258,6 +294,7 @@ export default function OnboardServant() {
     setSubmitError('')
     if (!validateForReview()) {
       if (!validatePersonal()) setStep(1)
+      else if (!validateSkillsRates()) setStep(2)
       else if (!validateAvailability()) setStep(3)
       else if (!validateZones()) setStep(4)
       else if (!validateDocuments()) setStep(5)
@@ -327,7 +364,7 @@ export default function OnboardServant() {
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Personal Info</h3>
           {PERSONAL_FIELDS.map((f) => (
-            <Field key={f.key} label={f.label}>
+            <Field key={f.key} label={f.label} required>
               <input
                 placeholder={f.placeholder}
                 value={form[f.key]}
@@ -355,7 +392,7 @@ export default function OnboardServant() {
               <FieldError message={personalErrors[f.key]} />
             </Field>
           ))}
-          <Field label="Skill">
+          <Field label="Skill" required>
             <SkillDropdown
               skills={skills}
               skillsLoading={skillsLoading}
@@ -367,7 +404,7 @@ export default function OnboardServant() {
             />
             <FieldError message={personalErrors.skills} />
           </Field>
-          <Field label="Address">
+          <Field label="Address" required>
             <textarea
               placeholder="Enter full residential address"
               value={form.address}
@@ -387,15 +424,34 @@ export default function OnboardServant() {
       {step === 2 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Skills & Rates</h3>
-          <Field label="Years of experience">
-            <input
-              placeholder="e.g. 3"
-              type="number"
-              value={form.experience}
-              onChange={(e) => update('experience', e.target.value)}
-              className={inputClassName()}
-            />
-          </Field>
+          {SKILLS_RATE_FIELDS.map(({ key, label }) => (
+            <Field
+              key={key}
+              required
+              label={key === 'hourlyRate' || key === 'monthlyRate' ? `${label} (₹)` : label}
+            >
+              <input
+                placeholder={key === 'experience' ? 'e.g. 3' : key === 'hourlyRate' ? 'e.g. 150' : 'e.g. 15000'}
+                type="number"
+                min={0}
+                step={key === 'experience' ? 1 : 'any'}
+                value={form[key]}
+                onChange={(e) => {
+                  update(key, sanitizeNonNegativeInput(e.target.value))
+                  setSkillsRateErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
+                }}
+                onBlur={() =>
+                  setSkillsRateErrors((prev) => ({
+                    ...prev,
+                    [key]: validateSkillsRateFields(form, { required: true })[key],
+                  }))
+                }
+                aria-invalid={skillsRateErrors[key] ? 'true' : undefined}
+                className={inputClassName(!!skillsRateErrors[key])}
+              />
+              <FieldError message={skillsRateErrors[key]} />
+            </Field>
+          ))}
           <Field label="Bio">
             <textarea
               placeholder="Short description about the servant"
@@ -403,24 +459,6 @@ export default function OnboardServant() {
               onChange={(e) => update('bio', e.target.value)}
               className={inputClassName()}
               rows={3}
-            />
-          </Field>
-          <Field label="Hourly rate (₹)">
-            <input
-              placeholder="e.g. 150"
-              type="number"
-              value={form.hourlyRate}
-              onChange={(e) => update('hourlyRate', e.target.value)}
-              className={inputClassName()}
-            />
-          </Field>
-          <Field label="Monthly rate (₹)">
-            <input
-              placeholder="e.g. 15000"
-              type="number"
-              value={form.monthlyRate}
-              onChange={(e) => update('monthlyRate', e.target.value)}
-              className={inputClassName()}
             />
           </Field>
         </div>
@@ -442,7 +480,7 @@ export default function OnboardServant() {
                   checked={form.offersSession}
                   onChange={(e) => {
                     update('offersSession', e.target.checked)
-                    setAvailabilityError('')
+                    setAvailabilityErrors((prev) => ({ ...prev, bookingTypes: '' }))
                   }}
                 />
                 Session (one visit)
@@ -453,13 +491,13 @@ export default function OnboardServant() {
                   checked={form.offersMonthly}
                   onChange={(e) => {
                     update('offersMonthly', e.target.checked)
-                    setAvailabilityError('')
+                    setAvailabilityErrors((prev) => ({ ...prev, bookingTypes: '' }))
                   }}
                 />
                 Monthly contract
               </label>
             </div>
-            <FieldError message={availabilityError} />
+            <FieldError message={availabilityErrors.bookingTypes} />
           </div>
 
           {form.offersSession && (
@@ -506,16 +544,27 @@ export default function OnboardServant() {
                   ))}
                 </div>
               </div>
-              <Field label="Hours per day">
+              <Field label="Hours per day" required>
                 <input
                   type="number"
-                  min="1"
-                  max="24"
+                  min={1}
+                  max={24}
                   placeholder="e.g. 8"
                   value={form.hoursPerDay}
-                  onChange={(e) => update('hoursPerDay', e.target.value)}
-                  className={inputClassName()}
+                  onChange={(e) => {
+                    update('hoursPerDay', sanitizeNonNegativeInput(e.target.value))
+                    setAvailabilityErrors((prev) => ({ ...prev, hoursPerDay: '' }))
+                  }}
+                  onBlur={() =>
+                    setAvailabilityErrors((prev) => ({
+                      ...prev,
+                      hoursPerDay: hoursPerDayError(),
+                    }))
+                  }
+                  aria-invalid={availabilityErrors.hoursPerDay ? 'true' : undefined}
+                  className={inputClassName(!!availabilityErrors.hoursPerDay)}
                 />
+                <FieldError message={availabilityErrors.hoursPerDay} />
               </Field>
               <Field label="Monthly availability notes">
                 <textarea

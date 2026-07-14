@@ -1,5 +1,5 @@
 const { z } = require("zod");
-const { optionalNumber, requiredPhone, optionalPhone } = require("./zodHelpers");
+const { optionalNumber, optionalNonNegativeNumber, requiredPhone, optionalPhone } = require("./zodHelpers");
 
 const bankDetailsFields = {
   bankAccountHolder: z.string().optional(),
@@ -19,7 +19,7 @@ const updateServantMeSchema = z.object({
     offersSession: z.coerce.boolean().optional(),
     offersMonthly: z.coerce.boolean().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
-    hoursPerDay: optionalNumber(),
+    hoursPerDay: optionalNonNegativeNumber(),
     availabilityNotes: z.string().optional(),
     ...bankDetailsFields
   })
@@ -32,16 +32,16 @@ const createServantSchema = z.object({
     phone: requiredPhone,
     password: z.string().min(6),
     bio: z.string().optional(),
-    experience: optionalNumber(),
-    hourlyRate: optionalNumber(),
-    monthlyRate: optionalNumber(),
+    experience: optionalNonNegativeNumber(),
+    hourlyRate: optionalNonNegativeNumber(),
+    monthlyRate: optionalNonNegativeNumber(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
     offersSession: z.coerce.boolean().optional(),
     offersMonthly: z.coerce.boolean().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
-    hoursPerDay: optionalNumber(),
+    hoursPerDay: optionalNonNegativeNumber(),
     availabilityNotes: z.string().optional(),
     idProofType: z.string().optional(),
     skills: z.union([z.string(), z.array(z.string())]).optional(),
@@ -62,16 +62,16 @@ const updateServantSchema = z.object({
     latitude: z.coerce.number().min(-90).max(90).optional(),
     longitude: z.coerce.number().min(-180).max(180).optional(),
     bio: z.string().optional(),
-    experience: optionalNumber(),
-    hourlyRate: optionalNumber(),
-    monthlyRate: optionalNumber(),
+    experience: optionalNonNegativeNumber(),
+    hourlyRate: optionalNonNegativeNumber(),
+    monthlyRate: optionalNonNegativeNumber(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
     offersSession: z.coerce.boolean().optional(),
     offersMonthly: z.coerce.boolean().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
-    hoursPerDay: optionalNumber(),
+    hoursPerDay: optionalNonNegativeNumber(),
     availabilityNotes: z.string().optional(),
     idProofType: z.string().optional(),
     skills: z.union([z.string(), z.array(z.string())]).optional(),

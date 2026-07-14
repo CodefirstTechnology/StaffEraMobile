@@ -40,6 +40,9 @@ const optionalNumber = (schema = z.number()) =>
 const optionalInt = () => optionalNumber(z.number().int());
 const optionalPositiveInt = () => optionalNumber(z.number().int().positive());
 
+const optionalNonNegativeNumber = () =>
+  optionalNumber(z.number().min(0, "Must be 0 or greater"));
+
 module.exports = {
   emptyToUndefined,
   phoneDigitsOnly,
@@ -47,5 +50,6 @@ module.exports = {
   optionalPhone,
   optionalNumber,
   optionalInt,
-  optionalPositiveInt
+  optionalPositiveInt,
+  optionalNonNegativeNumber,
 };
