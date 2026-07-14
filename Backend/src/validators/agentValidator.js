@@ -13,7 +13,7 @@ const radiusKmField = z.coerce
 
 const updateAgentProfileSchema = z.object({
   body: z.object({
-    agencyName: z.preprocess(emptyToUndefined, z.string().optional()),
+    agencyName: clearableOptionalString,
     address: z.string().min(5, "Agency location address is required"),
     city: z.preprocess(emptyToUndefined, z.string().optional()),
     latitude: z.coerce.number().min(-90).max(90),
@@ -24,7 +24,7 @@ const updateAgentProfileSchema = z.object({
 
 const updateAgentSchema = z.object({
   body: z.object({
-    agencyName: z.preprocess(emptyToUndefined, z.string().optional()),
+    agencyName: clearableOptionalString,
     address: z.preprocess(emptyToUndefined, z.string().min(5).optional()),
     city: z.preprocess(emptyToUndefined, z.string().optional()),
     latitude: z.coerce.number().min(-90).max(90).optional(),

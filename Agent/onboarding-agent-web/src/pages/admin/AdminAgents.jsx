@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
 import { Button } from '../../components/ui/Button'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { AgentLocationPicker } from '../../components/AgentLocationPicker'
 import { LocationIcon } from '../../components/icons/LocationIcon'
@@ -43,20 +44,23 @@ const emptyEditFieldErrors = () => ({
   serviceRadiusKm: '',
 })
 
-function FormField({ label, required, error, hint, className = '', children }) {
+function FormField({ label, required, error, hint, className = '', htmlFor, children }) {
   return (
-    <label className={`block space-y-1.5 ${className}`.trim()}>
-      <span className="text-sm font-medium text-on-background">
+    <div className={`block space-y-1.5 ${className}`.trim()}>
+      <label
+        htmlFor={htmlFor}
+        className="block text-sm font-medium text-on-background"
+      >
         {label}
         {required ? <span className="text-error"> *</span> : null}
-      </span>
+      </label>
       {children}
       {error ? (
         <span className="text-xs font-medium text-error">{error}</span>
       ) : hint ? (
         <span className="text-xs text-on-surface-variant">{hint}</span>
       ) : null}
-    </label>
+    </div>
   )
 }
 
@@ -620,7 +624,7 @@ export default function AdminAgents() {
     try {
       const radius = Number(editForm.serviceRadiusKm)
       await api.patch(`/admin/agents/${editingAgent.id}`, {
-        agencyName: editForm.agencyName.trim() || undefined,
+        agencyName: editForm.agencyName.trim() || null,
         address: editForm.location.address,
         city: editForm.location.city,
         latitude: editForm.location.latitude,
@@ -774,7 +778,13 @@ export default function AdminAgents() {
       )}
 
       {showForm && (
-        <form key={createFormKey} onSubmit={createAgent} noValidate className="glass-card space-y-5 p-6">
+        <form
+          key={createFormKey}
+          onSubmit={createAgent}
+          noValidate
+          autoComplete="off"
+          className="glass-card space-y-5 p-6"
+        >
           <div>
             <h3 className="text-lg font-semibold text-primary">New field agent</h3>
             <p className="text-sm text-on-surface-variant">
@@ -799,9 +809,14 @@ export default function AdminAgents() {
                 aria-invalid={!!fieldErrors.name}
               />
             </FormField>
-            <FormField label="Email" required error={fieldErrors.email}>
+            <FormField label="Email" required error={fieldErrors.email} htmlFor="new-agent-email">
               <input
+                id="new-agent-email"
+                name="new-agent-email"
                 type="email"
+                autoComplete="off"
+                data-lpignore="true"
+                data-1p-ignore
                 className={fieldInputClass(!!fieldErrors.email)}
                 value={email}
                 onChange={(e) => {
@@ -1030,7 +1045,7 @@ export default function AdminAgents() {
             ) : null}
           </label>
 
-          <div className="flex items-center gap-2">
+          <div className="inline-flex w-fit max-w-full items-center gap-2">
             <input
               id="generate-agent-password"
               type="checkbox"
@@ -1038,21 +1053,30 @@ export default function AdminAgents() {
               onChange={(e) => {
                 setGeneratePassword(e.target.checked)
                 if (e.target.checked) {
+                  setPassword('')
                   setFieldErrors((prev) => ({ ...prev, password: '' }))
                 }
               }}
             />
-            <label htmlFor="generate-agent-password" className="text-sm cursor-pointer">
+            <label htmlFor="generate-agent-password" className="cursor-pointer text-sm">
               Auto-generate login password
             </label>
           </div>
           {!generatePassword && (
-            <FormField label="Login password" required error={fieldErrors.password}>
-              <input
-                type="password"
+            <FormField
+              label="Login password"
+              required
+              error={fieldErrors.password}
+              htmlFor="new-agent-password"
+            >
+              <PasswordInput
+                id="new-agent-password"
+                name="new-agent-password"
+                autoComplete="new-password"
                 placeholder="Min 6 characters"
-                className={`${fieldInputClass(!!fieldErrors.password)} max-w-sm`}
+                className={`${fieldInputClass(!!fieldErrors.password)} max-w-sm w-full`}
                 value={password}
+                invalid={!!fieldErrors.password}
                 onChange={(e) => {
                   const next = e.target.value
                   setPassword(next)

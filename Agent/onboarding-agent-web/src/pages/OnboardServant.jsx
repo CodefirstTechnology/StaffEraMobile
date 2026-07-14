@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
+import { PasswordInput } from '../components/ui/PasswordInput'
 import { SkillDropdown } from '../components/SkillDropdown'
 import { useSkills } from '../hooks/useSkills'
 import {
