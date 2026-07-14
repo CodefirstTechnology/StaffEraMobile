@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
+import { PasswordInput } from '../components/ui/PasswordInput'
 import { SkillDropdown } from '../components/SkillDropdown'
 import { useSkills } from '../hooks/useSkills'
 import {
@@ -365,30 +366,47 @@ export default function OnboardServant() {
           <h3 className="font-semibold">Personal Info</h3>
           {PERSONAL_FIELDS.map((f) => (
             <Field key={f.key} label={f.label} required>
-              <input
-                placeholder={f.placeholder}
-                value={form[f.key]}
-                onChange={(e) => {
-                  const val =
-                    f.key === 'phone' ? digitsOnlyPhone(e.target.value) : e.target.value
-                  update(f.key, val)
-                  clearPersonalError(f.key)
-                }}
-                onBlur={
-                  f.key === 'phone'
-                    ? () =>
-                        setPersonalErrors((prev) => ({
-                          ...prev,
-                          phone: validatePhoneRequired(form.phone),
-                        }))
-                    : undefined
-                }
-                type={f.type}
-                inputMode={f.key === 'phone' ? 'numeric' : undefined}
-                pattern={f.key === 'phone' ? '[0-9]*' : undefined}
-                aria-invalid={personalErrors[f.key] ? 'true' : undefined}
-                className={inputClassName(!!personalErrors[f.key])}
-              />
+              {f.key === 'password' ? (
+                <PasswordInput
+                  id="onboard-servant-password"
+                  name="onboard-servant-password"
+                  autoComplete="new-password"
+                  placeholder={f.placeholder}
+                  value={form[f.key]}
+                  invalid={!!personalErrors[f.key]}
+                  onChange={(e) => {
+                    update(f.key, e.target.value)
+                    clearPersonalError(f.key)
+                  }}
+                  aria-invalid={personalErrors[f.key] ? 'true' : undefined}
+                  className={inputClassName(!!personalErrors[f.key])}
+                />
+              ) : (
+                <input
+                  placeholder={f.placeholder}
+                  value={form[f.key]}
+                  onChange={(e) => {
+                    const val =
+                      f.key === 'phone' ? digitsOnlyPhone(e.target.value) : e.target.value
+                    update(f.key, val)
+                    clearPersonalError(f.key)
+                  }}
+                  onBlur={
+                    f.key === 'phone'
+                      ? () =>
+                          setPersonalErrors((prev) => ({
+                            ...prev,
+                            phone: validatePhoneRequired(form.phone),
+                          }))
+                      : undefined
+                  }
+                  type={f.type}
+                  inputMode={f.key === 'phone' ? 'numeric' : undefined}
+                  pattern={f.key === 'phone' ? '[0-9]*' : undefined}
+                  aria-invalid={personalErrors[f.key] ? 'true' : undefined}
+                  className={inputClassName(!!personalErrors[f.key])}
+                />
+              )}
               <FieldError message={personalErrors[f.key]} />
             </Field>
           ))}

@@ -4,6 +4,16 @@ const { optionalPhone } = require("./zodHelpers");
 const emptyToUndefined = (val) =>
   val === undefined || val === null || String(val).trim() === "" ? undefined : val;
 
+/** Preserves null so PATCH can clear optional string fields (e.g. agency name). */
+const clearableOptionalString = z.preprocess(
+  (val) => {
+    if (val === undefined) return undefined;
+    const trimmed = val === null ? "" : String(val).trim();
+    return trimmed === "" ? null : trimmed;
+  },
+  z.union([z.string(), z.null()]).optional()
+);
+
 const radiusKmField = z.coerce
   .number()
   .min(1, "Radius must be at least 1 km")
@@ -11,7 +21,7 @@ const radiusKmField = z.coerce
 
 const updateAgentProfileSchema = z.object({
   body: z.object({
-    agencyName: z.preprocess(emptyToUndefined, z.string().optional()),
+    agencyName: clearableOptionalString,
     address: z.string().min(5, "Agency location address is required"),
     city: z.preprocess(emptyToUndefined, z.string().optional()),
     latitude: z.coerce.number().min(-90).max(90),
@@ -22,7 +32,7 @@ const updateAgentProfileSchema = z.object({
 
 const updateAgentSchema = z.object({
   body: z.object({
-    agencyName: z.preprocess(emptyToUndefined, z.string().optional()),
+    agencyName: clearableOptionalString,
     address: z.preprocess(emptyToUndefined, z.string().min(5).optional()),
     city: z.preprocess(emptyToUndefined, z.string().optional()),
     latitude: z.coerce.number().min(-90).max(90).optional(),

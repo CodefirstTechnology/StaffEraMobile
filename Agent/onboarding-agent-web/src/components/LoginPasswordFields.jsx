@@ -1,4 +1,5 @@
 import { Button } from './ui/Button'
+import { PasswordInput } from './ui/PasswordInput'
 import { useToast } from '../context/ToastContext'
 import { copyText } from '../lib/copyToClipboard'
 import { generateServantPassword } from '../lib/generatePassword'
@@ -23,19 +24,20 @@ export function LoginPasswordFields({ email, password, onPasswordChange, hint, e
           <span className="font-medium text-primary">{email}</span>
         </p>
       ) : null}
-      <label className="block space-y-1.5">
+      <div className="block space-y-1.5">
         <span className="text-sm font-medium text-gray-700">Login password</span>
-        <input
-          type="text"
+        <PasswordInput
+          id="servant-login-password"
+          name="servant-login-password"
           autoComplete="new-password"
           value={password}
+          invalid={!!error}
           onChange={(e) => onPasswordChange(e.target.value)}
           placeholder="Min 6 characters"
-          aria-invalid={error ? 'true' : undefined}
           aria-describedby={error ? 'login-password-error' : undefined}
-          className={`w-full rounded-lg border px-3 py-2 ${error ? 'border-error' : ''}`}
+          className={`w-full rounded-lg border px-3 py-2${error ? ' border-error' : ''}`}
         />
-      </label>
+      </div>
       {error ? (
         <div
           id="login-password-error"

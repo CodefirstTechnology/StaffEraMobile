@@ -161,7 +161,7 @@ export default function AgentProfile() {
     setSaving(true)
     try {
       const res = await api.patch('/agent/profile', {
-        agencyName: agencyName.trim() || undefined,
+        agencyName: agencyName.trim() || null,
         address: location.address,
         city: location.city,
         latitude: location.latitude,
