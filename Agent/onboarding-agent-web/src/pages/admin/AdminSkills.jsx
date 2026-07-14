@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
 import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { useToast } from '../../context/ToastContext'
 import {
   PageHeader,
   StatCard,
@@ -104,6 +105,7 @@ function parseSortOrder(value) {
 
 export default function AdminSkills() {
   const qc = useQueryClient()
+  const toast = useToast()
   const [label, setLabel] = useState('')
   const [code, setCode] = useState('')
   const [sortOrder, setSortOrder] = useState('')
@@ -173,6 +175,7 @@ export default function AdminSkills() {
       resetForm()
       qc.invalidateQueries({ queryKey: ['admin-skills'] })
       qc.invalidateQueries({ queryKey: ['skills'] })
+      toast.success(`Skill "${label.trim()}" added`)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add skill')
     } finally {
@@ -181,9 +184,18 @@ export default function AdminSkills() {
   }
 
   const toggleActive = async (skill) => {
-    await api.patch(`/admin/skills/${skill.id}`, { isActive: !skill.isActive })
-    qc.invalidateQueries({ queryKey: ['admin-skills'] })
-    qc.invalidateQueries({ queryKey: ['skills'] })
+    try {
+      await api.patch(`/admin/skills/${skill.id}`, { isActive: !skill.isActive })
+      qc.invalidateQueries({ queryKey: ['admin-skills'] })
+      qc.invalidateQueries({ queryKey: ['skills'] })
+      toast.success(
+        skill.isActive
+          ? `Skill "${skill.label}" deactivated`
+          : `Skill "${skill.label}" activated`,
+      )
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update skill')
+    }
   }
 
   const removeSkill = async () => {
@@ -194,6 +206,7 @@ export default function AdminSkills() {
       await api.delete(`/admin/skills/${skillToRemove.id}`)
       qc.invalidateQueries({ queryKey: ['admin-skills'] })
       qc.invalidateQueries({ queryKey: ['skills'] })
+      toast.success(`Skill "${skillToRemove.label}" removed`)
       setSkillToRemove(null)
     } catch (err) {
       setRemoveError(err.response?.data?.message || 'Failed to remove skill')

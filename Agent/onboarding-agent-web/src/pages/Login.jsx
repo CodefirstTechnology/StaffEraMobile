@@ -5,9 +5,57 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../context/AuthContext'
 
+function emailMessage(value) {
+  const email = String(value ?? '').trim()
+  if (!email) return 'Email is required'
+  if (!email.includes('@')) return 'Email must include "@"'
+
+  const atCount = (email.match(/@/g) || []).length
+  if (atCount > 1) return 'Email must contain only one "@"'
+
+  const [local, domain = ''] = email.split('@')
+  if (!local) return 'Enter a name before "@"'
+  if (!domain) return 'Enter a domain after "@" (e.g. example.com)'
+  if (domain.startsWith('.') || domain.endsWith('.')) {
+    return 'Enter a valid domain after "@" (e.g. example.com)'
+  }
+  if (!domain.includes('.')) return 'Email must include a domain extension (e.g. ".com")'
+
+  const labels = domain.split('.')
+  if (labels.some((part) => !part)) {
+    return 'Enter a valid domain after "@" (e.g. example.com)'
+  }
+  const tld = labels[labels.length - 1]
+  if (!/^[a-zA-Z]{2,}$/.test(tld)) {
+    return 'Email must include a valid domain extension (e.g. ".com")'
+  }
+  if (/\s/.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return 'Enter a valid email address'
+  }
+  return null
+}
+
+function passwordMessage(value) {
+  const password = String(value ?? '')
+  if (!password) return 'Password is required'
+  if (password.trim().length === 0) return 'Password cannot contain only spaces'
+  if (password.length < 6) return 'Password must be at least 6 characters'
+  return null
+}
+
+function fieldClass(invalid, extra = '') {
+  return `input-ghost w-full${extra}${invalid ? ' is-invalid' : ''}`
+}
+
 const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().superRefine((value, ctx) => {
+    const message = emailMessage(value)
+    if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message })
+  }),
+  password: z.string().superRefine((value, ctx) => {
+    const message = passwordMessage(value)
+    if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message })
+  }),
 })
 
 export default function Login() {
@@ -24,13 +72,20 @@ export default function Login() {
   const {
     register,
     handleSubmit,
-    formState: { isSubmitting },
-  } = useForm({ resolver: zodResolver(schema) })
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(schema),
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
+  })
+
+  const emailInvalid = !!errors.email || !!error
+  const passwordInvalid = !!errors.password || !!error
 
   const onSubmit = async (data) => {
     setError('')
     try {
-      const user = await login(data.email, data.password)
+      const user = await login(data.email.trim(), data.password)
       if (!['AGENT', 'ADMIN'].includes(user.role)) {
         localStorage.clear()
         setError(
@@ -57,22 +112,40 @@ export default function Login() {
           Onboard and verify home staff. Trusted by families across India.
         </p>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-on-surface-variant ml-1">Email</label>
+            <label className="text-xs font-medium text-on-surface-variant ml-1" htmlFor="login-email">
+              Email
+            </label>
             <input
-              {...register('email')}
-              type="email"
-              className="input-ghost w-full mt-1"
+              id="login-email"
+              {...register('email', { onChange: () => setError('') })}
+              type="text"
+              inputMode="email"
+              autoComplete="email"
+              aria-invalid={emailInvalid}
+              aria-describedby={errors.email ? 'login-email-error' : undefined}
+              className={fieldClass(emailInvalid, ' mt-1')}
             />
+            {errors.email && (
+              <p id="login-email-error" className="text-xs font-medium text-error mt-1.5 ml-1">
+                {errors.email.message}
+              </p>
+            )}
           </div>
           <div>
-            <label className="text-xs font-medium text-on-surface-variant ml-1">Password</label>
+            <label className="text-xs font-medium text-on-surface-variant ml-1" htmlFor="login-password">
+              Password
+            </label>
             <div className="relative mt-1">
               <input
-                {...register('password')}
+                id="login-password"
+                {...register('password', { onChange: () => setError('') })}
                 type={showPassword ? 'text' : 'password'}
-                className="input-ghost w-full pr-11"
+                autoComplete="current-password"
+                aria-invalid={passwordInvalid}
+                aria-describedby={errors.password ? 'login-password-error' : undefined}
+                className={fieldClass(passwordInvalid, ' pr-11')}
               />
               <button
                 type="button"
@@ -94,6 +167,11 @@ export default function Login() {
                 )}
               </button>
             </div>
+            {errors.password && (
+              <p id="login-password-error" className="text-xs font-medium text-error mt-1.5 ml-1">
+                {errors.password.message}
+              </p>
+            )}
           </div>
           {error && <p className="text-sm text-error">{error}</p>}
           <button type="submit" disabled={isSubmitting} className="btn-gradient w-full py-3.5 mt-2">
