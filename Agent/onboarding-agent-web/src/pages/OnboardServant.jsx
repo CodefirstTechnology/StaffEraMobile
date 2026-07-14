@@ -732,7 +732,7 @@ export default function OnboardServant() {
           <Field label="ID proof document" required>
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
+              accept="image/jpeg,image/png,application/pdf"
               onChange={(e) => {
                 const file = e.target.files?.[0] || null
                 if (file) {
@@ -758,7 +758,7 @@ export default function OnboardServant() {
           <Field label="Profile photo" required>
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png"
               onChange={(e) => {
                 const file = e.target.files?.[0] || null
                 if (file) {

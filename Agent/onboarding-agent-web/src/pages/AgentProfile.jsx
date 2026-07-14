@@ -90,6 +90,7 @@ export default function AgentProfile() {
   const { user, logout, setUser } = useAuth()
   const navigate = useNavigate()
   const isAdmin = user?.role === 'ADMIN'
+  const MAX_RADIUS = Number(import.meta.env.VITE_MAX_SERVICE_RADIUS) || 50
   const [agencyName, setAgencyName] = useState('')
   const [location, setLocation] = useState(null)
   const [serviceRadiusKm, setServiceRadiusKm] = useState('3')
@@ -154,8 +155,8 @@ export default function AgentProfile() {
       return
     }
     const radius = Number(serviceRadiusKm)
-    if (!Number.isFinite(radius) || radius < 1 || radius > 100) {
-      setSettingsError('Service radius must be between 1 and 100 km.')
+    if (!Number.isFinite(radius) || radius < 1 || radius > MAX_RADIUS) {
+      setSettingsError(`Service radius must be between 1 and ${MAX_RADIUS} km.`)
       return
     }
     setSaving(true)
@@ -354,7 +355,7 @@ export default function AgentProfile() {
               <input
                 type="number"
                 min={1}
-                max={100}
+                max={MAX_RADIUS}
                 step={0.5}
                 className="w-full rounded-lg border px-3 py-2"
                 value={serviceRadiusKm}
