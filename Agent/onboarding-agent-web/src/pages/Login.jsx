@@ -6,32 +6,11 @@ import { z } from 'zod'
 import { useAuth } from '../context/AuthContext'
 import { checkPasswordStrength } from '../lib/generatePassword'
 
-function emailMessage(value) {
-  const email = String(value ?? '').trim()
-  if (!email) return 'Email is required'
-  if (!email.includes('@')) return 'Email must include "@"'
-
-  const atCount = (email.match(/@/g) || []).length
-  if (atCount > 1) return 'Email must contain only one "@"'
-
-  const [local, domain = ''] = email.split('@')
-  if (!local) return 'Enter a name before "@"'
-  if (!domain) return 'Enter a domain after "@" (e.g. example.com)'
-  if (domain.startsWith('.') || domain.endsWith('.')) {
-    return 'Enter a valid domain after "@" (e.g. example.com)'
-  }
-  if (!domain.includes('.')) return 'Email must include a domain extension (e.g. ".com")'
-
-  const labels = domain.split('.')
-  if (labels.some((part) => !part)) {
-    return 'Enter a valid domain after "@" (e.g. example.com)'
-  }
-  const tld = labels[labels.length - 1]
-  if (!/^[a-zA-Z]{2,}$/.test(tld)) {
-    return 'Email must include a valid domain extension (e.g. ".com")'
-  }
-  if (/\s/.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return 'Enter a valid email address'
+function usernameMessage(value) {
+  const username = String(value ?? '').trim()
+  if (!username) return 'Username is required'
+  if (/\s/.test(username) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)) {
+    return 'Enter a valid username (email address)'
   }
   return null
 }
@@ -50,7 +29,7 @@ function fieldClass(invalid, extra = '') {
 
 const schema = z.object({
   email: z.string().superRefine((value, ctx) => {
-    const message = emailMessage(value)
+    const message = usernameMessage(value)
     if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, message })
   }),
   password: z.string().superRefine((value, ctx) => {
@@ -100,7 +79,14 @@ export default function Login() {
       if (user.role === 'ADMIN') navigate('/admin')
       else navigate('/')
     } catch (e) {
-      setError(e.response?.data?.message || 'Login failed')
+      const msg = e.response?.data?.message || ''
+      if (msg.includes('email or password') || msg === 'Unauthorized' || msg === 'Login failed') {
+        setError('Invalid username or password. Please try again.')
+      } else if (msg.includes('Email and password are required')) {
+        setError('Username and password are required.')
+      } else {
+        setError(msg || 'Invalid username or password. Please try again.')
+      }
     }
   }
 
@@ -119,7 +105,7 @@ export default function Login() {
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
           <div>
             <label className="text-xs font-medium text-on-surface-variant ml-1" htmlFor="login-email">
-              Email
+              Username <span className="text-error">*</span>
             </label>
             <input
               id="login-email"
@@ -127,6 +113,7 @@ export default function Login() {
               type="text"
               inputMode="email"
               autoComplete="email"
+              placeholder="Enter your username"
               aria-invalid={emailInvalid}
               aria-describedby={errors.email ? 'login-email-error' : undefined}
               className={fieldClass(emailInvalid, ' mt-1')}
@@ -139,7 +126,7 @@ export default function Login() {
           </div>
           <div>
             <label className="text-xs font-medium text-on-surface-variant ml-1" htmlFor="login-password">
-              Password
+              Password <span className="text-error">*</span>
             </label>
             <div className="relative mt-1">
               <input
@@ -147,6 +134,7 @@ export default function Login() {
                 {...register('password', { onChange: () => setError('') })}
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
+                placeholder="Enter your password"
                 aria-invalid={passwordInvalid}
                 aria-describedby={errors.password ? 'login-password-error' : undefined}
                 className={fieldClass(passwordInvalid, ' pr-11')}
