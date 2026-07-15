@@ -1,4 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { API_BASE_URL } from '@/lib/apiConfig';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,6 +17,7 @@ import { translateVerification } from '@/lib/i18n';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { formatCurrency } from '@/lib/i18n/format';
 import { formatSkillLabel } from '@/lib/skills';
+import { GhostInput } from '@/components/ui/GhostInput';
 
 type Zone = { id: number; name: string; city?: string | null };
 type Skill = { skillName: string };
@@ -21,14 +25,22 @@ type Skill = { skillName: string };
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const { user, logout } = useAuthStore();
+  const hydrate = useAuthStore((s) => s.hydrate);
 
-  const { data: profile } = useQuery({
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: profile, refetch } = useQuery({
     queryKey: ['servant-profile'],
     queryFn: async () => {
       const res = await api.get('/servants/me');
       return res.data.data.servant as {
         verificationStatus: string;
         bio?: string | null;
+        profilePhoto?: string | null;
         rating?: number;
         totalRatings?: number;
         hourlyRate?: number | null;
@@ -41,14 +53,109 @@ export default function ProfileScreen() {
     },
   });
 
+  useEffect(() => {
+    if (profile?.user) {
+      setName(profile.user.name || '');
+      setEmail(profile.user.email || '');
+      setPhone(profile.user.phone || '');
+    }
+  }, [profile]);
+
+  const saveProfile = async () => {
+    if (!name.trim()) {
+      Alert.alert('Error', 'Name is required');
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      Alert.alert('Error', 'Valid email is required');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.patch('/servants/me', {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+      });
+      await refetch();
+      await hydrate();
+      setEditing(false);
+      Alert.alert(t('success.saved') || 'Success', 'Profile updated successfully');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      Alert.alert('Error', err.response?.data?.message || 'Could not update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need access to your photos to upload a profile picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > 3 * 1024 * 1024) {
+        Alert.alert('File Too Large', 'Please select an image that is 3MB or less.');
+        return;
+      }
+      await uploadImage(asset.uri);
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    setSaving(true);
+    try {
+      const filename = uri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+      const formData = new FormData();
+      formData.append('profilePhoto', {
+        uri,
+        name: filename,
+        type,
+      } as any);
+
+      await api.post('/servants/me/profile-photo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      await refetch();
+      await hydrate();
+      Alert.alert(t('success.saved') || 'Success', 'Profile photo updated successfully');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      Alert.alert('Error', err.response?.data?.message || 'Could not upload image');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const zones: Zone[] = profile?.zones || [];
   const skills = profile?.skills || [];
   const verification = profile?.verificationStatus || user?.servant?.verificationStatus || 'PENDING';
   const verifyStyle = StatusColors[verification] || StatusColors.PENDING;
   const displayName = profile?.user?.name || user?.name || t('verification.verifiedHelper');
-  const email = profile?.user?.email || user?.email;
-  const phone = profile?.user?.phone;
+  const userEmail = profile?.user?.email || user?.email;
+  const userPhone = profile?.user?.phone;
   const initial = displayName.trim()[0]?.toUpperCase() || '?';
+
+  const photoUrl = profile?.profilePhoto || user?.servant?.profilePhoto;
+  const backendBase = API_BASE_URL.replace('/api/v1', '');
+  const avatarSource = photoUrl ? { uri: photoUrl.startsWith('http') ? photoUrl : `${backendBase}${photoUrl}` } : null;
 
   const signOut = async () => {
     await logout();
@@ -57,55 +164,115 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Text style={styles.screenTitle}>{t('profile.title')}</Text>
-
-      <LinearGradient
-        colors={[Stitch.colors.primary, Stitch.colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <View style={styles.avatarWrap}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
-          {verification === 'VERIFIED' ? (
-            <View style={styles.verifiedBadge}>
-              <MaterialIcons name="verified" size={16} color="#1D9BF0" />
-            </View>
-          ) : null}
-        </View>
-
-        <Text style={styles.heroName} numberOfLines={2}>
-          {displayName}
-        </Text>
-        <Text style={styles.heroBrand}>{t('common.appNamePro')}</Text>
-
-        {verification === 'VERIFIED' ? (
-          <VerifiedBadge size="md" />
-        ) : (
-          <View style={[styles.verifyPill, { backgroundColor: verifyStyle.bg }]}>
-            <Text style={[styles.verifyText, { color: verifyStyle.text }]}>
-              {translateVerification(verification)}
-            </Text>
-          </View>
-        )}
-
-        {email ? (
-          <View style={styles.metaRow}>
-            <MaterialIcons name="mail-outline" size={16} color="rgba(255,255,255,0.85)" />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {email}
-            </Text>
-          </View>
+      <View style={styles.headerRow}>
+        <Text style={styles.screenTitle}>{t('profile.title')}</Text>
+        {!editing ? (
+          <TouchableOpacity style={styles.editIconBtn} onPress={() => setEditing(true)} hitSlop={8}>
+            <MaterialIcons name="edit" size={24} color={Stitch.colors.primary} />
+          </TouchableOpacity>
         ) : null}
-        {phone ? (
-          <View style={styles.metaRow}>
-            <MaterialIcons name="phone" size={16} color="rgba(255,255,255,0.85)" />
-            <Text style={styles.metaText}>{phone}</Text>
+      </View>
+
+      {editing ? (
+        <GlassCard style={styles.sectionCard}>
+          <Text style={styles.editTitle}>{t('profile.editDetails') || 'Edit Profile Details'}</Text>
+          <GhostInput
+            label={t('auth.fullName')}
+            value={name}
+            onChangeText={setName}
+            placeholder={t('auth.fullName')}
+          />
+          <GhostInput
+            label={t('auth.email')}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            placeholder={t('auth.email')}
+          />
+          <GhostInput
+            label={t('auth.mobile') || 'Mobile Number'}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            placeholder={t('auth.mobile') || 'Mobile Number'}
+          />
+          <View style={styles.editActions}>
+            <GradientButton
+              title={saving ? t('common.saving') : t('common.save') || 'Save'}
+              onPress={saveProfile}
+              loading={saving}
+              style={styles.saveBtn}
+            />
+            <GradientButton
+              title={t('common.cancel')}
+              variant="outline"
+              onPress={() => {
+                setEditing(false);
+                setName(profile?.user?.name || '');
+                setEmail(profile?.user?.email || '');
+                setPhone(profile?.user?.phone || '');
+              }}
+              style={styles.cancelBtn}
+            />
           </View>
-        ) : null}
-      </LinearGradient>
+        </GlassCard>
+      ) : (
+        <>
+          <LinearGradient
+            colors={[Stitch.colors.primary, Stitch.colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
+          >
+            <TouchableOpacity style={styles.avatarWrap} onPress={pickImage} activeOpacity={0.85}>
+              <View style={styles.avatar}>
+                {avatarSource ? (
+                  <Image source={avatarSource} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>{initial}</Text>
+                )}
+              </View>
+              <View style={styles.cameraIconBadge}>
+                <MaterialIcons name="photo-camera" size={12} color={Stitch.colors.primary} />
+              </View>
+              {verification === 'VERIFIED' ? (
+                <View style={styles.verifiedBadge}>
+                  <MaterialIcons name="verified" size={16} color="#1D9BF0" />
+                </View>
+              ) : null}
+            </TouchableOpacity>
+
+            <Text style={styles.heroName} numberOfLines={2}>
+              {displayName}
+            </Text>
+            <Text style={styles.heroBrand}>{t('common.appNamePro')}</Text>
+
+            {verification === 'VERIFIED' ? (
+              <VerifiedBadge size="md" />
+            ) : (
+              <View style={[styles.verifyPill, { backgroundColor: verifyStyle.bg }]}>
+                <Text style={[styles.verifyText, { color: verifyStyle.text }]}>
+                  {translateVerification(verification)}
+                </Text>
+              </View>
+            )}
+
+            {userEmail ? (
+              <View style={styles.metaRow}>
+                <MaterialIcons name="mail-outline" size={16} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {userEmail}
+                </Text>
+              </View>
+            ) : null}
+            {userPhone ? (
+              <View style={styles.metaRow}>
+                <MaterialIcons name="phone" size={16} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.metaText}>{userPhone}</Text>
+              </View>
+            ) : null}
+          </LinearGradient>
 
       {(profile?.rating != null ||
         profile?.hourlyRate != null ||
@@ -244,6 +411,8 @@ export default function ProfileScreen() {
       </GlassCard>
 
       <GradientButton title={t('auth.signOut')} variant="outline" onPress={signOut} style={styles.signOutBtn} />
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -375,4 +544,48 @@ const styles = StyleSheet.create({
   zoneBtnTitle: { fontSize: 15, fontWeight: '700', color: Stitch.colors.onBackground },
   zoneBtnSub: { fontSize: 12, color: Stitch.colors.onSurfaceVariant, marginTop: 2 },
   signOutBtn: { marginTop: 8 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Stitch.spacing.gutter,
+  },
+  editIconBtn: {
+    padding: 4,
+  },
+  editTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+    marginBottom: 16,
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  saveBtn: {
+    flex: 1,
+  },
+  cancelBtn: {
+    flex: 1,
+  },
+  cameraIconBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: -4,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Stitch.colors.primary,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
+  },
 });

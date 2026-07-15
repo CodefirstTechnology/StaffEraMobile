@@ -12,6 +12,9 @@ const bankDetailsFields = {
 const updateServantMeSchema = z.object({
   body: z.object({
     bio: z.string().max(500, "Bio cannot exceed 500 characters").optional(),
+    name: z.string().min(2).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
     profilePhoto: z.string().optional(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),

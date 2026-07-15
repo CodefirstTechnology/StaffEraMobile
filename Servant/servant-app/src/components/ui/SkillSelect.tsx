@@ -39,7 +39,13 @@ export function SkillSelect({ label, placeholder, skills, loading, value, onChan
     value.length === 0
       ? placeholder
       : value
-          .map((code) => skills.find((s) => s.code === code)?.label || code.replace(/_/g, ' '))
+          .map((code) => {
+            const translationKey = `skills.${code}`;
+            const translated = t(translationKey);
+            return translated !== translationKey
+              ? translated
+              : (skills.find((s) => s.code === code)?.label || code.replace(/_/g, ' '));
+          })
           .join(', ');
 
   return (
@@ -66,7 +72,11 @@ export function SkillSelect({ label, placeholder, skills, loading, value, onChan
       {value.length > 0 ? (
         <View style={styles.chips}>
           {value.map((code) => {
-            const itemLabel = skills.find((s) => s.code === code)?.label || code;
+            const translationKey = `skills.${code}`;
+            const translated = t(translationKey);
+            const itemLabel = translated !== translationKey
+              ? translated
+              : (skills.find((s) => s.code === code)?.label || code);
             return (
               <Pressable key={code} style={styles.chip} onPress={() => remove(code)}>
                 <Text style={styles.chipText}>{itemLabel}</Text>
@@ -87,13 +97,16 @@ export function SkillSelect({ label, placeholder, skills, loading, value, onChan
             keyExtractor={(item) => item.code}
             renderItem={({ item }) => {
               const selected = value.includes(item.code);
+              const translationKey = `skills.${item.code}`;
+              const translated = t(translationKey);
+              const itemLabel = translated !== translationKey ? translated : item.label;
               return (
                 <Pressable
                   style={[styles.option, selected && styles.optionOn]}
                   onPress={() => toggle(item.code)}
                 >
                   <Text style={[styles.optionText, selected && styles.optionTextOn]}>
-                    {item.label}
+                    {itemLabel}
                   </Text>
                   {selected ? <Text style={styles.check}>✓</Text> : null}
                 </Pressable>

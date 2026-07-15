@@ -11,7 +11,7 @@ type User = {
   email: string;
   role: string;
   preferredLanguage?: string;
-  servant?: { id: number; verificationStatus: string };
+  servant?: { id: number; verificationStatus: string; profilePhoto?: string | null };
 };
 
 type AuthState = {

@@ -81,11 +81,11 @@ export default function RegisterScreen() {
   };
 
   const fields = [
-    { key: 'name' as const, label: t('auth.fullName'), secure: false },
-    { key: 'email' as const, label: t('auth.email'), secure: false },
+    { key: 'name' as const, label: t('auth.fullName'), secure: false, required: true },
+    { key: 'email' as const, label: t('auth.email'), secure: false, required: true },
     { key: 'phone' as const, label: t('auth.phone'), secure: false, keyboard: 'phone-pad' as const },
-    { key: 'password' as const, label: t('auth.password'), secure: true },
-    { key: 'confirmPassword' as const, label: t('auth.confirmPassword'), secure: true },
+    { key: 'password' as const, label: t('auth.password'), secure: true, required: true },
+    { key: 'confirmPassword' as const, label: t('auth.confirmPassword'), secure: true, required: true },
   ];
 
   return (
@@ -114,6 +114,7 @@ export default function RegisterScreen() {
                 }
               : undefined
           }
+          required={f.required}
         />
       ))}
 

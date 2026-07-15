@@ -59,7 +59,7 @@
     "trustedSubtitle": "Trusted home help for your family",
     "trustLine": "Verified helpers · Secure payments · Support in English & Hindi",
     "safeData": "Your home details stay private and encrypted.",
-    "email": "Email",
+    "email": "Username",
     "password": "Password",
     "signIn": "Sign in",
     "signOut": "Sign out",
@@ -109,12 +109,13 @@
     "registrationSuccess": "Registration complete",
     "registrationPending": "Your application is pending. An agent will contact you.",
     "noSelfSignup": "No self-signup. Your agent creates your account and verifies your ID.",
-    "invalidCredentials": "Invalid email or password. Use the email and password your agent set when onboarding you.",
+    "invalidCredentials": "Invalid username or password. Please try again.",
     "networkLocalhost": "Cannot reach the server. On a real phone, set EXPO_PUBLIC_API_BASE_URL in .env to your PC IP (run ipconfig), then restart: npx expo start -c",
     "networkGeneric": "Cannot reach {{base}}\n\n• Backend running? (npm start in Backend)\n• Phone on same Wi‑Fi as PC (not mobile data)\n• Windows Firewall: allow Node/port 5000\n• Restart app after .env change: npx expo start -c"
   },
   "validation": {
-    "emailInvalid": "Enter a valid email",
+    "emailInvalid": "Enter a valid username (email address)",
+    "usernameRequired": "Username required",
     "passwordRequired": "Password required",
     "nameMin": "Name must be at least 2 characters",
     "mobileRequired": "Mobile number is required",
@@ -320,7 +321,11 @@
     "ELDERLY_CARE": "Elderly care",
     "GARDENING": "Gardening",
     "CHOPPING": "Chopping helper",
-    "HELPING": "Helping"
+    "HELPING": "Helping",
+    "MOPPING": "Mopping",
+    "IRON_AND_FOLD": "Iron & Fold",
+    "CARRING": "Caring",
+    "CARING": "Caring"
   },
   "timeSlots": {
     "range": "{{start}} to {{end}}"

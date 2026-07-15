@@ -157,13 +157,46 @@ exports.updateMyProfile = async (req, res) => {
     bankAccountNumber,
     bankName,
     bankIfsc,
-    bankUpiId
+    bankUpiId,
+    name,
+    email,
+    phone
   } = req.body;
 
   const servant = await prisma.servant.findUnique({
     where: { userId: req.user.id }
   });
   if (!servant) throw new ApiError(404, "Servant profile not found");
+
+  if (name !== undefined || email !== undefined || phone !== undefined) {
+    if (email) {
+      const normalizedEmail = email.trim().toLowerCase();
+      const existingEmail = await prisma.user.findFirst({
+        where: { email: normalizedEmail, NOT: { id: req.user.id } }
+      });
+      if (existingEmail) {
+        throw new ApiError(400, "Email is already in use");
+      }
+    }
+    if (phone) {
+      const normalizedPhone = phone.trim();
+      const existingPhone = await prisma.user.findFirst({
+        where: { phone: normalizedPhone, NOT: { id: req.user.id } }
+      });
+      if (existingPhone) {
+        throw new ApiError(400, "Phone number is already in use");
+      }
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        ...(name !== undefined && { name: name.trim() }),
+        ...(email !== undefined && { email: email.trim().toLowerCase() }),
+        ...(phone !== undefined && { phone: phone.trim() })
+      }
+    });
+  }
 
   const updated = await prisma.servant.update({
     where: { id: servant.id },
@@ -251,4 +284,34 @@ exports.getMyTimeEntries = async (req, res) => {
   ]);
 
   sendSuccess(res, { entries, pagination: { page, limit, total } });
+};
+
+exports.uploadProfilePhoto = async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "Please upload an image file");
+  }
+
+  if (req.file.size > 3 * 1024 * 1024) {
+    try {
+      require("fs").unlinkSync(req.file.path);
+    } catch (err) {
+      // ignore
+    }
+    throw new ApiError(400, "Profile photo size must be 3MB or less");
+  }
+
+  const servant = await prisma.servant.findUnique({
+    where: { userId: req.user.id }
+  });
+  if (!servant) throw new ApiError(404, "Servant profile not found");
+
+  const profilePhoto = `/uploads/${req.file.filename}`;
+
+  const updated = await prisma.servant.update({
+    where: { id: servant.id },
+    data: { profilePhoto },
+    include: servantInclude
+  });
+
+  sendSuccess(res, { servant: updated, profilePhoto });
 };

@@ -54,38 +54,68 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState('');
-  const [phoneError, setPhoneError] = useState('');
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    phone?: string;
+    skills?: string;
+    addressText?: string;
+    city?: string;
+  }>({});
+  const [formError, setFormError] = useState('');
 
   const validatePhoneField = (value: string) => {
     const kind = getPhoneValidationKind(value, { required: true });
     const msg = phoneErrorMessage(kind, t);
-    setPhoneError(msg);
+    setErrors((prev) => ({ ...prev, phone: msg || undefined }));
     return !kind;
   };
 
-  const validate = (): string | null => {
+  const validate = (): boolean => {
+    const newErrors: typeof errors = {};
+
     const name = form.name.trim();
-    if (name.length < 2) return t('validation.nameMin');
-    const email = form.email.trim().toLowerCase();
-    if (!email.includes('@') || !email.includes('.')) return t('validation.emailInvalid');
+    if (!name) {
+      newErrors.name = t('validation.nameMin') || 'Full name is required';
+    } else if (name.length < 2) {
+      newErrors.name = t('validation.nameMin') || 'Name must be at least 2 characters';
+    }
+
+    const email = form.email.trim();
+    if (!email) {
+      newErrors.email = t('validation.usernameRequired') || 'Username required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = t('validation.emailInvalid') || 'Enter a valid username (email address)';
+    }
+
     const phoneKind = getPhoneValidationKind(form.phone, { required: true });
     if (phoneKind) {
-      setPhoneError(phoneErrorMessage(phoneKind, t));
-      return 'phone';
+      newErrors.phone = phoneErrorMessage(phoneKind, t);
     }
-    setPhoneError('');
-    if (skillsLoading) return t('auth.skillsLoading');
-    if (form.skills.length === 0) return t('auth.skillRequired');
+
+    if (skillsError || skills.length === 0) {
+      newErrors.skills = t('auth.skillsUnavailable') || 'Skills could not be loaded';
+    } else if (form.skills.length === 0) {
+      newErrors.skills = t('auth.skillRequired') || 'Please select at least one skill';
+    }
+
     const address = homeLocation?.address?.trim() || form.addressText.trim();
-    if (address.length < 5) return t('auth.addressRequired');
-    if (skillsError || skills.length === 0) return t('auth.skillsUnavailable');
-    return null;
+    if (!address) {
+      newErrors.addressText = t('auth.addressRequired') || 'Address is required';
+    } else if (address.length < 5) {
+      newErrors.addressText = 'Address must be at least 5 characters';
+    }
+
+    if (!homeLocation && !form.city.trim()) {
+      newErrors.city = 'City is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const submit = async () => {
-    const err = validate();
-    if (err) {
-      if (err !== 'phone') Alert.alert(t('auth.registrationFailed'), err);
+    if (!validate()) {
       return;
     }
 
@@ -93,6 +123,7 @@ export default function RegisterScreen() {
     const phone = digitsOnlyPhone(form.phone);
 
     setLoading(true);
+    setFormError('');
     try {
       const email = form.email.trim().toLowerCase();
       await submitApplication({
@@ -108,16 +139,28 @@ export default function RegisterScreen() {
       setSubmittedEmail(email);
       setSubmitted(true);
     } catch (e: unknown) {
-      Alert.alert(t('auth.registrationFailed'), getApiErrorMessage(e, 'auth.tryAgain'));
+      const errorMsg = getApiErrorMessage(e, 'auth.tryAgain');
+      if (
+        errorMsg.includes('already active') ||
+        errorMsg.includes('already registered') ||
+        errorMsg.includes('already exists')
+      ) {
+        setErrors((prev) => ({
+          ...prev,
+          email: 'This email is already registered.',
+        }));
+      } else {
+        setFormError(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const fields = [
-    { key: 'name' as const, label: t('auth.fullName') },
-    { key: 'email' as const, label: t('auth.email') },
-    { key: 'phone' as const, label: t('auth.mobile'), keyboard: 'phone-pad' as const },
+    { key: 'name' as const, label: t('auth.fullName'), required: true },
+    { key: 'email' as const, label: t('auth.email'), required: true },
+    { key: 'phone' as const, label: t('auth.mobile'), keyboard: 'phone-pad' as const, required: true },
   ];
 
   return (
@@ -157,11 +200,13 @@ export default function RegisterScreen() {
                 {...('keyboard' in f ? { keyboardType: f.keyboard } : {})}
                 autoCapitalize={f.key === 'email' ? 'none' : 'words'}
                 value={form[f.key]}
-                error={f.key === 'phone' ? phoneError : undefined}
+                error={errors[f.key]}
+                required={f.required}
                 onChangeText={(v) => {
                   const next = f.key === 'phone' ? digitsOnlyPhone(v) : v;
                   setForm((prev) => ({ ...prev, [f.key]: next }));
-                  if (f.key === 'phone') setPhoneError('');
+                  if (errors[f.key]) setErrors((prev) => ({ ...prev, [f.key]: undefined }));
+                  if (formError) setFormError('');
                 }}
                 onBlur={
                   f.key === 'phone'
@@ -179,8 +224,13 @@ export default function RegisterScreen() {
               skills={skills}
               loading={skillsLoading}
               value={form.skills}
-              onChange={(skillsSelected) => setForm((prev) => ({ ...prev, skills: skillsSelected }))}
+              onChange={(skillsSelected) => {
+                setForm((prev) => ({ ...prev, skills: skillsSelected }));
+                if (errors.skills) setErrors((prev) => ({ ...prev, skills: undefined }));
+                if (formError) setFormError('');
+              }}
             />
+            {errors.skills ? <Text style={styles.inlineError}>{errors.skills}</Text> : null}
             {skillsError && !skillsLoading ? (
               <Pressable onPress={() => refetchSkills()}>
                 <Text style={styles.skillsError}>
@@ -200,6 +250,8 @@ export default function RegisterScreen() {
                   addressText: location.address,
                   city: location.city || prev.city,
                 }));
+                if (errors.addressText) setErrors((prev) => ({ ...prev, addressText: undefined }));
+                if (formError) setFormError('');
               }}
             />
 
@@ -207,18 +259,32 @@ export default function RegisterScreen() {
               label={t('auth.addressManual')}
               placeholder={t('auth.addressManualPlaceholder')}
               value={form.addressText}
-              onChangeText={(v) => setForm((prev) => ({ ...prev, addressText: v }))}
+              onChangeText={(v) => {
+                setForm((prev) => ({ ...prev, addressText: v }));
+                if (errors.addressText) setErrors((prev) => ({ ...prev, addressText: undefined }));
+                if (formError) setFormError('');
+              }}
+              error={errors.addressText}
               multiline
               style={styles.addressInput}
+              required
             />
 
             {!homeLocation ? (
               <GhostInput
                 label={t('auth.cityIfNoLocation')}
                 value={form.city}
-                onChangeText={(v) => setForm((prev) => ({ ...prev, city: v }))}
+                onChangeText={(v) => {
+                  setForm((prev) => ({ ...prev, city: v }));
+                  if (errors.city) setErrors((prev) => ({ ...prev, city: undefined }));
+                  if (formError) setFormError('');
+                }}
+                error={errors.city}
+                required
               />
             ) : null}
+
+            {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
             <GradientButton title={t('auth.register')} onPress={submit} loading={loading} />
 
@@ -244,6 +310,22 @@ const styles = StyleSheet.create({
     color: Stitch.colors.error,
     marginTop: -8,
     marginBottom: Stitch.spacing.gutter,
+    textAlign: 'center',
+  },
+  inlineError: {
+    fontSize: 12,
+    color: Stitch.colors.error,
+    marginTop: -8,
+    marginBottom: Stitch.spacing.gutter,
+    marginLeft: 4,
+  },
+  formError: {
+    color: Stitch.colors.error,
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 8,
+    marginBottom: 16,
+    marginLeft: 4,
     textAlign: 'center',
   },
   successCard: {

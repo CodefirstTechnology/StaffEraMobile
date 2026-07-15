@@ -59,7 +59,7 @@
     "trustedSubtitle": "आपके परिवार के लिए विश्वसनीय घरेलू सहायता",
     "trustLine": "सत्यापित सहायक · सुरक्षित भुगतान · हिंदी और अंग्रेज़ी सहायता",
     "safeData": "आपके घर का विवरण निजी और एन्क्रिप्टेड रहता है।",
-    "email": "ईमेल",
+    "email": "यूज़रनेम",
     "password": "पासवर्ड",
     "signIn": "साइन इन",
     "signOut": "साइन आउट",
@@ -108,19 +108,20 @@
     "registrationSuccess": "पंजीकरण पूर्ण",
     "registrationPending": "प्रोफ़ाइल सत्यापन के लिए लंबित है। एजेंट समीक्षा के दौरान ऐप देख सकते हैं।",
     "noSelfSignup": "स्व-पंजीकरण नहीं। एजेंट आपका खाता बनाता और ID सत्यापित करता है।",
-    "invalidCredentials": "अमान्य ईमेल या पासवर्ड। ऑनबोर्डिंग पर सेट क्रेडेंशियल उपयोग करें।",
+    "invalidCredentials": "अमान्य यूज़रनेम या पासवर्ड। कृपया पुनः प्रयास करें।",
     "networkLocalhost": "सर्वर तक नहीं पहुँच। फ़ोन पर .env में PC का IP सेट करें (ipconfig), फिर: npx expo start -c",
     "networkGeneric": "{{base}} तक नहीं पहुँच\n\n• Backend चल रहा है?\n• फ़ोन और PC एक Wi‑Fi पर\n• Firewall: पोर्ट 5000\n• .env बदलने के बाद ऐप रीस्टार्ट",
     "wrongRoleServant": "This account is not a servant. Use the House Owner or Agent app."
   },
   "validation": {
-    "emailInvalid": "मान्य ईमेल दर्ज करें",
+    "emailInvalid": "मान्य यूज़रनेम (ईमेल पता) दर्ज करें",
     "passwordRequired": "पासवर्ड आवश्यक",
     "nameMin": "नाम कम से कम 2 अक्षर",
     "mobileRequired": "मोबाइल नंबर आवश्यक है",
     "passwordMin": "पासवर्ड कम से कम 6 अक्षर",
     "locationRequired": "स्थान आवश्यक",
-    "pickHomeFirst": "पहले घर का स्थान चुनें।"
+    "pickHomeFirst": "पहले घर का स्थान चुनें।",
+    "usernameRequired": "यूज़रनेम आवश्यक"
   },
   "errors": {
     "generic": "कुछ गलत हो गया",
@@ -484,8 +485,12 @@
     "LAUNDRY": "कपड़े धोना",
     "ELDERLY_CARE": "बुजुर्गों की देखभाल",
     "GARDENING": "बागवानी",
-    "CHOPPING": "काट-छाँट सहायक",
-    "HELPING": "सहायता"
+    "CHOPPING": "सब्जी काटना",
+    "HELPING": "मदद करना",
+    "MOPPING": "पोछा लगाना",
+    "IRON_AND_FOLD": "इस्त्री और तह",
+    "CARRING": "देखभाल करना",
+    "CARING": "देखभाल करना"
   },
   "timeSlots": {
     "range": "{{start}} से {{end}}"
