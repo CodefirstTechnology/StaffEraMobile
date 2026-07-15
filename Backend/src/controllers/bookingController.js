@@ -307,7 +307,9 @@ exports.listOpenRequests = async (req, res) => {
   const requests = openBookings.filter(
     (booking) =>
       servantCoversLocation(servant, booking.latitude, booking.longitude) &&
-      bookingMatchesServantSkill(booking, servant)
+      bookingMatchesServantSkill(booking, servant) &&
+      ((booking.bookingType === "SESSION" && servant.offersSession) ||
+       (booking.bookingType === "MONTHLY" && servant.offersMonthly))
   );
 
   sendSuccess(res, { requests });

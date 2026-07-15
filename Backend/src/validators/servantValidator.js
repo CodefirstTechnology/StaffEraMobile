@@ -1,5 +1,5 @@
 const { z } = require("zod");
-const { optionalNumber, optionalNonNegativeNumber, requiredPhone, optionalPhone } = require("./zodHelpers");
+const { optionalNumber, optionalNonNegativeNumber, optionalRateNumber, requiredPhone, optionalPhone, strictEmail, booleanString } = require("./zodHelpers");
 
 const bankDetailsFields = {
   bankAccountHolder: z.string().optional(),
@@ -11,16 +11,16 @@ const bankDetailsFields = {
 
 const updateServantMeSchema = z.object({
   body: z.object({
-    bio: z.string().optional(),
+    bio: z.string().max(500, "Bio cannot exceed 500 characters").optional(),
     profilePhoto: z.string().optional(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
-    offersSession: z.coerce.boolean().optional(),
-    offersMonthly: z.coerce.boolean().optional(),
+    offersSession: booleanString().optional(),
+    offersMonthly: booleanString().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
     hoursPerDay: optionalNonNegativeNumber(),
-    availabilityNotes: z.string().optional(),
+    availabilityNotes: z.string().max(500, "Availability notes cannot exceed 500 characters").optional(),
     ...bankDetailsFields
   })
 });
@@ -28,24 +28,24 @@ const updateServantMeSchema = z.object({
 const createServantSchema = z.object({
   body: z.object({
     name: z.string().min(2),
-    email: z.string().email(),
+    email: strictEmail(),
     phone: requiredPhone,
     password: z.string().min(6),
-    bio: z.string().optional(),
-    experience: optionalNonNegativeNumber(),
-    hourlyRate: optionalNonNegativeNumber(),
-    monthlyRate: optionalNonNegativeNumber(),
+    bio: z.string().max(500, "Bio cannot exceed 500 characters").optional(),
+    experience: optionalRateNumber(),
+    hourlyRate: optionalRateNumber(),
+    monthlyRate: optionalRateNumber(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
-    offersSession: z.coerce.boolean().optional(),
-    offersMonthly: z.coerce.boolean().optional(),
+    offersSession: booleanString().optional(),
+    offersMonthly: booleanString().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
     hoursPerDay: optionalNonNegativeNumber(),
-    availabilityNotes: z.string().optional(),
+    availabilityNotes: z.string().max(500, "Availability notes cannot exceed 500 characters").optional(),
     idProofType: z.string().optional(),
     skills: z.union([z.string(), z.array(z.string())]).optional(),
-    address: z.string().optional(),
+    address: z.string().max(500, "Address cannot exceed 500 characters").optional(),
     city: z.string().optional(),
     latitude: z.coerce.number().min(-90).max(90).optional(),
     longitude: z.coerce.number().min(-180).max(180).optional(),
@@ -57,22 +57,22 @@ const updateServantSchema = z.object({
   body: z.object({
     name: z.string().min(2).optional(),
     phone: optionalPhone,
-    address: z.string().optional(),
+    address: z.string().max(500, "Address cannot exceed 500 characters").optional(),
     city: z.string().optional(),
     latitude: z.coerce.number().min(-90).max(90).optional(),
     longitude: z.coerce.number().min(-180).max(180).optional(),
-    bio: z.string().optional(),
-    experience: optionalNonNegativeNumber(),
-    hourlyRate: optionalNonNegativeNumber(),
-    monthlyRate: optionalNonNegativeNumber(),
+    bio: z.string().max(500, "Bio cannot exceed 500 characters").optional(),
+    experience: optionalRateNumber(),
+    hourlyRate: optionalRateNumber(),
+    monthlyRate: optionalRateNumber(),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
-    offersSession: z.coerce.boolean().optional(),
-    offersMonthly: z.coerce.boolean().optional(),
+    offersSession: booleanString().optional(),
+    offersMonthly: booleanString().optional(),
     weekOffDays: z.union([z.string(), z.array(z.string())]).optional(),
     hoursPerDay: optionalNonNegativeNumber(),
-    availabilityNotes: z.string().optional(),
+    availabilityNotes: z.string().max(500, "Availability notes cannot exceed 500 characters").optional(),
     idProofType: z.string().optional(),
     skills: z.union([z.string(), z.array(z.string())]).optional(),
     ...bankDetailsFields

@@ -43,6 +43,34 @@ const optionalPositiveInt = () => optionalNumber(z.number().int().positive());
 const optionalNonNegativeNumber = () =>
   optionalNumber(z.number().min(0, "Must be 0 or greater"));
 
+const optionalRateNumber = () =>
+  optionalNumber(
+    z.number()
+      .min(0, "Must be 0 or greater")
+      .refine(
+        (val) => {
+          const str = String(val);
+          const parts = str.split(".");
+          return parts.length <= 1 || parts[1].length <= 2;
+        },
+        { message: "Rate cannot have more than 2 decimal places" }
+      )
+  );
+
+const booleanString = () => z.preprocess(
+  (v) => {
+    if (v === undefined || v === null) return undefined;
+    if (v === true || v === false) return v;
+    return String(v).toLowerCase() === "true";
+  },
+  z.boolean()
+);
+
+const STRICT_EMAIL_REGEX = /^[a-zA-Z0-9]+([._-]?[a-zA-Z0-9]+)*@[a-zA-Z0-9]+([.-]?[a-zA-Z0-9]+)*\.[a-zA-Z]{2,}$/;
+
+const strictEmail = (msg = "Invalid email address") =>
+  z.string().regex(STRICT_EMAIL_REGEX, msg);
+
 module.exports = {
   emptyToUndefined,
   phoneDigitsOnly,
@@ -52,4 +80,7 @@ module.exports = {
   optionalInt,
   optionalPositiveInt,
   optionalNonNegativeNumber,
+  optionalRateNumber,
+  booleanString,
+  strictEmail,
 };
