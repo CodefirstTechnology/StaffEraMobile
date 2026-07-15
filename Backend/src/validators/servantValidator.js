@@ -11,6 +11,9 @@ const bankDetailsFields = {
 
 const updateServantMeSchema = z.object({
   body: z.object({
+    name: z.string().min(2).optional(),
+    email: z.string().email().optional(),
+    phone: z.string().optional(),
     bio: z.string().optional(),
     profilePhoto: z.string().optional(),
     availableFrom: z.string().optional(),

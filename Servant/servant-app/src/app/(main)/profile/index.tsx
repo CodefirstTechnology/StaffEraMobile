@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,6 +15,7 @@ import { translateVerification } from '@/lib/i18n';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { formatCurrency } from '@/lib/i18n/format';
 import { formatSkillLabel } from '@/lib/skills';
+import { GhostInput } from '@/components/ui/GhostInput';
 
 type Zone = { id: number; name: string; city?: string | null };
 type Skill = { skillName: string };
@@ -21,8 +23,15 @@ type Skill = { skillName: string };
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const { user, logout } = useAuthStore();
+  const hydrate = useAuthStore((s) => s.hydrate);
 
-  const { data: profile } = useQuery({
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const { data: profile, refetch } = useQuery({
     queryKey: ['servant-profile'],
     queryFn: async () => {
       const res = await api.get('/servants/me');
@@ -41,13 +50,49 @@ export default function ProfileScreen() {
     },
   });
 
+  useEffect(() => {
+    if (profile?.user) {
+      setName(profile.user.name || '');
+      setEmail(profile.user.email || '');
+      setPhone(profile.user.phone || '');
+    }
+  }, [profile]);
+
+  const saveProfile = async () => {
+    if (!name.trim()) {
+      Alert.alert('Error', 'Name is required');
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      Alert.alert('Error', 'Valid email is required');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.patch('/servants/me', {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+      });
+      await refetch();
+      await hydrate();
+      setEditing(false);
+      Alert.alert(t('success.saved') || 'Success', 'Profile updated successfully');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      Alert.alert('Error', err.response?.data?.message || 'Could not update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const zones: Zone[] = profile?.zones || [];
   const skills = profile?.skills || [];
   const verification = profile?.verificationStatus || user?.servant?.verificationStatus || 'PENDING';
   const verifyStyle = StatusColors[verification] || StatusColors.PENDING;
   const displayName = profile?.user?.name || user?.name || t('verification.verifiedHelper');
-  const email = profile?.user?.email || user?.email;
-  const phone = profile?.user?.phone;
+  const userEmail = profile?.user?.email || user?.email;
+  const userPhone = profile?.user?.phone;
   const initial = displayName.trim()[0]?.toUpperCase() || '?';
 
   const signOut = async () => {
@@ -57,55 +102,108 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Text style={styles.screenTitle}>{t('profile.title')}</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.screenTitle}>{t('profile.title')}</Text>
+        {!editing ? (
+          <TouchableOpacity style={styles.editIconBtn} onPress={() => setEditing(true)} hitSlop={8}>
+            <MaterialIcons name="edit" size={24} color={Stitch.colors.primary} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
-      <LinearGradient
-        colors={[Stitch.colors.primary, Stitch.colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <View style={styles.avatarWrap}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
+      {editing ? (
+        <GlassCard style={styles.sectionCard}>
+          <Text style={styles.editTitle}>{t('profile.editDetails') || 'Edit Profile Details'}</Text>
+          <GhostInput
+            label={t('auth.fullName')}
+            value={name}
+            onChangeText={setName}
+            placeholder={t('auth.fullName')}
+          />
+          <GhostInput
+            label={t('auth.email')}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            placeholder={t('auth.email')}
+          />
+          <GhostInput
+            label={t('auth.mobile') || 'Mobile Number'}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            placeholder={t('auth.mobile') || 'Mobile Number'}
+          />
+          <View style={styles.editActions}>
+            <GradientButton
+              title={saving ? t('common.saving') : t('common.save') || 'Save'}
+              onPress={saveProfile}
+              loading={saving}
+              style={styles.saveBtn}
+            />
+            <GradientButton
+              title={t('common.cancel')}
+              variant="outline"
+              onPress={() => {
+                setEditing(false);
+                setName(profile?.user?.name || '');
+                setEmail(profile?.user?.email || '');
+                setPhone(profile?.user?.phone || '');
+              }}
+              style={styles.cancelBtn}
+            />
           </View>
-          {verification === 'VERIFIED' ? (
-            <View style={styles.verifiedBadge}>
-              <MaterialIcons name="verified" size={16} color="#1D9BF0" />
+        </GlassCard>
+      ) : (
+        <>
+          <LinearGradient
+            colors={[Stitch.colors.primary, Stitch.colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.hero}
+          >
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initial}</Text>
+              </View>
+              {verification === 'VERIFIED' ? (
+                <View style={styles.verifiedBadge}>
+                  <MaterialIcons name="verified" size={16} color="#1D9BF0" />
+                </View>
+              ) : null}
             </View>
-          ) : null}
-        </View>
 
-        <Text style={styles.heroName} numberOfLines={2}>
-          {displayName}
-        </Text>
-        <Text style={styles.heroBrand}>{t('common.appNamePro')}</Text>
-
-        {verification === 'VERIFIED' ? (
-          <VerifiedBadge size="md" />
-        ) : (
-          <View style={[styles.verifyPill, { backgroundColor: verifyStyle.bg }]}>
-            <Text style={[styles.verifyText, { color: verifyStyle.text }]}>
-              {translateVerification(verification)}
+            <Text style={styles.heroName} numberOfLines={2}>
+              {displayName}
             </Text>
-          </View>
-        )}
+            <Text style={styles.heroBrand}>{t('common.appNamePro')}</Text>
 
-        {email ? (
-          <View style={styles.metaRow}>
-            <MaterialIcons name="mail-outline" size={16} color="rgba(255,255,255,0.85)" />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {email}
-            </Text>
-          </View>
-        ) : null}
-        {phone ? (
-          <View style={styles.metaRow}>
-            <MaterialIcons name="phone" size={16} color="rgba(255,255,255,0.85)" />
-            <Text style={styles.metaText}>{phone}</Text>
-          </View>
-        ) : null}
-      </LinearGradient>
+            {verification === 'VERIFIED' ? (
+              <VerifiedBadge size="md" />
+            ) : (
+              <View style={[styles.verifyPill, { backgroundColor: verifyStyle.bg }]}>
+                <Text style={[styles.verifyText, { color: verifyStyle.text }]}>
+                  {translateVerification(verification)}
+                </Text>
+              </View>
+            )}
+
+            {userEmail ? (
+              <View style={styles.metaRow}>
+                <MaterialIcons name="mail-outline" size={16} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {userEmail}
+                </Text>
+              </View>
+            ) : null}
+            {userPhone ? (
+              <View style={styles.metaRow}>
+                <MaterialIcons name="phone" size={16} color="rgba(255,255,255,0.85)" />
+                <Text style={styles.metaText}>{userPhone}</Text>
+              </View>
+            ) : null}
+          </LinearGradient>
 
       {(profile?.rating != null ||
         profile?.hourlyRate != null ||
@@ -244,6 +342,8 @@ export default function ProfileScreen() {
       </GlassCard>
 
       <GradientButton title={t('auth.signOut')} variant="outline" onPress={signOut} style={styles.signOutBtn} />
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -375,4 +475,30 @@ const styles = StyleSheet.create({
   zoneBtnTitle: { fontSize: 15, fontWeight: '700', color: Stitch.colors.onBackground },
   zoneBtnSub: { fontSize: 12, color: Stitch.colors.onSurfaceVariant, marginTop: 2 },
   signOutBtn: { marginTop: 8 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Stitch.spacing.gutter,
+  },
+  editIconBtn: {
+    padding: 4,
+  },
+  editTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+    marginBottom: 16,
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  saveBtn: {
+    flex: 1,
+  },
+  cancelBtn: {
+    flex: 1,
+  },
 });
