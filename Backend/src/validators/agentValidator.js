@@ -1,5 +1,5 @@
 const { z } = require("zod");
-const { optionalPhone } = require("./zodHelpers");
+const { optionalPhone, requiredPhone, strictEmail } = require("./zodHelpers");
 
 const emptyToUndefined = (val) =>
   val === undefined || val === null || String(val).trim() === "" ? undefined : val;
@@ -19,7 +19,15 @@ const MAX_RADIUS_KM = Number(process.env.MAX_SERVICE_RADIUS_KM) || 50;
 const radiusKmField = z.coerce
   .number()
   .min(1, "Radius must be at least 1 km")
-  .max(MAX_RADIUS_KM, `Radius cannot exceed ${MAX_RADIUS_KM} km`);
+  .max(MAX_RADIUS_KM, `Radius cannot exceed ${MAX_RADIUS_KM} km`)
+  .refine(
+    (val) => {
+      const str = String(val);
+      const parts = str.split(".");
+      return parts.length <= 1 || parts[1].length <= 2;
+    },
+    { message: "Service radius cannot have more than 2 decimal places" }
+  );
 
 const updateAgentProfileSchema = z.object({
   body: z.object({
@@ -46,8 +54,8 @@ const updateAgentSchema = z.object({
 const createAgentSchema = z.object({
   body: z.object({
     name: z.string().min(2, "Agent name is required"),
-    email: z.string().email("Valid email is required"),
-    phone: optionalPhone,
+    email: strictEmail("Valid email is required"),
+    phone: requiredPhone,
     password: z.preprocess(emptyToUndefined, z.string().min(6).optional()),
     generatePassword: z.preprocess(
       (v) => v === true || String(v).toLowerCase() === "true",

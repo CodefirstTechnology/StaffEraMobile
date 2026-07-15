@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
@@ -31,48 +31,56 @@ const qc = new QueryClient({
   },
 })
 
+const router = createBrowserRouter([
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "/",
+    element: (
+      <ProtectedRoute roles={['AGENT', 'ADMIN']}>
+        <DashboardLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Dashboard /> },
+      { path: "registrations", element: <AppRegistrationList /> },
+      { path: "servants", element: <ServantList /> },
+      { path: "servants/new", element: <OnboardServant /> },
+      { path: "servants/:id", element: <ServantDetail /> },
+      { path: "servants/:id/edit", element: <EditServant /> },
+      { path: "profile", element: <AgentProfile /> },
+    ]
+  },
+  {
+    path: "/admin",
+    element: (
+      <AdminRoute>
+        <AdminLayout />
+      </AdminRoute>
+    ),
+    children: [
+      { index: true, element: <AdminDashboard /> },
+      { path: "agents", element: <AdminAgents /> },
+      { path: "users", element: <AdminUsers /> },
+      { path: "bookings", element: <AdminBookings /> },
+      { path: "servants", element: <AdminServants /> },
+      { path: "skills", element: <AdminSkills /> },
+    ]
+  },
+  {
+    path: "*",
+    element: <Navigate to="/" replace />,
+  }
+])
+
 export default function App() {
   return (
     <QueryClientProvider client={qc}>
       <AuthProvider>
         <ToastProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute roles={['AGENT', 'ADMIN']}>
-                    <DashboardLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<Dashboard />} />
-                <Route path="registrations" element={<AppRegistrationList />} />
-                <Route path="servants" element={<ServantList />} />
-                <Route path="servants/new" element={<OnboardServant />} />
-                <Route path="servants/:id" element={<ServantDetail />} />
-                <Route path="servants/:id/edit" element={<EditServant />} />
-                <Route path="profile" element={<AgentProfile />} />
-              </Route>
-              <Route
-                path="/admin"
-                element={
-                  <AdminRoute>
-                    <AdminLayout />
-                  </AdminRoute>
-                }
-              >
-                <Route index element={<AdminDashboard />} />
-                <Route path="agents" element={<AdminAgents />} />
-                <Route path="users" element={<AdminUsers />} />
-                <Route path="bookings" element={<AdminBookings />} />
-                <Route path="servants" element={<AdminServants />} />
-                <Route path="skills" element={<AdminSkills />} />
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </BrowserRouter>
+          <RouterProvider router={router} />
         </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>

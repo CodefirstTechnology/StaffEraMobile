@@ -92,6 +92,10 @@ export function ServiceZonesEditor({
       setError('Add a zone name or pick a location on the map.')
       return
     }
+    if (payload.description && payload.description.length > 500) {
+      setError('Description cannot exceed 500 characters.')
+      return
+    }
     if (editing) {
       onDraftChange(
         draftZones.map((z) =>
@@ -138,6 +142,10 @@ export function ServiceZonesEditor({
     const payload = buildPayload()
     if (!payload.name) {
       setError('Add a zone name or pick a location on the map.')
+      return
+    }
+    if (payload.description && payload.description.length > 500) {
+      setError('Description cannot exceed 500 characters.')
       return
     }
     if (editing?.id) {
@@ -233,7 +241,11 @@ export function ServiceZonesEditor({
             <textarea
               placeholder="Optional details"
               value={draft.description}
-              onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+              onChange={(e) => {
+                setDraft((d) => ({ ...d, description: e.target.value }))
+                setError('')
+              }}
+              maxLength={500}
               className={inputClassName()}
               rows={2}
             />

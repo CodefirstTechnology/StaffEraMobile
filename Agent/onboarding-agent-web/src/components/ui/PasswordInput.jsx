@@ -44,20 +44,51 @@ function EyeClosedIcon() {
 export function PasswordInput({ className = '', invalid, ...props }) {
   const [show, setShow] = useState(false)
 
+  const classes = className.split(/\s+/).filter(Boolean)
+  const wrapperClasses = ['relative']
+  const inputClasses = []
+
+  classes.forEach((c) => {
+    if (
+      c.startsWith('w-') ||
+      c.startsWith('max-w-') ||
+      c.startsWith('m-') ||
+      c.startsWith('mx-') ||
+      c.startsWith('my-') ||
+      c.startsWith('mt-') ||
+      c.startsWith('mb-') ||
+      c.startsWith('ml-') ||
+      c.startsWith('mr-') ||
+      c === 'flex-1' ||
+      c === 'shrink-0' ||
+      c === 'grow'
+    ) {
+      wrapperClasses.push(c)
+    } else {
+      inputClasses.push(c)
+    }
+  })
+
+  if (!inputClasses.some((c) => c.startsWith('w-'))) {
+    inputClasses.push('w-full')
+  }
+
+  const finalInputClass = `${inputClasses.join(' ')}${inputClasses.join(' ').includes('pr-') ? '' : ' pr-11'}`.trim()
+
   return (
-    <div className="relative">
+    <div className={wrapperClasses.join(' ')}>
       <input
         {...props}
         type={show ? 'text' : 'password'}
         autoComplete={props.autoComplete ?? 'new-password'}
         aria-invalid={invalid ? 'true' : props['aria-invalid']}
-        className={`${className}${className.includes('pr-') ? '' : ' pr-11'}`.trim()}
+        className={finalInputClass}
       />
       <button
         type="button"
         tabIndex={-1}
         onClick={() => setShow((v) => !v)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary flex items-center justify-center"
         aria-label={show ? 'Hide password' : 'Show password'}
       >
         {show ? <EyeClosedIcon /> : <EyeOpenIcon />}

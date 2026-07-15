@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link, useBlocker, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -42,6 +42,7 @@ const emptyPersonalErrors = () => ({
   skills: '',
   address: '',
   agentId: '',
+  bio: '',
 })
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
@@ -152,6 +153,7 @@ export default function OnboardServant() {
   const [documentErrors, setDocumentErrors] = useState({ idProof: '', profilePhoto: '' })
   const [skillsRateErrors, setSkillsRateErrors] = useState(emptySkillsRateErrors)
   const [bankError, setBankError] = useState('')
+  const [bankAccountConfirm, setBankAccountConfirm] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
     name: '',
@@ -177,8 +179,40 @@ export default function OnboardServant() {
   })
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
-  const [bankAccountConfirm, setBankAccountConfirm] = useState('')
   const [draftZones, setDraftZones] = useState([])
+  const [countryCode, setCountryCode] = useState('+91')
+
+  const reactLocation = useLocation()
+
+  const isFormDirty =
+    form.name !== '' ||
+    form.email !== '' ||
+    form.phone !== '' ||
+    form.password !== '' ||
+    form.bio !== '' ||
+    form.experience !== '' ||
+    form.hourlyRate !== '' ||
+    form.monthlyRate !== '' ||
+    form.address !== '' ||
+    form.availabilityNotes !== '' ||
+    profilePhoto !== null ||
+    idProof !== null
+
+  const blocker = useBlocker(
+    ({ nextLocation }) =>
+      isFormDirty && !submitting && nextLocation.pathname !== reactLocation.pathname
+  )
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const proceed = window.confirm('You have unsaved changes. Are you sure you want to leave?')
+      if (proceed) {
+        blocker.proceed()
+      } else {
+        blocker.reset()
+      }
+    }
+  }, [blocker.state])
 
   const clearPersonalError = (key) =>
     setPersonalErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
@@ -197,16 +231,23 @@ export default function OnboardServant() {
     if (!form.name?.trim()) errors.name = 'Full name is required'
     if (!form.email?.trim()) {
       errors.email = 'Email is required'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    } else if (!/^[a-zA-Z0-9]+([._-]?[a-zA-Z0-9]+)*@[a-zA-Z0-9]+([.-]?[a-zA-Z0-9]+)*\.[a-zA-Z]{2,}$/.test(form.email.trim())) {
       errors.email = 'Enter a valid email address'
     }
-    errors.phone = validatePhoneRequired(form.phone)
+    errors.phone = validatePhoneRequired(form.phone, countryCode)
     const pwVal = validateServantPassword(form.password)
     if (!pwVal.ok) {
       errors.password = pwVal.error
     }
     if (!form.skills?.length) errors.skills = 'Select at least one skill'
-    if (!form.address?.trim()) errors.address = 'Address is required'
+    if (!form.address?.trim()) {
+      errors.address = 'Address is required'
+    } else if (form.address.length > 500) {
+      errors.address = 'Address cannot exceed 500 characters'
+    }
+    if (form.bio && form.bio.length > 500) {
+      errors.bio = 'Bio cannot exceed 500 characters'
+    }
     if (user?.role === 'ADMIN' && !form.agentId) {
       errors.agentId = 'Agent assignment is required'
     }
@@ -231,11 +272,14 @@ export default function OnboardServant() {
   }
 
   const validateAvailability = () => {
-    const errors = { bookingTypes: '', hoursPerDay: '' }
+    const errors = { bookingTypes: '', hoursPerDay: '', availabilityNotes: '' }
     if (!form.offersSession && !form.offersMonthly) {
       errors.bookingTypes = 'Select at least one booking type: Session or Monthly'
     }
     errors.hoursPerDay = hoursPerDayError()
+    if (form.availabilityNotes && form.availabilityNotes.length > 500) {
+      errors.availabilityNotes = 'Availability notes cannot exceed 500 characters'
+    }
     setAvailabilityErrors(errors)
     return !Object.values(errors).some(Boolean)
   }
@@ -336,6 +380,9 @@ export default function OnboardServant() {
         fd.append(k, JSON.stringify(v))
       } else if (typeof v === 'boolean') {
         fd.append(k, v ? 'true' : 'false')
+      } else if (k === 'phone') {
+        const cc = countryCode.replace(/\D/g, '')
+        fd.append(k, cc + v)
       } else {
         fd.append(k, String(v))
       }
@@ -440,6 +487,7 @@ export default function OnboardServant() {
                         clearPersonalError('password')
                       }}
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       aria-invalid={personalErrors.password ? 'true' : undefined}
                       className={`${inputClassName(!!personalErrors.password)} pr-32`}
                     />
@@ -477,11 +525,60 @@ export default function OnboardServant() {
                 </Field>
               )
             }
+            if (f.key === 'phone') {
+              return (
+                <Field key={f.key} label={f.label} required>
+                  <div className="flex gap-2">
+                    <select
+                      value={countryCode}
+                      onChange={(e) => {
+                        setCountryCode(e.target.value)
+                        setPersonalErrors((prev) => ({
+                          ...prev,
+                          phone: validatePhoneRequired(form.phone, e.target.value),
+                        }))
+                      }}
+                      className="rounded-lg border px-3 py-2 bg-white"
+                      style={{ width: '100px' }}
+                    >
+                      <option value="+91">+91 (IN)</option>
+                      <option value="+1">+1 (US)</option>
+                      <option value="+44">+44 (UK)</option>
+                      <option value="+971">+971 (AE)</option>
+                      <option value="+966">+966 (SA)</option>
+                      <option value="+65">+65 (SG)</option>
+                      <option value="+61">+61 (AU)</option>
+                    </select>
+                    <input
+                      placeholder={f.placeholder}
+                      value={form[f.key]}
+                      onChange={(e) => {
+                        update(f.key, digitsOnlyPhone(e.target.value))
+                        clearPersonalError(f.key)
+                      }}
+                      onBlur={() =>
+                        setPersonalErrors((prev) => ({
+                          ...prev,
+                          phone: validatePhoneRequired(form.phone, countryCode),
+                        }))
+                      }
+                      type={f.type}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      aria-invalid={personalErrors[f.key] ? 'true' : undefined}
+                      className={inputClassName(!!personalErrors[f.key])}
+                    />
+                  </div>
+                  <FieldError message={personalErrors[f.key]} />
+                </Field>
+              )
+            }
             return (
               <Field key={f.key} label={f.label} required>
                 <input
                   placeholder={f.placeholder}
                   value={form[f.key]}
+                  autoComplete={f.key === 'name' ? 'new-name' : f.key === 'email' ? 'new-email' : 'off'}
                   onChange={(e) => {
                     const val =
                       f.key === 'phone' ? digitsOnlyPhone(e.target.value) : e.target.value
@@ -493,7 +590,7 @@ export default function OnboardServant() {
                       ? () =>
                           setPersonalErrors((prev) => ({
                             ...prev,
-                            phone: validatePhoneRequired(form.phone),
+                            phone: validatePhoneRequired(form.phone, countryCode),
                           }))
                       : undefined
                   }
@@ -527,6 +624,7 @@ export default function OnboardServant() {
                 update('address', e.target.value)
                 clearPersonalError('address')
               }}
+              maxLength={500}
               aria-invalid={personalErrors.address ? 'true' : undefined}
               className={inputClassName(!!personalErrors.address)}
               rows={3}
@@ -571,10 +669,15 @@ export default function OnboardServant() {
             <textarea
               placeholder="Short description about the servant"
               value={form.bio}
-              onChange={(e) => update('bio', e.target.value)}
-              className={inputClassName()}
+              onChange={(e) => {
+                update('bio', e.target.value)
+                clearPersonalError('bio')
+              }}
+              maxLength={500}
+              className={inputClassName(!!personalErrors.bio)}
               rows={3}
             />
+            <FieldError message={personalErrors.bio} />
           </Field>
         </div>
       )}
@@ -685,10 +788,15 @@ export default function OnboardServant() {
                 <textarea
                   placeholder="e.g. Second Saturday off, half day on Friday…"
                   value={form.availabilityNotes}
-                  onChange={(e) => update('availabilityNotes', e.target.value)}
-                  className={inputClassName()}
+                  onChange={(e) => {
+                    update('availabilityNotes', e.target.value)
+                    setAvailabilityErrors((prev) => ({ ...prev, availabilityNotes: '' }))
+                  }}
+                  maxLength={500}
+                  className={inputClassName(!!availabilityErrors.availabilityNotes)}
                   rows={3}
                 />
+                <FieldError message={availabilityErrors.availabilityNotes} />
               </Field>
             </div>
           )}

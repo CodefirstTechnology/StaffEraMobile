@@ -12,6 +12,12 @@ export function validateNonNegativeNumber(value, fieldLabel) {
   const num = Number(trimmed)
   if (!Number.isFinite(num)) return `${fieldLabel} must be a valid number`
   if (num < 0) return `${fieldLabel} cannot be negative`
+  if (fieldLabel.toLowerCase().includes('rate') || fieldLabel.toLowerCase().includes('experience')) {
+    const parts = trimmed.split('.')
+    if (parts.length > 1 && parts[1].length > 2) {
+      return `${fieldLabel} cannot have more than 2 decimal places`
+    }
+  }
   return ''
 }
 

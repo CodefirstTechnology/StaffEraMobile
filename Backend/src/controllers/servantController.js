@@ -33,7 +33,7 @@ const resolveHouseOwnerCoords = async (userId, queryLat, queryLng) => {
 };
 
 exports.listServants = async (req, res) => {
-  const { skill, city, zone, latitude, longitude, radiusKm } = req.query;
+  const { skill, city, zone, latitude, longitude, radiusKm, bookingType } = req.query;
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const limit = Math.min(50, parseInt(req.query.limit, 10) || 20);
   const skip = (page - 1) * limit;
@@ -46,6 +46,8 @@ exports.listServants = async (req, res) => {
     verificationStatus: "VERIFIED",
     user: { isActive: true },
     ...(requireAadhaar ? { aadhaarVerified: true } : {}),
+    ...(bookingType === 'SESSION' ? { offersSession: true } : {}),
+    ...(bookingType === 'MONTHLY' ? { offersMonthly: true } : {}),
     ...(skill
       ? { skills: { some: { skillName: { equals: skill, mode: "insensitive" } } } }
       : {}),

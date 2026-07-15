@@ -615,7 +615,7 @@ export default function ServantDetail() {
             </div>
 
             {canReview && (
-              <div className="space-y-2">
+              <div className="mt-2 space-y-2">
                 {reviewActionError ? (
                   <p className="rounded-lg bg-red-50 p-3 text-sm text-error">{reviewActionError}</p>
                 ) : null}
