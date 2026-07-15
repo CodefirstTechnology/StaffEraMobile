@@ -283,3 +283,33 @@ exports.getMyTimeEntries = async (req, res) => {
 
   sendSuccess(res, { entries, pagination: { page, limit, total } });
 };
+
+exports.uploadProfilePhoto = async (req, res) => {
+  if (!req.file) {
+    throw new ApiError(400, "Please upload an image file");
+  }
+
+  if (req.file.size > 3 * 1024 * 1024) {
+    try {
+      require("fs").unlinkSync(req.file.path);
+    } catch (err) {
+      // ignore
+    }
+    throw new ApiError(400, "Profile photo size must be 3MB or less");
+  }
+
+  const servant = await prisma.servant.findUnique({
+    where: { userId: req.user.id }
+  });
+  if (!servant) throw new ApiError(404, "Servant profile not found");
+
+  const profilePhoto = `/uploads/${req.file.filename}`;
+
+  const updated = await prisma.servant.update({
+    where: { id: servant.id },
+    data: { profilePhoto },
+    include: servantInclude
+  });
+
+  sendSuccess(res, { servant: updated, profilePhoto });
+};

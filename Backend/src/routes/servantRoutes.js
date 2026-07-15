@@ -4,6 +4,7 @@ const servantController = require("../controllers/servantController");
 const { authenticate, requireRole } = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const { updateServantMeSchema } = require("../validators/servantValidator");
+const upload = require("../middleware/upload");
 
 router.get(
   "/",
@@ -36,6 +37,13 @@ router.patch(
   requireRole("SERVANT"),
   validate(updateServantMeSchema),
   servantController.updateMyProfile
+);
+router.post(
+  "/me/profile-photo",
+  authenticate,
+  requireRole("SERVANT"),
+  upload.single("profilePhoto"),
+  servantController.uploadProfilePhoto
 );
 
 router.get("/:id", authenticate, servantController.getServant);

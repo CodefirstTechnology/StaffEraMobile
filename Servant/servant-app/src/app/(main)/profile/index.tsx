@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { API_BASE_URL } from '@/lib/apiConfig';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,6 +40,7 @@ export default function ProfileScreen() {
       return res.data.data.servant as {
         verificationStatus: string;
         bio?: string | null;
+        profilePhoto?: string | null;
         rating?: number;
         totalRatings?: number;
         hourlyRate?: number | null;
@@ -86,6 +89,61 @@ export default function ProfileScreen() {
     }
   };
 
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need access to your photos to upload a profile picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > 3 * 1024 * 1024) {
+        Alert.alert('File Too Large', 'Please select an image that is 3MB or less.');
+        return;
+      }
+      await uploadImage(asset.uri);
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    setSaving(true);
+    try {
+      const filename = uri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+      const formData = new FormData();
+      formData.append('profilePhoto', {
+        uri,
+        name: filename,
+        type,
+      } as any);
+
+      await api.post('/servants/me/profile-photo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      await refetch();
+      await hydrate();
+      Alert.alert(t('success.saved') || 'Success', 'Profile photo updated successfully');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      Alert.alert('Error', err.response?.data?.message || 'Could not upload image');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const zones: Zone[] = profile?.zones || [];
   const skills = profile?.skills || [];
   const verification = profile?.verificationStatus || user?.servant?.verificationStatus || 'PENDING';
@@ -94,6 +152,10 @@ export default function ProfileScreen() {
   const userEmail = profile?.user?.email || user?.email;
   const userPhone = profile?.user?.phone;
   const initial = displayName.trim()[0]?.toUpperCase() || '?';
+
+  const photoUrl = profile?.profilePhoto || user?.servant?.profilePhoto;
+  const backendBase = API_BASE_URL.replace('/api/v1', '');
+  const avatarSource = photoUrl ? { uri: photoUrl.startsWith('http') ? photoUrl : `${backendBase}${photoUrl}` } : null;
 
   const signOut = async () => {
     await logout();
@@ -163,16 +225,23 @@ export default function ProfileScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.hero}
           >
-            <View style={styles.avatarWrap}>
+            <TouchableOpacity style={styles.avatarWrap} onPress={pickImage} activeOpacity={0.85}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{initial}</Text>
+                {avatarSource ? (
+                  <Image source={avatarSource} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>{initial}</Text>
+                )}
+              </View>
+              <View style={styles.cameraIconBadge}>
+                <MaterialIcons name="photo-camera" size={12} color={Stitch.colors.primary} />
               </View>
               {verification === 'VERIFIED' ? (
                 <View style={styles.verifiedBadge}>
                   <MaterialIcons name="verified" size={16} color="#1D9BF0" />
                 </View>
               ) : null}
-            </View>
+            </TouchableOpacity>
 
             <Text style={styles.heroName} numberOfLines={2}>
               {displayName}
@@ -500,5 +569,23 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     flex: 1,
+  },
+  cameraIconBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: -4,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Stitch.colors.primary,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 40,
   },
 });
