@@ -479,14 +479,18 @@
   },
   "skills": {
     "COOKING": "स्वयंपाक",
-    "CLEANING": "साफसफाई",
-    "CHILDCARE": "मुलांची काळजी",
+    "CLEANING": "सफाई",
+    "CHILDCARE": "बालसंगोपन",
     "DRIVING": "ड्रायव्हिंग",
-    "LAUNDRY": "कपडे धुणे",
-    "ELDERLY_CARE": "ज्येष्ठांची काळजी",
+    "LAUNDRY": "धुलाई",
+    "ELDERLY_CARE": "वृद्धांची काळजी",
     "GARDENING": "बागकाम",
-    "CHOPPING": "साहित्य चिरणे",
-    "HELPING": "साहाय्य"
+    "CHOPPING": "भाजी चिरणे",
+    "HELPING": "मदतनीस",
+    "MOPPING": "फरशी पुसणे",
+    "IRON_AND_FOLD": "इस्त्री आणि घडी",
+    "CARRING": "काळजी घेणे",
+    "CARING": "काळजी घेणे"
   },
   "timeSlots": {
     "range": "{{start}} ते {{end}}"

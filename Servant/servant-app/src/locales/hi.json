@@ -485,8 +485,12 @@
     "LAUNDRY": "कपड़े धोना",
     "ELDERLY_CARE": "बुजुर्गों की देखभाल",
     "GARDENING": "बागवानी",
-    "CHOPPING": "काट-छाँट सहायक",
-    "HELPING": "सहायता"
+    "CHOPPING": "सब्जी काटना",
+    "HELPING": "मदद करना",
+    "MOPPING": "पोछा लगाना",
+    "IRON_AND_FOLD": "इस्त्री और तह",
+    "CARRING": "देखभाल करना",
+    "CARING": "देखभाल करना"
   },
   "timeSlots": {
     "range": "{{start}} से {{end}}"

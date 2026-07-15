@@ -321,7 +321,11 @@
     "ELDERLY_CARE": "Elderly care",
     "GARDENING": "Gardening",
     "CHOPPING": "Chopping helper",
-    "HELPING": "Helping"
+    "HELPING": "Helping",
+    "MOPPING": "Mopping",
+    "IRON_AND_FOLD": "Iron & Fold",
+    "CARRING": "Caring",
+    "CARING": "Caring"
   },
   "timeSlots": {
     "range": "{{start}} to {{end}}"
