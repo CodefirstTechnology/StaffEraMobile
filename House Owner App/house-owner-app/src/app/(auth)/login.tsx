@@ -27,25 +27,50 @@ export default function LoginScreen() {
   const schema = useMemo(
     () =>
       z.object({
-        email: z.string().email(t('validation.emailInvalid')),
+        email: z
+          .string()
+          .min(1, t('validation.usernameRequired') || 'Username required')
+          .refine(
+            (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+            t('validation.emailInvalid') || 'Enter a valid username (email address)'
+          ),
         password: z.string().min(1, t('validation.passwordRequired')),
       }),
     [t],
   );
 
-  const { control, handleSubmit } = useForm({
+  const {
+    control,
+    handleSubmit,
+    setError,
+    formState: { errors },
+  } = useForm({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
   });
 
+  const [formError, setFormError] = useState('');
+
   const onSubmit = async (data: z.infer<typeof schema>) => {
     setLoading(true);
+    setFormError('');
     try {
       await login(data.email, data.password);
       router.replace('/(main)/home');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(t('auth.loginFailed'), err.response?.data?.message || t('auth.tryAgain'));
+      const msg = err.response?.data?.message || '';
+      let displayMsg = msg;
+      if (msg.includes('email or password') || msg === 'Unauthorized' || msg === 'Login failed') {
+        displayMsg = t('auth.invalidCredentials') || 'Invalid username or password. Please try again.';
+      } else if (msg.includes('Email and password are required')) {
+        displayMsg = 'Username and password are required.';
+      } else if (!msg) {
+        displayMsg = t('auth.tryAgain') || 'Please try again';
+      }
+      setFormError(displayMsg);
+      setError('email', { type: 'manual', message: ' ' });
+      setError('password', { type: 'manual', message: ' ' });
     } finally {
       setLoading(false);
     }
@@ -72,8 +97,14 @@ export default function LoginScreen() {
               label={t('auth.email')}
               autoCapitalize="none"
               keyboardType="email-address"
+              placeholder={t('auth.email') || 'Username'}
               value={value}
-              onChangeText={onChange}
+              onChangeText={(val) => {
+                onChange(val);
+                setFormError('');
+              }}
+              error={errors.email?.message}
+              required
             />
           )}
         />
@@ -84,11 +115,19 @@ export default function LoginScreen() {
             <GhostInput
               label={t('auth.password')}
               secureTextEntry
+              placeholder={t('auth.password') || 'Password'}
               value={value}
-              onChangeText={onChange}
+              onChangeText={(val) => {
+                onChange(val);
+                setFormError('');
+              }}
+              error={errors.password?.message}
+              required
             />
           )}
         />
+
+        {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
         <GradientButton title={t('auth.signIn')} onPress={handleSubmit(onSubmit)} loading={loading} />
 
@@ -156,5 +195,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 32,
     opacity: 0.8,
+  },
+  formError: {
+    color: Stitch.colors.error,
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: -8,
+    marginBottom: 16,
+    marginLeft: 4,
   },
 });
