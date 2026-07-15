@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useBlocker, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
 import { Button } from '../../components/ui/Button'
@@ -7,7 +8,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { AgentLocationPicker } from '../../components/AgentLocationPicker'
 import { LocationIcon } from '../../components/icons/LocationIcon'
 import { CredentialsBanner } from '../../components/CredentialsBanner'
-import { validatePhoneOptional, digitsOnlyPhone } from '../../lib/phone'
+import { validatePhoneRequired, validatePhoneOptional, digitsOnlyPhone } from '../../lib/phone'
 import { useToast } from '../../context/ToastContext'
 import { validateServantPassword, checkPasswordStrength } from '../../lib/generatePassword'
 
@@ -66,7 +67,7 @@ function FormField({ label, required, error, hint, className = '', htmlFor, chil
 
 function validateEmail(value) {
   if (!value.trim()) return REQUIRED
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) {
+  if (!/^[a-zA-Z0-9]+([._-]?[a-zA-Z0-9]+)*@[a-zA-Z0-9]+([.-]?[a-zA-Z0-9]+)*\.[a-zA-Z]{2,}$/.test(value.trim())) {
     return 'Enter a valid email address'
   }
   return ''
@@ -85,11 +86,15 @@ function validateServiceRadius(value, maxRadius = 50) {
   const radius = Number(trimmed)
   if (!Number.isFinite(radius)) return 'Enter a valid number'
   if (radius < 1 || radius > maxRadius) return `Service radius must be between 1 and ${maxRadius} km`
+  const parts = trimmed.split('.')
+  if (parts.length > 1 && parts[1].length > 2) {
+    return 'Service radius cannot have more than 2 decimal places'
+  }
   return ''
 }
 
-function validatePhone(value) {
-  return validatePhoneOptional(value)
+function validatePhone(value, countryCode = '+91') {
+  return validatePhoneRequired(value, countryCode)
 }
 
 function validateCreateAgentFields({
@@ -104,11 +109,11 @@ function validateCreateAgentFields({
   generatePassword,
   password,
   serviceRadiusKm,
-}, maxRadius = 50) {
+}, maxRadius = 50, countryCode = '+91') {
   const errors = emptyCreateFieldErrors()
   errors.name = validateName(name)
   errors.email = validateEmail(email)
-  errors.phone = validatePhone(phone)
+  errors.phone = validatePhone(phone, countryCode)
 
   if (locationMode === 'manual') {
     if (!manualAddress.trim()) errors.manualAddress = REQUIRED
@@ -518,6 +523,7 @@ export default function AdminAgents() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [countryCode, setCountryCode] = useState('+91')
   const [agencyName, setAgencyName] = useState('')
   const [password, setPassword] = useState('')
   const [generatePassword, setGeneratePassword] = useState(true)
@@ -536,6 +542,68 @@ export default function AdminAgents() {
   const [editFieldErrors, setEditFieldErrors] = useState(emptyEditFieldErrors)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
+
+  const reactLocation = useLocation()
+
+  const isCreateFormDirty =
+    showForm &&
+    (name !== '' ||
+      email !== '' ||
+      phone !== '' ||
+      agencyName !== '' ||
+      location !== null ||
+      manualAddress !== '' ||
+      manualLatitude !== '' ||
+      manualLongitude !== '' ||
+      password !== '')
+
+  const isEditFormDirty = useMemo(() => {
+    if (!editingAgent) return false
+    const initialAgencyName = editingAgent.agencyName || ''
+    const initialRadius = String(editingAgent.serviceRadiusKm ?? 3)
+    const initialLoc =
+      editingAgent.address && editingAgent.latitude != null && editingAgent.longitude != null
+        ? {
+            address: editingAgent.address,
+            city: editingAgent.city,
+            latitude: editingAgent.latitude,
+            longitude: editingAgent.longitude,
+          }
+        : null
+
+    const locChanged =
+      (!editForm.location && initialLoc) ||
+      (editForm.location && !initialLoc) ||
+      (editForm.location &&
+        initialLoc &&
+        (editForm.location.address !== initialLoc.address ||
+          editForm.location.latitude !== initialLoc.latitude ||
+          editForm.location.longitude !== initialLoc.longitude))
+
+    return (
+      editForm.agencyName !== initialAgencyName ||
+      editForm.serviceRadiusKm !== initialRadius ||
+      locChanged
+    )
+  }, [editForm, editingAgent])
+
+  const isFormDirty = isCreateFormDirty || isEditFormDirty
+
+  const blocker = useBlocker(
+    ({ nextLocation }) =>
+      isFormDirty && !saving && !editSaving && nextLocation.pathname !== reactLocation.pathname
+  )
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const proceed = window.confirm('You have unsaved changes. Are you sure you want to leave?')
+      if (proceed) {
+        blocker.proceed()
+      } else {
+        blocker.reset()
+      }
+    }
+  }, [blocker.state])
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-agents', search],
@@ -560,6 +628,7 @@ export default function AdminAgents() {
     setName('')
     setEmail('')
     setPhone('')
+    setCountryCode('+91')
     setAgencyName('')
     setPassword('')
     setGeneratePassword(true)
@@ -689,7 +758,7 @@ export default function AdminAgents() {
       generatePassword,
       password,
       serviceRadiusKm,
-    }, MAX_RADIUS)
+    }, MAX_RADIUS, countryCode)
     setFieldErrors(errors)
     if (hasFieldErrors(errors)) return
 
@@ -712,10 +781,11 @@ export default function AdminAgents() {
 
     setSaving(true)
     try {
+      const cc = countryCode.replace(/\D/g, '')
       const res = await api.post('/admin/agents', {
         name: name.trim(),
         email: email.trim(),
-        phone: digitsOnlyPhone(phone) || undefined,
+        phone: cc + digitsOnlyPhone(phone),
         agencyName: agencyName.trim() || undefined,
         password: generatePassword ? undefined : password,
         generatePassword,
@@ -830,23 +900,45 @@ export default function AdminAgents() {
                 aria-invalid={!!fieldErrors.email}
               />
             </FormField>
-            <FormField label="Phone" hint="Optional" error={fieldErrors.phone}>
-              <input
-                type="tel"
-                className={fieldInputClass(!!fieldErrors.phone)}
-                value={phone}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                onChange={(e) => {
-                  const next = digitsOnlyPhone(e.target.value)
-                  setPhone(next)
-                  updateFieldError(setFieldErrors, 'phone', next, validatePhone)
-                }}
-                onBlur={() =>
-                  setFieldErrors((prev) => ({ ...prev, phone: validatePhone(phone) }))
-                }
-                aria-invalid={!!fieldErrors.phone}
-              />
+            <FormField label="Phone" required error={fieldErrors.phone}>
+              <div className="flex gap-2">
+                <select
+                  value={countryCode}
+                  onChange={(e) => {
+                    setCountryCode(e.target.value)
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      phone: validatePhone(phone, e.target.value),
+                    }))
+                  }}
+                  className="rounded-lg border px-3 py-2 bg-white"
+                  style={{ width: '100px' }}
+                >
+                  <option value="+91">+91 (IN)</option>
+                  <option value="+1">+1 (US)</option>
+                  <option value="+44">+44 (UK)</option>
+                  <option value="+971">+971 (AE)</option>
+                  <option value="+966">+966 (SA)</option>
+                  <option value="+65">+65 (SG)</option>
+                  <option value="+61">+61 (AU)</option>
+                </select>
+                <input
+                  type="tel"
+                  className={fieldInputClass(!!fieldErrors.phone)}
+                  value={phone}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  onChange={(e) => {
+                    const next = digitsOnlyPhone(e.target.value)
+                    setPhone(next)
+                    updateFieldError(setFieldErrors, 'phone', next, (v) => validatePhone(v, countryCode))
+                  }}
+                  onBlur={() =>
+                    setFieldErrors((prev) => ({ ...prev, phone: validatePhone(phone, countryCode) }))
+                  }
+                  aria-invalid={!!fieldErrors.phone}
+                />
+              </div>
             </FormField>
             <FormField label="Agency name" hint="Optional">
               <input

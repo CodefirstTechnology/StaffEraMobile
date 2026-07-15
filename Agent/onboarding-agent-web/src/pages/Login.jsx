@@ -30,7 +30,8 @@ function emailMessage(value) {
   if (!/^[a-zA-Z]{2,}$/.test(tld)) {
     return 'Email must include a valid domain extension (e.g. ".com")'
   }
-  if (/\s/.test(email) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  const STRICT_EMAIL_REGEX = /^[a-zA-Z0-9]+([._-]?[a-zA-Z0-9]+)*@[a-zA-Z0-9]+([.-]?[a-zA-Z0-9]+)*\.[a-zA-Z]{2,}$/;
+  if (/\s/.test(email) || !STRICT_EMAIL_REGEX.test(email)) {
     return 'Enter a valid email address'
   }
   return null

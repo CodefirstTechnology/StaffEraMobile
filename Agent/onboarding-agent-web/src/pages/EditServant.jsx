@@ -1,6 +1,6 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useBlocker, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import api from '../lib/api'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
@@ -87,6 +87,10 @@ export default function EditServant() {
     },
   })
 
+  const [countryCode, setCountryCode] = useState('+91')
+
+  const reactLocation = useLocation()
+
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -107,11 +111,73 @@ export default function EditServant() {
     ...EMPTY_BANK_FORM,
   })
 
+  const isFormDirty = useMemo(() => {
+    if (!servant) return false
+    const initialName = servant.user?.name || ''
+    let initialPhoneVal = servant.user?.phone || ''
+    if (initialPhoneVal.startsWith('91') && initialPhoneVal.length > 10) {
+      initialPhoneVal = initialPhoneVal.substring(2)
+    } else if (initialPhoneVal.startsWith('+91')) {
+      initialPhoneVal = initialPhoneVal.substring(3)
+    }
+    
+    return (
+      form.name !== initialName ||
+      form.phone !== initialPhoneVal ||
+      form.bio !== (servant.bio || '') ||
+      form.experience !== (servant.experience ?? '') ||
+      form.hourlyRate !== (servant.hourlyRate ?? '') ||
+      form.monthlyRate !== (servant.monthlyRate ?? '') ||
+      form.address !== (servant.address || '') ||
+      form.availabilityNotes !== (servant.availabilityNotes || '') ||
+      profilePhoto !== null ||
+      idProof !== null
+    )
+  }, [form, servant, profilePhoto, idProof])
+
+  const blocker = useBlocker(
+    ({ nextLocation }) =>
+      isFormDirty && !saving && nextLocation.pathname !== reactLocation.pathname
+  )
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const proceed = window.confirm('You have unsaved changes. Are you sure you want to leave?')
+      if (proceed) {
+        blocker.proceed()
+      } else {
+        blocker.reset()
+      }
+    }
+  }, [blocker.state])
+
   useEffect(() => {
     if (!servant) return
+    let phoneVal = servant.user?.phone || ''
+    let ccVal = '+91'
+    if (phoneVal.startsWith('91') && phoneVal.length > 10) {
+      ccVal = '+91'
+      phoneVal = phoneVal.substring(2)
+    } else if (phoneVal.startsWith('+91')) {
+      ccVal = '+91'
+      phoneVal = phoneVal.substring(3)
+    } else if (phoneVal.length > 10) {
+      if (phoneVal.startsWith('+')) {
+        const match = phoneVal.match(/^\+(\d{1,4})(.*)$/)
+        if (match) {
+          ccVal = '+' + match[1]
+          phoneVal = match[2]
+        }
+      } else {
+        const ccLen = phoneVal.length - 10
+        ccVal = '+' + phoneVal.substring(0, ccLen)
+        phoneVal = phoneVal.substring(ccLen)
+      }
+    }
+    setCountryCode(ccVal)
     setForm({
       name: servant.user?.name || '',
-      phone: servant.user?.phone || '',
+      phone: phoneVal,
       bio: servant.bio || '',
       experience: servant.experience ?? '',
       hourlyRate: servant.hourlyRate ?? '',
@@ -145,12 +211,24 @@ export default function EditServant() {
 
   const save = async () => {
     setError('')
-    const phoneErr = validatePhoneRequired(form.phone)
+    const phoneErr = validatePhoneRequired(form.phone, countryCode)
     if (phoneErr) {
       setPhoneError(phoneErr)
       return
     }
     setPhoneError('')
+    if (form.bio && form.bio.length > 500) {
+      setError('Bio cannot exceed 500 characters')
+      return
+    }
+    if (form.address && form.address.length > 500) {
+      setError('Address cannot exceed 500 characters')
+      return
+    }
+    if (form.availabilityNotes && form.availabilityNotes.length > 500) {
+      setError('Availability notes cannot exceed 500 characters')
+      return
+    }
     const rateErrors = validateSkillsRateFields(form, { required: false })
     setSkillsRateErrors(rateErrors)
     if (Object.values(rateErrors).some(Boolean)) return
@@ -173,6 +251,9 @@ export default function EditServant() {
         fd.append(k, JSON.stringify(v))
       } else if (typeof v === 'boolean') {
         fd.append(k, v ? 'true' : 'false')
+      } else if (k === 'phone') {
+        const cc = countryCode.replace(/\D/g, '')
+        fd.append(k, cc + v)
       } else if (v !== '' && v !== null && v !== undefined) {
         fd.append(k, String(v))
       }
@@ -238,20 +319,39 @@ export default function EditServant() {
           />
         </Field>
         <Field label="Mobile" required>
-          <input
-            placeholder="Enter mobile number"
-            value={form.phone}
-            onChange={(e) => {
-              update('phone', digitsOnlyPhone(e.target.value))
-              setPhoneError('')
-            }}
-            onBlur={() => setPhoneError(validatePhoneRequired(form.phone))}
-            type="tel"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            aria-invalid={phoneError ? 'true' : undefined}
-            className={`${inputClassName()}${phoneError ? ' border-error' : ''}`}
-          />
+          <div className="flex gap-2">
+            <select
+              value={countryCode}
+              onChange={(e) => {
+                setCountryCode(e.target.value)
+                setPhoneError(validatePhoneRequired(form.phone, e.target.value))
+              }}
+              className="rounded-lg border px-3 py-2 bg-white"
+              style={{ width: '100px' }}
+            >
+              <option value="+91">+91 (IN)</option>
+              <option value="+1">+1 (US)</option>
+              <option value="+44">+44 (UK)</option>
+              <option value="+971">+971 (AE)</option>
+              <option value="+966">+966 (SA)</option>
+              <option value="+65">+65 (SG)</option>
+              <option value="+61">+61 (AU)</option>
+            </select>
+            <input
+              placeholder="Enter mobile number"
+              value={form.phone}
+              onChange={(e) => {
+                update('phone', digitsOnlyPhone(e.target.value))
+                setPhoneError('')
+              }}
+              onBlur={() => setPhoneError(validatePhoneRequired(form.phone, countryCode))}
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              aria-invalid={phoneError ? 'true' : undefined}
+              className={`${inputClassName()}${phoneError ? ' border-error' : ''}`}
+            />
+          </div>
           {phoneError ? <p className="mt-1.5 text-sm text-error">{phoneError}</p> : null}
         </Field>
         <Field label="Skill" required>
@@ -267,6 +367,7 @@ export default function EditServant() {
             placeholder="Enter full residential address"
             value={form.address}
             onChange={(e) => update('address', e.target.value)}
+            maxLength={500}
             className={inputClassName()}
             rows={3}
           />
@@ -317,6 +418,7 @@ export default function EditServant() {
             placeholder="Short description about the servant"
             value={form.bio}
             onChange={(e) => update('bio', e.target.value)}
+            maxLength={500}
             className={inputClassName()}
             rows={3}
           />
@@ -411,6 +513,7 @@ export default function EditServant() {
                 placeholder="e.g. Second Saturday off, half day on Friday…"
                 value={form.availabilityNotes}
                 onChange={(e) => update('availabilityNotes', e.target.value)}
+                maxLength={500}
                 className={inputClassName()}
                 rows={3}
               />

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState, useMemo } from 'react'
+import { Link, useNavigate, useBlocker, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
 import api from '../lib/api'
@@ -97,6 +97,53 @@ export default function AgentProfile() {
   const [saving, setSaving] = useState(false)
   const [settingsError, setSettingsError] = useState('')
 
+  const reactLocation = useLocation()
+
+  const isFormDirty = useMemo(() => {
+    if (!user?.agent) return false
+    const initialName = user.agent.agencyName || ''
+    const initialRadius = String(user.agent.serviceRadiusKm ?? 3)
+    const initialLoc = hasAgencyLocation(user.agent)
+      ? {
+          address: user.agent.address,
+          city: user.agent.city,
+          latitude: user.agent.latitude,
+          longitude: user.agent.longitude,
+        }
+      : null
+
+    const locChanged =
+      (!location && initialLoc) ||
+      (location && !initialLoc) ||
+      (location &&
+        initialLoc &&
+        (location.address !== initialLoc.address ||
+          location.latitude !== initialLoc.latitude ||
+          location.longitude !== initialLoc.longitude))
+
+    return (
+      agencyName !== initialName ||
+      serviceRadiusKm !== initialRadius ||
+      locChanged
+    )
+  }, [agencyName, location, serviceRadiusKm, user])
+
+  const blocker = useBlocker(
+    ({ nextLocation }) =>
+      isFormDirty && !saving && nextLocation.pathname !== reactLocation.pathname
+  )
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const proceed = window.confirm('You have unsaved changes. Are you sure you want to leave?')
+      if (proceed) {
+        blocker.proceed()
+      } else {
+        blocker.reset()
+      }
+    }
+  }, [blocker.state])
+
   useEffect(() => {
     if (!user?.agent) return
     setAgencyName(user.agent.agencyName || '')
@@ -157,6 +204,12 @@ export default function AgentProfile() {
     const radius = Number(serviceRadiusKm)
     if (!Number.isFinite(radius) || radius < 1 || radius > MAX_RADIUS) {
       setSettingsError(`Service radius must be between 1 and ${MAX_RADIUS} km.`)
+      return
+    }
+    const radiusStr = String(serviceRadiusKm || '').trim()
+    const parts = radiusStr.split('.')
+    if (parts.length > 1 && parts[1].length > 2) {
+      setSettingsError('Service radius cannot have more than 2 decimal places.')
       return
     }
     setSaving(true)
