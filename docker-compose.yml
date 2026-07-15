@@ -114,6 +114,7 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:?Set VITE_API_BASE_URL in .env}
         VITE_API_HOST: ${VITE_API_HOST:-}
+        VITE_MAX_SERVICE_RADIUS: ${VITE_MAX_SERVICE_RADIUS:-50}
     restart: unless-stopped
     depends_on:
       - api

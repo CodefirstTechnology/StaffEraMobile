@@ -23,7 +23,7 @@ COPY prisma ./prisma
 COPY src ./src
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 
-RUN npx prisma generate \
+RUN npx --no-install prisma generate \
   && mkdir -p uploads \
   && chown -R staffera:staffera /app \
   && chmod +x docker-entrypoint.sh
