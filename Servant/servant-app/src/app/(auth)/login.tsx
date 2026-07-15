@@ -15,14 +15,50 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [formError, setFormError] = useState('');
 
   const submit = async () => {
+    const newErrors: { email?: string; password?: string } = {};
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      newErrors.email = t('validation.usernameRequired') || 'Username required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      newErrors.email = t('validation.emailInvalid') || 'Enter a valid username (email address)';
+    }
+
+    if (!password) {
+      newErrors.password = t('validation.passwordRequired') || 'Password required';
+    } else if (password.length < 6) {
+      newErrors.password = t('validation.passwordMin') || 'Password must be at least 6 characters';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setFormError('');
+      return;
+    }
+    setErrors({});
+    setFormError('');
+
     setLoading(true);
     try {
-      await login(email, password);
+      await login(trimmedEmail, password);
       router.replace('/(main)/home');
     } catch (e: unknown) {
-      Alert.alert(t('auth.loginFailed'), getLoginErrorMessage(e));
+      const err = e as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || '';
+      let displayMsg = msg;
+      if (msg.includes('email or password') || msg === 'Unauthorized' || msg === 'Login failed') {
+        displayMsg = t('auth.invalidCredentials') || 'Invalid username or password. Please try again.';
+      } else if (msg.includes('Email and password are required')) {
+        displayMsg = 'Username and password are required.';
+      } else if (!msg) {
+        displayMsg = getLoginErrorMessage(e) || t('auth.tryAgain');
+      }
+      setFormError(displayMsg);
+      setErrors({ email: ' ', password: ' ' });
     } finally {
       setLoading(false);
     }
@@ -42,15 +78,31 @@ export default function LoginScreen() {
           label={t('auth.email')}
           autoCapitalize="none"
           keyboardType="email-address"
+          placeholder={t('auth.email') || 'Username'}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(val) => {
+            setEmail(val);
+            if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+            setFormError('');
+          }}
+          error={errors.email}
+          required
         />
         <GhostInput
           label={t('auth.password')}
           secureTextEntry
+          placeholder={t('auth.password') || 'Password'}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(val) => {
+            setPassword(val);
+            if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+            setFormError('');
+          }}
+          error={errors.password}
+          required
         />
+
+        {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
         <GradientButton title={t('auth.signIn')} onPress={submit} loading={loading} />
 
@@ -109,5 +161,13 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 15,
     fontWeight: '600',
+  },
+  formError: {
+    color: Stitch.colors.error,
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: -8,
+    marginBottom: 16,
+    marginLeft: 4,
   },
 });

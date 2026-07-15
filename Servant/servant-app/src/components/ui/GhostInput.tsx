@@ -3,15 +3,18 @@ import { View, TextInput, Text, StyleSheet, TextInputProps, Pressable } from 're
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 
-type Props = TextInputProps & { label: string; error?: string };
+type Props = TextInputProps & { label: string; error?: string; required?: boolean };
 
-export function GhostInput({ label, style, secureTextEntry, error, ...props }: Props) {
+export function GhostInput({ label, style, secureTextEntry, error, required, ...props }: Props) {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const isPassword = secureTextEntry === true;
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>
+        {label}
+        {required ? <Text style={{ color: Stitch.colors.error }}> *</Text> : null}
+      </Text>
       <View style={styles.inputWrap}>
         <TextInput
           placeholderTextColor={Stitch.colors.onSurfaceVariant + '99'}
@@ -34,7 +37,7 @@ export function GhostInput({ label, style, secureTextEntry, error, ...props }: P
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error && error.trim() ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
