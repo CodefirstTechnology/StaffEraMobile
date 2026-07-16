@@ -35,9 +35,9 @@ const createServantSchema = z.object({
     phone: requiredPhone,
     password: z.string().min(6),
     bio: z.string().max(500, "Bio cannot exceed 500 characters").optional(),
-    experience: optionalRateNumber(),
-    hourlyRate: optionalRateNumber(),
-    monthlyRate: optionalRateNumber(),
+    experience: optionalRateNumber().refine(val => val === undefined || val === null || val < 20, "Years of experience must be under 20 years"),
+    hourlyRate: optionalRateNumber().refine(val => val === undefined || val === null || val < 999, "Hourly rate must be under 999"),
+    monthlyRate: optionalRateNumber().refine(val => val === undefined || val === null || val < 30000, "Monthly rate must be under 30000"),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
@@ -65,9 +65,9 @@ const updateServantSchema = z.object({
     latitude: z.coerce.number().min(-90).max(90).optional(),
     longitude: z.coerce.number().min(-180).max(180).optional(),
     bio: z.string().max(500, "Bio cannot exceed 500 characters").optional(),
-    experience: optionalRateNumber(),
-    hourlyRate: optionalRateNumber(),
-    monthlyRate: optionalRateNumber(),
+    experience: optionalRateNumber().refine(val => val === undefined || val === null || val < 20, "Years of experience must be under 20 years"),
+    hourlyRate: optionalRateNumber().refine(val => val === undefined || val === null || val < 999, "Hourly rate must be under 999"),
+    monthlyRate: optionalRateNumber().refine(val => val === undefined || val === null || val < 30000, "Monthly rate must be under 30000"),
     availableFrom: z.string().optional(),
     availableTo: z.string().optional(),
     workingDays: z.union([z.string(), z.array(z.string())]).optional(),
@@ -98,10 +98,18 @@ const verifyServantSchema = z.object({
   })
 });
 
+const updateServantStatusSchema = z.object({
+  body: z.object({
+    isActive: z.boolean(),
+    reason: z.string().min(1, "Reason is required")
+  })
+});
+
 module.exports = {
   updateServantMeSchema,
   createServantSchema,
   updateServantSchema,
   setServantPasswordSchema,
-  verifyServantSchema
+  verifyServantSchema,
+  updateServantStatusSchema
 };

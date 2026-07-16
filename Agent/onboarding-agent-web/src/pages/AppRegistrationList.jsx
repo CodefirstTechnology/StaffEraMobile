@@ -7,6 +7,7 @@ import { VerifiedBadge } from '../components/ui/VerifiedBadge'
 import { Button } from '../components/ui/Button'
 import { SetPasswordModal } from '../components/SetPasswordModal'
 import { CredentialsBanner } from '../components/CredentialsBanner'
+import { getMissingProfileFields } from '../lib/onboardingReport'
 import {
   PageHeader,
   StatCard,
@@ -56,16 +57,30 @@ export default function AppRegistrationList() {
     },
   })
 
+  const { data: allRegistrationsData } = useQuery({
+    queryKey: ['agent-registrations-all'],
+    queryFn: async () => {
+      const res = await api.get('/agent/servants', {
+        params: {
+          category: 'registered',
+          limit: 1000,
+        },
+      })
+      return res.data.data.servants
+    },
+  })
+
   const rows = data?.servants || []
+  const allRows = allRegistrationsData || []
   const locationNotice = data?.locationNotice
 
   const stats = useMemo(() => {
-    const pending = rows.filter((s) =>
+    const pending = allRows.filter((s) =>
       ['PENDING', 'UNDER_REVIEW'].includes(s.verificationStatus),
     ).length
-    const needPassword = rows.filter((s) => !s.user.agentSetPassword).length
-    return { total: rows.length, pending, needPassword }
-  }, [rows])
+    const needPassword = allRows.filter((s) => !s.user.agentSetPassword).length
+    return { total: allRows.length, pending, needPassword }
+  }, [allRows])
 
   const savePassword = async ({ password }) => {
     if (!passwordTarget) return
@@ -76,6 +91,7 @@ export default function AppRegistrationList() {
         password,
       })
       qc.invalidateQueries({ queryKey: ['agent-registrations'] })
+      qc.invalidateQueries({ queryKey: ['agent-registrations-all'] })
       qc.invalidateQueries({ queryKey: ['servant', String(passwordTarget.id)] })
       setCredentials(res.data?.data?.credentials || null)
       setPasswordTarget(null)
@@ -130,7 +146,7 @@ export default function AppRegistrationList() {
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search name or email…"
+          placeholder="Search by name, mobile no…"
         />
       </FilterBar>
 
@@ -237,6 +253,7 @@ export default function AppRegistrationList() {
         onSaveErrorClear={() => setPasswordSaveError('')}
         onClose={closePasswordModal}
         onSaved={savePassword}
+        missingFields={passwordTarget ? getMissingProfileFields(passwordTarget) : []}
       />
     </div>
   )

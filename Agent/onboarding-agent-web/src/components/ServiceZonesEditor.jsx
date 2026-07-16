@@ -4,10 +4,13 @@ import api from '../lib/api'
 import { Button } from './ui/Button'
 import { AgentLocationPicker } from './AgentLocationPicker'
 
-function Field({ label, children }) {
+function Field({ label, required, children }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <span className="text-sm font-medium text-gray-700">
+        {label}
+        {required && <span className="text-error"> *</span>}
+      </span>
       {children}
     </label>
   )
@@ -92,6 +95,10 @@ export function ServiceZonesEditor({
       setError('Add a zone name or pick a location on the map.')
       return
     }
+    if (!payload.city) {
+      setError('City is required.')
+      return
+    }
     if (payload.description && payload.description.length > 500) {
       setError('Description cannot exceed 500 characters.')
       return
@@ -142,6 +149,10 @@ export function ServiceZonesEditor({
     const payload = buildPayload()
     if (!payload.name) {
       setError('Add a zone name or pick a location on the map.')
+      return
+    }
+    if (!payload.city) {
+      setError('City is required.')
       return
     }
     if (payload.description && payload.description.length > 500) {
@@ -209,7 +220,7 @@ export function ServiceZonesEditor({
       ) : (
         <div className="space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-4">
           <p className="text-sm font-semibold">{editing ? 'Edit zone' : 'New zone'}</p>
-          <Field label="Zone name">
+          <Field label="Zone name" required>
             <input
               placeholder="e.g. Bandra West"
               value={draft.name}
@@ -229,7 +240,7 @@ export function ServiceZonesEditor({
               }))
             }}
           />
-          <Field label="City">
+          <Field label="City" required>
             <input
               placeholder="Mumbai"
               value={draft.city}

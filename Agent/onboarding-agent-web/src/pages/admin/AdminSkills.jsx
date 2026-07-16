@@ -59,6 +59,12 @@ function validateLabel(value) {
   if (!value.length) return 'This field is required'
   if (!value.trim().length) return 'Label cannot contain only spaces'
   if (value.trim().length < 2) return 'Label must be at least 2 characters'
+  if (!/[a-zA-Z0-9]/.test(value)) {
+    return 'Label must contain at least one letter or number'
+  }
+  if (!/^[a-zA-Z0-9\s\-\(\)\/&,\.]+$/.test(value)) {
+    return 'Label cannot contain special characters'
+  }
   return ''
 }
 

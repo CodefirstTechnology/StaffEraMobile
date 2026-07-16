@@ -39,21 +39,32 @@ export default function AdminServants() {
     },
   })
 
+  const { data: allServantsData } = useQuery({
+    queryKey: ['admin-servants-all'],
+    queryFn: async () => {
+      const res = await api.get('/admin/servants', {
+        params: { limit: 1000 },
+      })
+      return res.data.data.servants
+    },
+  })
+
   const servants = data || []
+  const allServants = allServantsData || []
 
   const stats = useMemo(() => {
-    const verified = servants.filter((s) => s.verificationStatus === 'VERIFIED').length
-    const pending = servants.filter((s) =>
+    const verified = allServants.filter((s) => s.verificationStatus === 'VERIFIED').length
+    const pending = allServants.filter((s) =>
       ['PENDING', 'UNDER_REVIEW'].includes(s.verificationStatus),
     ).length
     const avgRating =
-      servants.length > 0
+      allServants.length > 0
         ? (
-            servants.reduce((sum, s) => sum + (s.rating || 0), 0) / servants.length
+            allServants.reduce((sum, s) => sum + (s.rating || 0), 0) / allServants.length
           ).toFixed(1)
         : '—'
-    return { total: servants.length, verified, pending, avgRating }
-  }, [servants])
+    return { total: allServants.length, verified, pending, avgRating }
+  }, [allServants])
 
   return (
     <div className="space-y-6">

@@ -8,6 +8,8 @@ import {
   buildReportFromServant,
   downloadOnboardingReport,
   printOnboardingReport,
+  isProfileComplete,
+  getMissingProfileFields,
 } from '../lib/onboardingReport'
 import { Badge } from '../components/ui/Badge'
 import { VerifiedBadge } from '../components/ui/VerifiedBadge'
@@ -22,6 +24,19 @@ import { copyText } from '../lib/copyToClipboard'
 import { BankDetailsReview } from '../components/BankDetailsFields'
 import { AadhaarXmlVerify } from '../components/AadhaarXmlVerify'
 import { isValidIfscFormat, lookupIfsc } from '../lib/ifscLookup'
+import { Mail, Phone, IdCard, BadgeCheck } from 'lucide-react'
+
+const formatTime12 = (timeStr) => {
+  if (!timeStr) return ''
+  const [hStr, mStr] = timeStr.split(':')
+  let h = Number(hStr)
+  const m = mStr || '00'
+  if (isNaN(h)) return timeStr
+  const period = h < 12 ? 'AM' : 'PM'
+  let h12 = h % 12
+  if (h12 === 0) h12 = 12
+  return `${String(h12).padStart(2, '0')}:${m} ${period}`
+}
 
 const parseWorkingDays = (wd) => {
   if (!wd) return []
@@ -107,10 +122,16 @@ export default function ServantDetail() {
   const [rejectLoading, setRejectLoading] = useState(false)
   const [reviewActionError, setReviewActionError] = useState('')
   const [credentials, setCredentials] = useState(null)
+  const [copiedCredentials, setCopiedCredentials] = useState(false)
   const [reason, setReason] = useState('')
   const [idModal, setIdModal] = useState(false)
   const [ifscMeta, setIfscMeta] = useState({ bank: '', branch: '' })
-  const { showToast } = useToast()
+  const toast = useToast()
+
+  const [statusModalOpen, setStatusModalOpen] = useState(false)
+  const [statusReason, setStatusReason] = useState('')
+  const [statusLoading, setStatusLoading] = useState(false)
+  const [statusError, setStatusError] = useState('')
 
   const { data: servant, isLoading, isError, error } = useQuery({
     queryKey: ['servant', id],
@@ -204,6 +225,10 @@ export default function ServantDetail() {
   }
 
   const handleReject = async () => {
+    if (!reason || !reason.trim()) {
+      setRejectError('Rejection reason is required')
+      return
+    }
     setRejectLoading(true)
     setRejectError('')
     try {
@@ -212,6 +237,30 @@ export default function ServantDetail() {
       setRejectError(err.response?.data?.message || 'Request failed')
     } finally {
       setRejectLoading(false)
+    }
+  }
+
+  const handleUpdateStatus = async (targetActive) => {
+    if (!statusReason || !statusReason.trim()) {
+      setStatusError('Reason is required')
+      return
+    }
+    setStatusLoading(true)
+    setStatusError('')
+    try {
+      await api.patch(`/agent/servants/${id}/status`, {
+        isActive: targetActive,
+        reason: statusReason,
+      })
+      qc.invalidateQueries({ queryKey: ['servant', id] })
+      qc.invalidateQueries({ queryKey: ['agent-servants'] })
+      toast.success(targetActive ? 'Account activated' : 'Account deactivated')
+      setStatusModalOpen(false)
+      setStatusReason('')
+    } catch (err) {
+      setStatusError(err.response?.data?.message || 'Request failed')
+    } finally {
+      setStatusLoading(false)
     }
   }
 
@@ -234,7 +283,15 @@ export default function ServantDetail() {
     if (!credentials) return
     const text = `Email: ${credentials.email}\nPassword: ${credentials.password}`
     const ok = await copyText(text)
-    showToast(ok ? 'Copied' : 'Could not copy')
+    if (ok) {
+      setCopiedCredentials(true)
+      setTimeout(() => setCopiedCredentials(false), 2000)
+    }
+    if (ok) {
+      toast.success('Copied')
+    } else {
+      toast.error('Could not copy')
+    }
   }
 
   if (isLoading || authLoading) return <LoadingSkeleton />
@@ -325,32 +382,37 @@ export default function ServantDetail() {
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container px-3 py-1 text-xs font-medium text-on-surface-variant">
-                  ✉ {servant.user.email}
+                  <Mail size={13} className="text-secondary" />
+                  {servant.user.email}
                 </span>
                 {servant.user.phone && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container px-3 py-1 text-xs font-medium text-on-surface-variant">
-                    📞 {servant.user.phone}
+                    <Phone size={13} className="text-secondary" />
+                    {servant.user.phone}
                   </span>
                 )}
-                {servant.address && (
+                {(servant.address || servant.city) && (
                   <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-surface-container px-3 py-1 text-xs font-medium text-on-surface-variant">
                     <LocationIcon size={13} className="text-secondary" />
-                    {servant.address}
+                    {[servant.address, servant.city].filter(Boolean).join(', ')}
                   </span>
                 )}
                 {servant.idProofType && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-fixed px-3 py-1 text-xs font-medium text-primary">
-                    🪪 {servant.idProofType.replace(/_/g, ' ')}
+                    <IdCard size={13} />
+                    {servant.idProofType.replace(/_/g, ' ')}
                   </span>
                 )}
                 {servant.aadhaarVerified ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
-                    ✓ Aadhaar verified
+                    <BadgeCheck size={13} className="text-emerald-600" />
+                    Aadhaar verified
                   </span>
                 ) : null}
                 {servant.phoneVerified ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-medium text-sky-800">
-                    ✓ Mobile verified
+                    <BadgeCheck size={13} className="text-sky-600" />
+                    Mobile verified
                   </span>
                 ) : null}
               </div>
@@ -447,7 +509,7 @@ export default function ServantDetail() {
                     label="Hours"
                     value={
                       servant.availableFrom && servant.availableTo
-                        ? `${servant.availableFrom} – ${servant.availableTo}`
+                        ? `${formatTime12(servant.availableFrom)} – ${formatTime12(servant.availableTo)}`
                         : null
                     }
                   />
@@ -462,6 +524,15 @@ export default function ServantDetail() {
                     icon="📅"
                     label="Working days"
                     value={workingDays.length ? workingDays.join(', ') : null}
+                  />
+                  <DetailRow
+                    icon="🕐"
+                    label="Preferred timing"
+                    value={
+                      servant.availableFrom && servant.availableTo
+                        ? `${formatTime12(servant.availableFrom)} – ${formatTime12(servant.availableTo)}`
+                        : null
+                    }
                   />
                   <DetailRow
                     icon="⏱"
@@ -565,14 +636,55 @@ export default function ServantDetail() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {isAppRegistration ? (
+          {servant?.user ? (
             <SetLoginPasswordCard
               servantId={id}
               email={servant.user.email}
               passwordAlreadySet={!!servant.user.agentSetPassword}
               onSaved={() => qc.invalidateQueries({ queryKey: ['servant', id] })}
+              missingFields={getMissingProfileFields(servant)}
             />
           ) : null}
+
+          <section className="glass-card p-6">
+            <h3 className="text-lg font-semibold text-primary">Account Status</h3>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+                  servant.isActive !== false
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${
+                    servant.isActive !== false ? 'bg-emerald-600' : 'bg-red-600'
+                  }`} />
+                  {servant.isActive !== false ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              {servant.statusReason && (
+                <div className="rounded-lg bg-surface-container p-3 text-xs text-on-surface-variant">
+                  <p className="font-semibold text-primary">Status change reason:</p>
+                  <p className="mt-0.5 italic">"{servant.statusReason}"</p>
+                  {servant.statusChangedAt && (
+                    <p className="mt-1 text-[10px] opacity-70">
+                      Updated on: {new Date(servant.statusChangedAt).toLocaleString('en-IN')}
+                    </p>
+                  )}
+                </div>
+              )}
+              <Button
+                variant={servant.isActive !== false ? 'danger' : 'success'}
+                className="w-full mt-2"
+                onClick={() => {
+                  setStatusError('')
+                  setStatusReason('')
+                  setStatusModalOpen(true)
+                }}
+              >
+                {servant.isActive !== false ? 'Deactivate account' : 'Activate account'}
+              </Button>
+            </div>
+          </section>
 
           <section className="glass-card p-6">
             <h3 className="text-lg font-semibold text-primary">Verification</h3>
@@ -614,103 +726,143 @@ export default function ServantDetail() {
               </Button>
             </div>
 
-            {canReview && (
-              <div className="mt-2 space-y-2">
-                {reviewActionError ? (
-                  <p className="rounded-lg bg-red-50 p-3 text-sm text-error">{reviewActionError}</p>
-                ) : null}
-                <Button
-                  variant="success"
-                  className="w-full"
-                  onClick={handleApproveClick}
-                >
-                  ✓ Approve
-                </Button>
-                {isAppRegistration && !servant.user?.agentSetPassword ? (
+            {canReview && (() => {
+              const missingFields = getMissingProfileFields(servant)
+              const isComplete = missingFields.length === 0
+              return (
+                <div className="mt-2 space-y-2">
+                  {reviewActionError ? (
+                    <p className="rounded-lg bg-red-50 p-3 text-sm text-error">{reviewActionError}</p>
+                  ) : null}
+                  {!isComplete ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                      <p className="font-semibold">⚠️ Profile Incomplete</p>
+                      <p className="mt-0.5">Please edit the profile to fill in all required fields.</p>
+                      <p className="mt-1 font-medium text-amber-900">
+                        Missing: {missingFields.join(', ')}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <Button
+                        variant="success"
+                        className="w-full"
+                        onClick={handleApproveClick}
+                      >
+                        ✓ Approve
+                      </Button>
+                      {isAppRegistration && !servant.user?.agentSetPassword ? (
+                        <Button
+                          variant="secondary"
+                          className="w-full"
+                          onClick={() => {
+                            setApproveModalError('')
+                            setApproveOpen(true)
+                          }}
+                        >
+                          Approve with custom password
+                        </Button>
+                      ) : null}
+                    </>
+                  )}
                   <Button
                     variant="secondary"
                     className="w-full"
+                    onClick={handleMarkUnderReview}
+                  >
+                    Mark under review
+                  </Button>
+                  <Button
+                    variant="danger"
+                    className="w-full"
                     onClick={() => {
-                      setApproveModalError('')
-                      setApproveOpen(true)
+                      setRejectError('')
+                      setRejectOpen(true)
                     }}
                   >
-                    Approve with custom password
+                    Reject
                   </Button>
-                ) : null}
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={handleMarkUnderReview}
-                >
-                  Mark under review
-                </Button>
-                <Button
-                  variant="danger"
-                  className="w-full"
-                  onClick={() => {
-                    setRejectError('')
-                    setRejectOpen(true)
-                  }}
-                >
-                  Reject
-                </Button>
-              </div>
-            )}
+                </div>
+              )
+            })()}
           </section>
 
-          {servant.idProofUrl && (
-            <section className="glass-card p-6">
-              <h3 className="text-lg font-semibold text-primary">ID proof</h3>
-              <p className="mt-1 text-xs text-on-surface-variant">
-                {servant.idProofType?.replace(/_/g, ' ') || 'Document'}
-              </p>
-              <button
-                type="button"
-                onClick={() => setIdModal(true)}
-                className="group mt-4 block w-full overflow-hidden rounded-xl border border-outline-variant/40 bg-surface-low transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <img
-                  src={uploadUrl(servant.idProofUrl)}
-                  alt="ID proof preview"
-                  className="max-h-48 w-full object-contain transition-transform group-hover:scale-[1.02]"
-                />
-                <span className="block border-t border-outline-variant/30 bg-white/80 py-2 text-center text-xs font-medium text-primary">
-                  Tap to view full size
-                </span>
-              </button>
-            </section>
-          )}
+          {servant.idProofUrl && (() => {
+            const isPdf = servant.idProofUrl.toLowerCase().endsWith('.pdf')
+            return (
+              <section className="glass-card p-6">
+                <h3 className="text-lg font-semibold text-primary">ID proof</h3>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  {servant.idProofType?.replace(/_/g, ' ') || 'Document'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIdModal(true)}
+                  className="group mt-4 block w-full overflow-hidden rounded-xl border border-outline-variant/40 bg-surface-low transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  {isPdf ? (
+                    <div className="h-48 w-full overflow-hidden">
+                      <iframe
+                        src={uploadUrl(servant.idProofUrl) + "#toolbar=0&navpanes=0"}
+                        className="h-full w-full border-0 pointer-events-none"
+                        title="ID proof preview"
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      src={uploadUrl(servant.idProofUrl)}
+                      alt="ID proof preview"
+                      className="max-h-48 w-full object-contain transition-transform group-hover:scale-[1.02]"
+                    />
+                  )}
+                  <span className="block border-t border-outline-variant/30 bg-white/80 py-2 text-center text-xs font-medium text-primary">
+                    Tap to view full size
+                  </span>
+                </button>
+              </section>
+            )
+          })()}
         </div>
       </div>
 
-      {idModal && servant.idProofUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-          onClick={() => setIdModal(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="ID proof full size"
-        >
+      {idModal && servant.idProofUrl && (() => {
+        const isPdf = servant.idProofUrl.toLowerCase().endsWith('.pdf')
+        return (
           <div
-            className="relative max-h-[92vh] max-w-4xl"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+            onClick={() => setIdModal(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="ID proof full size"
           >
-            <button
-              type="button"
-              onClick={() => setIdModal(false)}
-              className="absolute -top-10 right-0 rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-primary shadow"
+            <div
+              className="relative max-h-[92vh] max-w-4xl"
+              onClick={(e) => e.stopPropagation()}
             >
-              Close ✕
-            </button>
-            <img
-              src={uploadUrl(servant.idProofUrl)}
-              alt="ID proof"
-              className="max-h-[85vh] w-full rounded-2xl object-contain shadow-2xl"
-            />
+              <button
+                type="button"
+                onClick={() => setIdModal(false)}
+                className="absolute -top-10 right-0 rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-primary shadow"
+              >
+                Close ✕
+              </button>
+              {isPdf ? (
+                <iframe
+                  src={uploadUrl(servant.idProofUrl)}
+                  className="w-[85vw] h-[80vh] rounded-2xl border-0 shadow-2xl bg-white"
+                  title="ID proof PDF"
+                />
+              ) : (
+                <img
+                  src={uploadUrl(servant.idProofUrl)}
+                  alt="ID proof"
+                  className="max-h-[85vh] w-full rounded-2xl object-contain shadow-2xl"
+                />
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       <ApprovePasswordModal
         open={approveOpen}
@@ -770,7 +922,7 @@ export default function ServantDetail() {
                 className="flex-1"
                 onClick={handleCopyCredentials}
               >
-                Copy all
+                {copiedCredentials ? '✓ Copied' : 'Copy all'}
               </Button>
               <Button variant="success" className="flex-1" onClick={() => setCredentials(null)}>
                 Done
@@ -787,7 +939,7 @@ export default function ServantDetail() {
           aria-modal="true"
         >
           <div className="glass-card w-full max-w-md p-6 shadow-2xl">
-            <h4 className="text-lg font-semibold text-primary">Rejection reason</h4>
+            <h4 className="text-lg font-semibold text-primary">Rejection reason <span className="text-error">*</span></h4>
             <p className="mt-1 text-sm text-on-surface-variant">
               This will be stored and shown to the agent reviewing the profile.
             </p>
@@ -817,6 +969,55 @@ export default function ServantDetail() {
                 onClick={() => {
                   setRejectOpen(false)
                   setRejectError('')
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {statusModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="glass-card w-full max-w-md p-6 shadow-2xl">
+            <h4 className="text-lg font-semibold text-primary">
+              Reason for {servant.isActive !== false ? 'deactivation' : 'activation'} <span className="text-error">*</span>
+            </h4>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Please provide a reason. This action will {servant.isActive !== false ? 'deactivate' : 'activate'} the servant's account and login capability.
+            </p>
+            <textarea
+              value={statusReason}
+              onChange={(e) => {
+                setStatusReason(e.target.value)
+                setStatusError('')
+              }}
+              className="input-ghost mt-4 w-full resize-none"
+              rows={4}
+              placeholder={`Explain why this profile is being ${servant.isActive !== false ? 'deactivated' : 'activated'}…`}
+            />
+            {statusError ? <p className="mt-3 text-sm text-error">{statusError}</p> : null}
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant={servant.isActive !== false ? 'danger' : 'success'}
+                className="flex-1"
+                disabled={statusLoading}
+                onClick={() => handleUpdateStatus(servant.isActive === false)}
+              >
+                {statusLoading ? 'Please wait…' : 'Confirm'}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={statusLoading}
+                onClick={() => {
+                  setStatusModalOpen(false)
+                  setStatusError('')
+                  setStatusReason('')
                 }}
               >
                 Cancel

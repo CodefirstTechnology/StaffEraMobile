@@ -47,6 +47,110 @@ const emptyPersonalErrors = () => ({
 
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 
+const TIME_12_OPTIONS = (() => {
+  const options = []
+  const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  for (let h of hours) {
+    for (let m of ['00', '30']) {
+      options.push(`${String(h).padStart(2, '0')}:${m}`)
+    }
+  }
+  return options
+})()
+
+const parseTimeTo12Hour = (timeStr) => {
+  if (!timeStr) return { time12: '09:00', period: 'AM' }
+  const [hStr, mStr] = timeStr.split(':')
+  let h = Number(hStr)
+  const m = mStr || '00'
+  if (isNaN(h)) return { time12: '09:00', period: 'AM' }
+  const period = h < 12 ? 'AM' : 'PM'
+  let h12 = h % 12
+  if (h12 === 0) h12 = 12
+  const time12 = `${String(h12).padStart(2, '0')}:${m}`
+  return { time12, period }
+}
+
+const formatTo24Hour = (time12, period) => {
+  if (!time12) return '09:00'
+  const [hStr, mStr] = time12.split(':')
+  let h = Number(hStr)
+  const m = mStr || '00'
+  if (period === 'PM' && h < 12) {
+    h += 12
+  } else if (period === 'AM' && h === 12) {
+    h = 0
+  }
+  return `${String(h).padStart(2, '0')}:${m}`
+}
+
+function TimePicker({ value, onChange, className }) {
+  const { time12, period } = parseTimeTo12Hour(value)
+
+  const get12HourOptions = () => {
+    const options = [...TIME_12_OPTIONS]
+    if (time12 && !options.includes(time12)) {
+      options.push(time12)
+      options.sort((a, b) => {
+        const parse = (t) => {
+          const [h, sm] = t.split(':').map(Number)
+          return (h === 12 ? 0 : h) * 60 + sm
+        }
+        return parse(a) - parse(b)
+      })
+    }
+    return options
+  }
+
+  const handleTimeChange = (newTime12) => {
+    onChange(formatTo24Hour(newTime12, period))
+  }
+
+  const handlePeriodChange = (newPeriod) => {
+    onChange(formatTo24Hour(time12, newPeriod))
+  }
+
+  const isInvalid = className?.includes('border-error')
+  const borderClass = isInvalid ? 'border-error' : 'border-gray-200'
+
+  return (
+    <div className="flex gap-2 max-w-xs">
+      <select
+        value={time12}
+        onChange={(e) => handleTimeChange(e.target.value)}
+        className={`flex-1 rounded-lg border ${borderClass} px-3 py-2 bg-white`}
+      >
+        {get12HourOptions().map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+      <select
+        value={period}
+        onChange={(e) => handlePeriodChange(e.target.value)}
+        className={`w-28 shrink-0 rounded-lg border ${borderClass} px-3 py-2 bg-white`}
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </div>
+  )
+}
+
+const calculateHours = (start, end) => {
+  if (!start || !end) return '0'
+  const [sh, sm] = start.split(':').map(Number)
+  const [eh, em] = end.split(':').map(Number)
+  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return '0'
+  let diffMin = (eh * 60 + em) - (sh * 60 + sm)
+  if (diffMin <= 0) {
+    diffMin += 24 * 60
+  }
+  const hours = diffMin / 60
+  return String(Math.round(hours * 10) / 10)
+}
+
 const STEPS = [
   { id: 1, label: 'Personal' },
   { id: 2, label: 'Skills' },
@@ -179,6 +283,28 @@ export default function OnboardServant() {
   })
   const [profilePhoto, setProfilePhoto] = useState(null)
   const [idProof, setIdProof] = useState(null)
+  const [idProofUrl, setIdProofUrl] = useState(null)
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState(null)
+
+  useEffect(() => {
+    if (idProof) {
+      const url = URL.createObjectURL(idProof)
+      setIdProofUrl(url)
+      return () => URL.revokeObjectURL(url)
+    } else {
+      setIdProofUrl(null)
+    }
+  }, [idProof])
+
+  useEffect(() => {
+    if (profilePhoto) {
+      const url = URL.createObjectURL(profilePhoto)
+      setProfilePhotoUrl(url)
+      return () => URL.revokeObjectURL(url)
+    } else {
+      setProfilePhotoUrl(null)
+    }
+  }, [profilePhoto])
   const [draftZones, setDraftZones] = useState([])
   const [countryCode, setCountryCode] = useState('+91')
 
@@ -214,17 +340,79 @@ export default function OnboardServant() {
     }
   }, [blocker.state])
 
+  useEffect(() => {
+    if (form.availableFrom && form.availableTo) {
+      const calculated = calculateHours(form.availableFrom, form.availableTo)
+      setForm((f) => {
+        if (f.hoursPerDay !== calculated) {
+          return { ...f, hoursPerDay: calculated }
+        }
+        return f
+      })
+      setAvailabilityErrors((prev) => ({ ...prev, hoursPerDay: '' }))
+    }
+  }, [form.availableFrom, form.availableTo])
+
+  // Debounced mobile uniqueness check – runs 600 ms after the user stops typing
+  useEffect(() => {
+    if (!form.phone) {
+      setPersonalErrors((prev) => (prev.phone ? { ...prev, phone: '' } : prev))
+      return
+    }
+    const handler = setTimeout(() => {
+      const digits = countryCode.replace(/\D/g, '')
+      const fullPhone = digits + form.phone
+      api
+        .get('/agent/servants/check-duplicate', { params: { phone: fullPhone } })
+        .then(() => {
+          setPersonalErrors((prev) => (prev.phone ? { ...prev, phone: '' } : prev))
+        })
+        .catch((err) => {
+          const msg = err.response?.data?.message
+          if (msg === 'Phone number already registered') {
+            setPersonalErrors((prev) => ({ ...prev, phone: 'This mobile number is already registered.' }))
+          }
+          // other errors (network etc.) are silently ignored here; the Next button check handles them
+        })
+    }, 600)
+    return () => clearTimeout(handler)
+  }, [form.phone, countryCode])
+
+  // Debounced email uniqueness check – runs 600 ms after the user stops typing
+  useEffect(() => {
+    if (!form.email) {
+      setPersonalErrors((prev) => (prev.email ? { ...prev, email: '' } : prev))
+      return
+    }
+    const handler = setTimeout(() => {
+      api
+        .get('/agent/servants/check-duplicate', { params: { email: form.email.trim() } })
+        .then(() => {
+          setPersonalErrors((prev) => (prev.email ? { ...prev, email: '' } : prev))
+        })
+        .catch((err) => {
+          const msg = err.response?.data?.message
+          if (msg === 'Email already registered') {
+            setPersonalErrors((prev) => ({ ...prev, email: 'This email is already registered.' }))
+          }
+        })
+    }, 600)
+    return () => clearTimeout(handler)
+  }, [form.email])
+
   const clearPersonalError = (key) =>
     setPersonalErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
 
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }))
-  const toggleDay = (d) =>
+  const toggleDay = (d) => {
     setForm((f) => ({
       ...f,
       workingDays: f.workingDays.includes(d)
         ? f.workingDays.filter((x) => x !== d)
         : [...f.workingDays, d],
     }))
+    setAvailabilityErrors((prev) => ({ ...prev, workingDays: '' }))
+  }
 
   const validatePersonal = () => {
     const errors = emptyPersonalErrors()
@@ -272,9 +460,12 @@ export default function OnboardServant() {
   }
 
   const validateAvailability = () => {
-    const errors = { bookingTypes: '', hoursPerDay: '', availabilityNotes: '' }
+    const errors = { bookingTypes: '', hoursPerDay: '', availabilityNotes: '', workingDays: '' }
     if (!form.offersSession && !form.offersMonthly) {
       errors.bookingTypes = 'Select at least one booking type: Session or Monthly'
+    }
+    if (form.offersMonthly && (!form.workingDays || form.workingDays.length === 0)) {
+      errors.workingDays = 'Select at least one working day for Monthly bookings'
     }
     errors.hoursPerDay = hoursPerDayError()
     if (form.availabilityNotes && form.availabilityNotes.length > 500) {
@@ -337,9 +528,32 @@ export default function OnboardServant() {
     printOnboardingReport(reportDraft())
   }
 
-  const goNext = () => {
+  const goNext = async () => {
     setSubmitError('')
-    if (step === 1 && !validatePersonal()) return
+    if (step === 1) {
+      if (!validatePersonal()) return
+      setSubmitting(true)
+      try {
+        await api.get('/agent/servants/check-duplicate', {
+          params: {
+            email: form.email || undefined,
+            phone: form.phone ? (countryCode + form.phone) : undefined,
+          },
+        })
+      } catch (err) {
+        const msg = err.response?.data?.message || 'Verification failed'
+        if (msg === 'Email already registered') {
+          setPersonalErrors((prev) => ({ ...prev, email: 'This email is already registered.' }))
+        } else if (msg === 'Phone number already registered') {
+          setPersonalErrors((prev) => ({ ...prev, phone: 'This phone number is already registered.' }))
+        } else {
+          setSubmitError('Failed to verify email/phone availability. Please check your connection.')
+        }
+        setSubmitting(false)
+        return
+      }
+      setSubmitting(false)
+    }
     if (step === 2 && !validateSkillsRates()) return
     if (step === 3 && !validateAvailability()) return
     if (step === 4 && !validateZones()) return
@@ -588,10 +802,10 @@ export default function OnboardServant() {
                   onBlur={
                     f.key === 'phone'
                       ? () =>
-                          setPersonalErrors((prev) => ({
-                            ...prev,
-                            phone: validatePhoneRequired(form.phone, countryCode),
-                          }))
+                        setPersonalErrors((prev) => ({
+                          ...prev,
+                          phone: validatePhoneRequired(form.phone, countryCode),
+                        }))
                       : undefined
                   }
                   type={f.type}
@@ -722,18 +936,16 @@ export default function OnboardServant() {
             <div className="space-y-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
               <h4 className="text-sm font-semibold text-gray-700">Session</h4>
               <Field label="Session start time">
-                <input
-                  type="time"
+                <TimePicker
                   value={form.availableFrom}
-                  onChange={(e) => update('availableFrom', e.target.value)}
+                  onChange={(val) => update('availableFrom', val)}
                   className={inputClassName()}
                 />
               </Field>
               <Field label="Session end time">
-                <input
-                  type="time"
+                <TimePicker
                   value={form.availableTo}
-                  onChange={(e) => update('availableTo', e.target.value)}
+                  onChange={(val) => update('availableTo', val)}
                   className={inputClassName()}
                 />
               </Field>
@@ -751,36 +963,42 @@ export default function OnboardServant() {
                       key={d}
                       type="button"
                       onClick={() => toggleDay(d)}
-                      className={`rounded-full px-3 py-1 text-sm ${
-                        form.workingDays.includes(d)
-                          ? 'bg-primary text-white'
-                          : 'bg-gray-100'
-                      }`}
+                      className={`rounded-full px-3 py-1 text-sm ${form.workingDays.includes(d)
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100'
+                        }`}
                     >
                       {d}
                     </button>
                   ))}
                 </div>
+                <FieldError message={availabilityErrors.workingDays} />
               </div>
+              {!form.offersSession && (
+                <>
+                  <Field label="Monthly start time">
+                    <TimePicker
+                      value={form.availableFrom}
+                      onChange={(val) => update('availableFrom', val)}
+                      className={inputClassName()}
+                    />
+                  </Field>
+                  <Field label="Monthly end time">
+                    <TimePicker
+                      value={form.availableTo}
+                      onChange={(val) => update('availableTo', val)}
+                      className={inputClassName()}
+                    />
+                  </Field>
+                </>
+              )}
               <Field label="Hours per day" required>
                 <input
                   type="number"
-                  min={1}
-                  max={24}
-                  placeholder="e.g. 8"
+                  placeholder="Calculated automatically"
                   value={form.hoursPerDay}
-                  onChange={(e) => {
-                    update('hoursPerDay', sanitizeNonNegativeInput(e.target.value))
-                    setAvailabilityErrors((prev) => ({ ...prev, hoursPerDay: '' }))
-                  }}
-                  onBlur={() =>
-                    setAvailabilityErrors((prev) => ({
-                      ...prev,
-                      hoursPerDay: hoursPerDayError(),
-                    }))
-                  }
-                  aria-invalid={availabilityErrors.hoursPerDay ? 'true' : undefined}
-                  className={inputClassName(!!availabilityErrors.hoursPerDay)}
+                  readOnly
+                  className={`${inputClassName(!!availabilityErrors.hoursPerDay)} bg-gray-100 text-gray-500 cursor-not-allowed`}
                 />
                 <FieldError message={availabilityErrors.hoursPerDay} />
               </Field>
@@ -860,8 +1078,47 @@ export default function OnboardServant() {
                 setIdProof(file)
                 setDocumentErrors((prev) => ({ ...prev, idProof: '' }))
               }}
-              className="w-full text-sm"
+              className="w-full text-sm font-medium file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
             />
+            {idProof && (
+              <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-gray-100">
+                  <span className="text-xs font-semibold text-gray-700">✓ Selected: {idProof.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setIdProof(null)}
+                    className="text-error hover:underline text-xs"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="mt-2 flex flex-col items-start gap-2">
+                  {idProof.type === 'application/pdf' ? (
+                    <div className="w-full">
+                      <iframe
+                        src={idProofUrl}
+                        className="w-full h-80 rounded border border-gray-200"
+                        title="ID Proof PDF Preview"
+                      />
+                      <a
+                        href={idProofUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center text-xs text-primary hover:underline font-semibold"
+                      >
+                        Open PDF in new tab
+                      </a>
+                    </div>
+                  ) : (
+                    <img
+                      src={idProofUrl}
+                      alt="ID Proof Preview"
+                      className="max-h-64 object-contain rounded border border-gray-200"
+                    />
+                  )}
+                </div>
+              </div>
+            )}
             <FieldError message={documentErrors.idProof} />
           </Field>
           <Field label="Profile photo" required>
@@ -886,8 +1143,29 @@ export default function OnboardServant() {
                 setProfilePhoto(file)
                 setDocumentErrors((prev) => ({ ...prev, profilePhoto: '' }))
               }}
-              className="w-full text-sm"
+              className="w-full text-sm font-medium file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
             />
+            {profilePhoto && (
+              <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-gray-100">
+                  <span className="text-xs font-semibold text-gray-700">✓ Selected: {profilePhoto.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setProfilePhoto(null)}
+                    className="text-error hover:underline text-xs"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <img
+                    src={profilePhotoUrl}
+                    alt="Profile Photo Preview"
+                    className="h-32 w-32 object-cover rounded-lg border border-gray-200"
+                  />
+                </div>
+              </div>
+            )}
             <FieldError message={documentErrors.profilePhoto} />
           </Field>
         </div>
@@ -998,8 +1276,8 @@ export default function OnboardServant() {
                 .filter(Boolean)
                 .join(', ') || '—'}
             </ReviewItem>
-            {form.offersSession && (
-              <ReviewItem label="Session hours">
+            {(form.offersSession || form.offersMonthly) && (
+              <ReviewItem label="Available hours">
                 {form.availableFrom && form.availableTo
                   ? `${form.availableFrom} – ${form.availableTo}`
                   : '—'}

@@ -29,6 +29,110 @@ import {
 const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const ID_TYPES = ['AADHAR', 'PAN', 'PASSPORT', 'VOTER_ID']
 
+const TIME_12_OPTIONS = (() => {
+  const options = []
+  const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  for (let h of hours) {
+    for (let m of ['00', '30']) {
+      options.push(`${String(h).padStart(2, '0')}:${m}`)
+    }
+  }
+  return options
+})()
+
+const parseTimeTo12Hour = (timeStr) => {
+  if (!timeStr) return { time12: '09:00', period: 'AM' }
+  const [hStr, mStr] = timeStr.split(':')
+  let h = Number(hStr)
+  const m = mStr || '00'
+  if (isNaN(h)) return { time12: '09:00', period: 'AM' }
+  const period = h < 12 ? 'AM' : 'PM'
+  let h12 = h % 12
+  if (h12 === 0) h12 = 12
+  const time12 = `${String(h12).padStart(2, '0')}:${m}`
+  return { time12, period }
+}
+
+const formatTo24Hour = (time12, period) => {
+  if (!time12) return '09:00'
+  const [hStr, mStr] = time12.split(':')
+  let h = Number(hStr)
+  const m = mStr || '00'
+  if (period === 'PM' && h < 12) {
+    h += 12
+  } else if (period === 'AM' && h === 12) {
+    h = 0
+  }
+  return `${String(h).padStart(2, '0')}:${m}`
+}
+
+function TimePicker({ value, onChange, className }) {
+  const { time12, period } = parseTimeTo12Hour(value)
+
+  const get12HourOptions = () => {
+    const options = [...TIME_12_OPTIONS]
+    if (time12 && !options.includes(time12)) {
+      options.push(time12)
+      options.sort((a, b) => {
+        const parse = (t) => {
+          const [h, sm] = t.split(':').map(Number)
+          return (h === 12 ? 0 : h) * 60 + sm
+        }
+        return parse(a) - parse(b)
+      })
+    }
+    return options
+  }
+
+  const handleTimeChange = (newTime12) => {
+    onChange(formatTo24Hour(newTime12, period))
+  }
+
+  const handlePeriodChange = (newPeriod) => {
+    onChange(formatTo24Hour(time12, newPeriod))
+  }
+
+  const isInvalid = className?.includes('border-error')
+  const borderClass = isInvalid ? 'border-error' : 'border-gray-200'
+
+  return (
+    <div className="flex gap-2 max-w-xs">
+      <select
+        value={time12}
+        onChange={(e) => handleTimeChange(e.target.value)}
+        className={`flex-1 rounded-lg border ${borderClass} px-3 py-2 bg-white`}
+      >
+        {get12HourOptions().map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+      <select
+        value={period}
+        onChange={(e) => handlePeriodChange(e.target.value)}
+        className={`w-28 shrink-0 rounded-lg border ${borderClass} px-3 py-2 bg-white`}
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </div>
+  )
+}
+
+const calculateHours = (start, end) => {
+  if (!start || !end) return '0'
+  const [sh, sm] = start.split(':').map(Number)
+  const [eh, em] = end.split(':').map(Number)
+  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return '0'
+  let diffMin = (eh * 60 + em) - (sh * 60 + sm)
+  if (diffMin <= 0) {
+    diffMin += 24 * 60
+  }
+  const hours = diffMin / 60
+  return String(Math.round(hours * 10) / 10)
+}
+
 function Field({ label, required, children }) {
   return (
     <label className="block space-y-1.5">
@@ -77,7 +181,8 @@ export default function EditServant() {
   const [phoneError, setPhoneError] = useState('')
   const [skillsRateErrors, setSkillsRateErrors] = useState(emptySkillsRateErrors)
   const [loginPasswordError, setLoginPasswordError] = useState('')
-  const { showToast } = useToast()
+  const [copied, setCopied] = useState(false)
+  const toast = useToast()
 
   const { data: servant, isLoading } = useQuery({
     queryKey: ['servant', id],
@@ -200,6 +305,18 @@ export default function EditServant() {
     })
   }, [servant])
 
+  useEffect(() => {
+    if (form.availableFrom && form.availableTo) {
+      const calculated = calculateHours(form.availableFrom, form.availableTo)
+      setForm((f) => {
+        if (f.hoursPerDay !== calculated) {
+          return { ...f, hoursPerDay: calculated }
+        }
+        return f
+      })
+    }
+  }, [form.availableFrom, form.availableTo])
+
   const update = (key, val) => setForm((f) => ({ ...f, [key]: val }))
   const toggleDay = (d) =>
     setForm((f) => ({
@@ -234,6 +351,10 @@ export default function EditServant() {
     if (Object.values(rateErrors).some(Boolean)) return
     if (!form.offersSession && !form.offersMonthly) {
       setError('Select at least one booking type: Session or Monthly')
+      return
+    }
+    if (form.offersMonthly && (!form.workingDays || form.workingDays.length === 0)) {
+      setError('Select at least one working day for Monthly bookings')
       return
     }
     const bankErr = validateBankDetails(form, bankAccountConfirm, {
@@ -457,18 +578,16 @@ export default function EditServant() {
           <div className="space-y-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
             <h4 className="text-sm font-semibold text-gray-700">Session</h4>
             <Field label="Session start time">
-              <input
-                type="time"
+              <TimePicker
                 value={form.availableFrom}
-                onChange={(e) => update('availableFrom', e.target.value)}
+                onChange={(val) => update('availableFrom', val)}
                 className={inputClassName()}
               />
             </Field>
             <Field label="Session end time">
-              <input
-                type="time"
+              <TimePicker
                 value={form.availableTo}
-                onChange={(e) => update('availableTo', e.target.value)}
+                onChange={(val) => update('availableTo', val)}
                 className={inputClassName()}
               />
             </Field>
@@ -497,15 +616,31 @@ export default function EditServant() {
                 ))}
               </div>
             </div>
+            {!form.offersSession && (
+              <>
+                <Field label="Monthly start time">
+                  <TimePicker
+                    value={form.availableFrom}
+                    onChange={(val) => update('availableFrom', val)}
+                    className={inputClassName()}
+                  />
+                </Field>
+                <Field label="Monthly end time">
+                  <TimePicker
+                    value={form.availableTo}
+                    onChange={(val) => update('availableTo', val)}
+                    className={inputClassName()}
+                  />
+                </Field>
+              </>
+            )}
             <Field label="Hours per day" required>
               <input
                 type="number"
-                min="1"
-                max="24"
-                placeholder="e.g. 8"
+                placeholder="Calculated automatically"
                 value={form.hoursPerDay}
-                onChange={(e) => update('hoursPerDay', e.target.value)}
-                className={inputClassName()}
+                readOnly
+                className={`${inputClassName()} bg-gray-100 text-gray-500 cursor-not-allowed`}
               />
             </Field>
             <Field label="Monthly availability notes">
@@ -576,7 +711,7 @@ export default function EditServant() {
                 const ext = file.name.split('.').pop().toLowerCase()
                 const allowed = ['jpg', 'jpeg', 'png', 'pdf']
                 if (!allowed.includes(ext) || file.type.includes('gif') || file.type.includes('video')) {
-                  showToast('ID proof must be a JPG, JPEG, PNG image or a PDF document', 'error')
+                  toast.error('ID proof must be a JPG, JPEG, PNG image or a PDF document')
                   e.target.value = ''
                   setIdProof(null)
                   return
@@ -607,7 +742,7 @@ export default function EditServant() {
                 const ext = file.name.split('.').pop().toLowerCase()
                 const allowed = ['jpg', 'jpeg', 'png']
                 if (!allowed.includes(ext) || file.type.includes('gif') || file.type.includes('video')) {
-                  showToast('Profile photo must be a JPG, JPEG or PNG image', 'error')
+                  toast.error('Profile photo must be a JPG, JPEG or PNG image')
                   e.target.value = ''
                   setProfilePhoto(null)
                   return
@@ -657,10 +792,18 @@ export default function EditServant() {
               onClick={async () => {
                 const text = `Email: ${savedCredentials.email}\nPassword: ${savedCredentials.password}`
                 const ok = await copyText(text)
-                showToast(ok ? 'Copied' : 'Could not copy')
+                if (ok) {
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }
+                if (ok) {
+                  toast.success('Copied')
+                } else {
+                  toast.error('Could not copy')
+                }
               }}
             >
-              Copy all
+              {copied ? '✓ Copied' : 'Copy all'}
             </Button>
             <Button variant="success" onClick={() => navigate(`/servants/${id}`)}>
               Done
