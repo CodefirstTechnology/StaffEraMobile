@@ -1,3 +1,5 @@
+import html2pdf from 'html2pdf.js'
+
 const esc = (v) =>
   String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -41,7 +43,7 @@ export function buildReportFromForm(form, skillsCatalog = [], files = {}) {
       offersSession: form.offersSession,
       offersMonthly: form.offersMonthly,
       sessionHours:
-        form.offersSession && form.availableFrom && form.availableTo
+        (form.offersSession || form.offersMonthly) && form.availableFrom && form.availableTo
           ? `${form.availableFrom} – ${form.availableTo}`
           : null,
       workingDays: form.offersMonthly ? form.workingDays : [],
@@ -236,15 +238,22 @@ function safeReportFilename(data, filenameBase = 'onboarding-report') {
 export function downloadOnboardingReport(data, filenameBase = 'onboarding-report') {
   const safeName = safeReportFilename(data, filenameBase)
   const html = reportHtml(data)
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `staffera-${safeName || 'servant'}-report.html`
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
+
+  const element = document.createElement('div')
+  element.innerHTML = html
+  element.style.padding = '20px'
+  element.style.fontFamily = 'Inter, system-ui, sans-serif'
+  element.style.color = '#1f2937'
+
+  const opt = {
+    margin: [10, 10, 10, 10],
+    filename: `staffera-${safeName || 'servant'}-report.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }
+
+  html2pdf().set(opt).from(element).save()
 }
 
 /** Opens the report in a new tab so the agent can print or save as PDF. */
@@ -261,4 +270,63 @@ export function printOnboardingReport(data) {
   win.onload = () => {
     win.print()
   }
+}
+
+export function getMissingProfileFields(servant) {
+  if (!servant) return ['Profile details']
+  const missing = []
+  const u = servant.user || {}
+
+  // 1. Personal details
+  if (!u.name?.trim()) missing.push('Full name')
+  if (!u.email?.trim()) missing.push('Email')
+  if (!u.phone?.trim()) missing.push('Phone number')
+  if (!servant.address?.trim()) missing.push('Address')
+
+  // 2. Skills
+  if (!servant.skills || servant.skills.length === 0) missing.push('Skills')
+
+  // 3. Zones
+  if (!servant.zones || servant.zones.length === 0) missing.push('Service zones')
+
+  // 4. Documents
+  if (!servant.profilePhoto) missing.push('Profile photo')
+  if (!servant.idProofUrl) missing.push('ID proof document')
+
+  // 5. Availability
+  if (!servant.offersSession && !servant.offersMonthly) {
+    missing.push('Booking types')
+  }
+  if (!servant.availableFrom || !servant.availableTo) {
+    missing.push('Preferred timing')
+  }
+
+  if (servant.offersMonthly) {
+    if (!servant.hoursPerDay || servant.hoursPerDay < 1) {
+      missing.push('Hours per day')
+    }
+    // Parse working days
+    let workingDays = []
+    if (servant.workingDays) {
+      if (Array.isArray(servant.workingDays)) {
+        workingDays = servant.workingDays
+      } else {
+        try {
+          const parsed = JSON.parse(servant.workingDays)
+          if (Array.isArray(parsed)) workingDays = parsed
+        } catch {
+          workingDays = servant.workingDays.split(',').map(d => d.trim()).filter(Boolean)
+        }
+      }
+    }
+    if (workingDays.length === 0) {
+      missing.push('Working days')
+    }
+  }
+
+  return missing
+}
+
+export function isProfileComplete(servant) {
+  return getMissingProfileFields(servant).length === 0
 }

@@ -7,7 +7,8 @@ const validate = require("../middleware/validate");
 const {
   createServantSchema,
   verifyServantSchema,
-  setServantPasswordSchema
+  setServantPasswordSchema,
+  updateServantStatusSchema
 } = require("../validators/servantValidator");
 const { updateAgentProfileSchema } = require("../validators/agentValidator");
 const {
@@ -59,6 +60,11 @@ router.post(
   "/servants/:id/upload-id",
   upload.single("idProof"),
   agentController.uploadIdProof
+);
+router.patch(
+  "/servants/:id/status",
+  validate(updateServantStatusSchema),
+  agentController.updateServantStatus
 );
 
 router.get("/servants/:id/zones", agentController.listServantZones);

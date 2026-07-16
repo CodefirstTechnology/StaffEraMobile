@@ -53,16 +53,27 @@ export default function AdminBookings() {
     },
   })
 
+  const { data: allBookingsData } = useQuery({
+    queryKey: ['admin-bookings-all'],
+    queryFn: async () => {
+      const res = await api.get('/admin/bookings', {
+        params: { limit: 1000 },
+      })
+      return res.data.data.bookings
+    },
+  })
+
   const bookings = data || []
+  const allBookings = allBookingsData || []
 
   const stats = useMemo(() => {
-    const revenue = bookings.reduce((sum, b) => sum + Number(b.totalAmount || 0), 0)
-    const active = bookings.filter((b) =>
+    const revenue = allBookings.reduce((sum, b) => sum + Number(b.totalAmount || 0), 0)
+    const active = allBookings.filter((b) =>
       ['PENDING', 'CONFIRMED', 'ACTIVE'].includes(b.status),
     ).length
-    const completed = bookings.filter((b) => b.status === 'COMPLETED').length
-    return { total: bookings.length, active, completed, revenue }
-  }, [bookings])
+    const completed = allBookings.filter((b) => b.status === 'COMPLETED').length
+    return { total: allBookings.length, active, completed, revenue }
+  }, [allBookings])
 
   return (
     <div className="space-y-6">

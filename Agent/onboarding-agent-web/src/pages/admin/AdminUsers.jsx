@@ -67,14 +67,26 @@ export default function AdminUsers() {
     },
   })
 
+  const { data: allUsersData } = useQuery({
+    queryKey: ['admin-users-all'],
+    queryFn: async () => {
+      const res = await api.get('/admin/users', {
+        params: { limit: 1 },
+      })
+      return res.data.data
+    },
+  })
+
   const users = data?.users || []
   const total = data?.pagination?.total ?? users.length
+  const overallTotalUsers = allUsersData?.pagination?.total ?? '—'
 
   const toggle = async (user) => {
     const wasActive = user.isActive
     try {
       await api.patch(`/admin/users/${user.id}/toggle`)
       qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['admin-users-all'] })
       qc.invalidateQueries({ queryKey: ['admin-stats'] })
       toast.success(
         wasActive
@@ -95,7 +107,7 @@ export default function AdminUsers() {
 
       {!isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Total users" value={total} />
+          <StatCard label="Total users" value={overallTotalUsers} />
           <StatCard
             label="House owners"
             value={stats?.totalOwners ?? '—'}

@@ -109,9 +109,6 @@ export function TypePill({ type }) {
 export function FilterBar({ children, count, countLabel = 'results' }) {
   return (
     <div className="glass-card flex flex-wrap items-center gap-3 p-4">
-      <span className="text-lg opacity-60" aria-hidden>
-        🔍
-      </span>
       {children}
       {count != null && (
         <span className="ml-auto text-sm text-on-surface-variant">
@@ -140,12 +137,18 @@ export function SelectFilter({ value, onChange, options, className = '' }) {
 
 export function SearchInput({ value, onChange, placeholder = 'Search…' }) {
   return (
-    <input
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`${inputClass()} max-w-md flex-1 min-w-[200px]`}
-    />
+    <div className="relative max-w-md flex-1 min-w-[200px] flex items-center">
+      <span className="absolute left-3.5 top-1/2 -translate-y-[52%] flex items-center justify-center text-base opacity-50 pointer-events-none" aria-hidden>
+        🔍
+      </span>
+      <input
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${inputClass()} w-full`}
+        style={{ paddingLeft: '2.5rem' }}
+      />
+    </div>
   )
 }
 

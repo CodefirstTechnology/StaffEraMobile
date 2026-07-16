@@ -98,10 +98,18 @@ const verifyServantSchema = z.object({
   })
 });
 
+const updateServantStatusSchema = z.object({
+  body: z.object({
+    isActive: z.boolean(),
+    reason: z.string().min(1, "Reason is required")
+  })
+});
+
 module.exports = {
   updateServantMeSchema,
   createServantSchema,
   updateServantSchema,
   setServantPasswordSchema,
-  verifyServantSchema
+  verifyServantSchema,
+  updateServantStatusSchema
 };

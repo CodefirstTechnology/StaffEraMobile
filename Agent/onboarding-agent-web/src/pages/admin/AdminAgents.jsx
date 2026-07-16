@@ -615,14 +615,25 @@ export default function AdminAgents() {
     },
   })
 
+  const { data: allAgentsData } = useQuery({
+    queryKey: ['admin-agents-all'],
+    queryFn: async () => {
+      const res = await api.get('/admin/agents', {
+        params: { limit: 1000 },
+      })
+      return res.data.data.agents
+    },
+  })
+
   const rows = data || []
+  const allRows = allAgentsData || []
 
   const stats = useMemo(() => {
-    const active = rows.filter((a) => a.user.isActive).length
-    const servants = rows.reduce((sum, a) => sum + (a._count?.servants ?? 0), 0)
-    const revenue = rows.reduce((sum, a) => sum + (a.annualRevenue ?? 0), 0)
-    return { total: rows.length, active, servants, revenue }
-  }, [rows])
+    const active = allRows.filter((a) => a.user.isActive).length
+    const servants = allRows.reduce((sum, a) => sum + (a._count?.servants ?? 0), 0)
+    const revenue = allRows.reduce((sum, a) => sum + (a.annualRevenue ?? 0), 0)
+    return { total: allRows.length, active, servants, revenue }
+  }, [allRows])
 
   const resetForm = () => {
     setName('')
@@ -702,6 +713,7 @@ export default function AdminAgents() {
       })
       closeEdit()
       qc.invalidateQueries({ queryKey: ['admin-agents'] })
+      qc.invalidateQueries({ queryKey: ['admin-agents-all'] })
       toast.success(`Agent "${editingAgent.user.name}" updated`)
     } catch (err) {
       setEditError(err.response?.data?.message || 'Failed to update agent')
@@ -729,6 +741,7 @@ export default function AdminAgents() {
       await api.patch(`/admin/users/${agentToToggle.user.id}/toggle`)
       setAgentToToggle(null)
       qc.invalidateQueries({ queryKey: ['admin-agents'] })
+      qc.invalidateQueries({ queryKey: ['admin-agents-all'] })
       qc.invalidateQueries({ queryKey: ['admin-stats'] })
       toast.success(
         wasActive
@@ -799,6 +812,7 @@ export default function AdminAgents() {
       resetForm()
       setShowForm(false)
       qc.invalidateQueries({ queryKey: ['admin-agents'] })
+      qc.invalidateQueries({ queryKey: ['admin-agents-all'] })
       qc.invalidateQueries({ queryKey: ['admin-stats'] })
       toast.success(`Agent "${name.trim()}" added`)
     } catch (err) {

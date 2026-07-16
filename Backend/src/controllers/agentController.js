@@ -849,3 +849,45 @@ exports.checkDuplicate = async (req, res) => {
   sendSuccess(res, { available: true });
 };
 
+exports.updateServantStatus = async (req, res) => {
+  const scope = await resolveAgentScope(req.user);
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    throw new ApiError(400, "Invalid servant ID");
+  }
+
+  const existing = await prisma.servant.findFirst({
+    where: recordWhereForScope(scope, { id }),
+    include: { user: true }
+  });
+  await assertScopedServantAccess(scope, existing);
+
+  const { isActive, reason } = req.body;
+
+  if (typeof isActive !== "boolean") {
+    throw new ApiError(400, "isActive must be a boolean");
+  }
+  if (!reason || typeof reason !== "string" || !reason.trim()) {
+    throw new ApiError(400, "Reason is required");
+  }
+
+  const updatedServant = await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: existing.userId },
+      data: { isActive }
+    });
+
+    return tx.servant.update({
+      where: { id },
+      data: {
+        isActive,
+        statusReason: reason.trim(),
+        statusChangedAt: new Date()
+      },
+      include: servantInclude
+    });
+  });
+
+  sendSuccess(res, { servant: updatedServant });
+};
+
