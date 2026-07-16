@@ -34,6 +34,7 @@ router.post(
   validate(createServantSchema),
   agentController.createServant
 );
+router.get("/servants/check-duplicate", agentController.checkDuplicate);
 router.get("/servants", agentController.listServants);
 router.get("/servants/:id", agentController.getServant);
 router.patch(
