@@ -1,4 +1,4 @@
-const { z } = require("zod");
+ const { z } = require("zod");
 const { optionalPhone, requiredPhone, strictEmail } = require("./zodHelpers");
 
 const emptyToUndefined = (val) =>

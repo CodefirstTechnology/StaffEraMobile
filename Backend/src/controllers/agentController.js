@@ -287,7 +287,7 @@ exports.listServants = async (req, res) => {
           user: {
             OR: [
               { name: { contains: search, mode: "insensitive" } },
-              { email: { contains: search, mode: "insensitive" } }
+              { phone: { contains: search, mode: "insensitive" } }
             ]
           }
         }
@@ -369,6 +369,9 @@ const assertScopedServantAccess = async (scope, servant) => {
 exports.getServant = async (req, res) => {
   const scope = await resolveAgentScope(req.user);
   const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    throw new ApiError(400, "Invalid servant ID");
+  }
 
   const servant = await prisma.servant.findFirst({
     where: recordWhereForScope(scope, { id }),
@@ -555,12 +558,6 @@ exports.setServantPassword = async (req, res) => {
   });
   await assertScopedServantAccess(scope, existing);
 
-  const isAppRegistration =
-    existing.registrationSource === "SELF" || existing.user.isActive === false;
-
-  if (!isAppRegistration) {
-    throw new ApiError(400, "Login password can only be set for app registrations");
-  }
 
   let loginPassword =
     password && String(password).trim().length >= 6 ? String(password).trim() : null;
@@ -829,3 +826,68 @@ exports.deleteServantZone = async (req, res) => {
   await prisma.zone.delete({ where: { id: zoneId } });
   sendSuccess(res, { message: "Zone deleted" });
 };
+
+exports.checkDuplicate = async (req, res) => {
+  const { email: rawEmail, phone: rawPhone } = req.query;
+
+  if (rawEmail) {
+    const email = normalizeEmail(rawEmail);
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new ApiError(400, "Email already registered");
+    }
+  }
+
+  if (rawPhone) {
+    const phone = normalizePhone(rawPhone);
+    const phoneTaken = await prisma.user.findFirst({ where: { phone } });
+    if (phoneTaken) {
+      throw new ApiError(400, "Phone number already registered");
+    }
+  }
+
+  sendSuccess(res, { available: true });
+};
+
+exports.updateServantStatus = async (req, res) => {
+  const scope = await resolveAgentScope(req.user);
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    throw new ApiError(400, "Invalid servant ID");
+  }
+
+  const existing = await prisma.servant.findFirst({
+    where: recordWhereForScope(scope, { id }),
+    include: { user: true }
+  });
+  await assertScopedServantAccess(scope, existing);
+
+  const { isActive, reason } = req.body;
+
+  if (typeof isActive !== "boolean") {
+    throw new ApiError(400, "isActive must be a boolean");
+  }
+  if (!reason || typeof reason !== "string" || !reason.trim()) {
+    throw new ApiError(400, "Reason is required");
+  }
+
+  const updatedServant = await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: existing.userId },
+      data: { isActive }
+    });
+
+    return tx.servant.update({
+      where: { id },
+      data: {
+        isActive,
+        statusReason: reason.trim(),
+        statusChangedAt: new Date()
+      },
+      include: servantInclude
+    });
+  });
+
+  sendSuccess(res, { servant: updatedServant });
+};
+

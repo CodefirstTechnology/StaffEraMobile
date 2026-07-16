@@ -33,6 +33,10 @@ function emailMessage(value) {
   const STRICT_EMAIL_REGEX = /^[a-zA-Z0-9]+([._-]?[a-zA-Z0-9]+)*@[a-zA-Z0-9]+([.-]?[a-zA-Z0-9]+)*\.[a-zA-Z]{2,}$/;
   if (/\s/.test(email) || !STRICT_EMAIL_REGEX.test(email)) {
     return 'Enter a valid email address'
+  }
+  return null
+}
+
 function usernameMessage(value) {
   const username = String(value ?? '').trim()
   if (!username) return 'Username is required'

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button } from './ui/Button'
 import { useToast } from '../context/ToastContext'
 import { copyText } from '../lib/copyToClipboard'
@@ -5,6 +6,7 @@ import { generateServantPassword, checkPasswordStrength } from '../lib/generateP
 
 export function LoginPasswordFields({ email, password, onPasswordChange, hint, error }) {
   const { showToast } = useToast()
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleCopyPassword = async () => {
     if (!password) return
@@ -25,16 +27,25 @@ export function LoginPasswordFields({ email, password, onPasswordChange, hint, e
       ) : null}
       <label className="block space-y-1.5">
         <span className="text-sm font-medium text-gray-700">Login password</span>
-        <input
-          type="text"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => onPasswordChange(e.target.value)}
-          placeholder="Min 6 characters"
-          aria-invalid={error ? 'true' : undefined}
-          aria-describedby={error ? 'login-password-error' : undefined}
-          className={`w-full rounded-lg border px-3 py-2 ${error ? 'border-error' : ''}`}
-        />
+        <div className="relative">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => onPasswordChange(e.target.value)}
+            placeholder="Min 6 characters"
+            aria-invalid={error ? 'true' : undefined}
+            aria-describedby={error ? 'login-password-error' : undefined}
+            className={`w-full rounded-lg border pl-3 pr-14 py-2 ${error ? 'border-error' : ''}`}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-violet-600 hover:text-violet-800 focus:outline-none cursor-pointer select-none"
+          >
+            {showPassword ? 'Hide' : 'Show'}
+          </button>
+        </div>
         {password && (
           <div className="mt-1 flex items-center gap-1.5">
             <span className="text-xs text-on-surface-variant font-medium">Strength:</span>

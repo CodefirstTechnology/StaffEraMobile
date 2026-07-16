@@ -1,16 +1,26 @@
+import { useState } from 'react'
 import { Button } from './ui/Button'
 import { useToast } from '../context/ToastContext'
 import { copyText } from '../lib/copyToClipboard'
 
 export function CredentialsBanner({ credentials, onDone }) {
-  const { showToast } = useToast()
+  const toast = useToast()
+  const [copied, setCopied] = useState(false)
 
   if (!credentials) return null
 
   const handleCopyAll = async () => {
     const text = `Email: ${credentials.email}\nPassword: ${credentials.password}`
     const ok = await copyText(text)
-    showToast(ok ? 'Copied' : 'Could not copy')
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+    if (ok) {
+      toast.success('Copied')
+    } else {
+      toast.error('Could not copy')
+    }
   }
 
   return (
@@ -24,7 +34,7 @@ export function CredentialsBanner({ credentials, onDone }) {
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="secondary" onClick={handleCopyAll}>
-          Copy all
+          {copied ? '✓ Copied' : 'Copy all'}
         </Button>
         {onDone ? (
           <Button variant="success" onClick={onDone}>

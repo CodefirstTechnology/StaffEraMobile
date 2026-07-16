@@ -72,15 +72,26 @@ export default function ServantList() {
     },
   })
 
+  const { data: allServantsData } = useQuery({
+    queryKey: ['agent-servants-all'],
+    queryFn: async () => {
+      const res = await api.get('/agent/servants', {
+        params: { limit: 1000 },
+      })
+      return res.data.data.servants
+    },
+  })
+
   const servants = data || []
+  const allServants = allServantsData || []
 
   const stats = useMemo(() => {
-    const verified = servants.filter((s) => s.verificationStatus === 'VERIFIED').length
-    const pending = servants.filter((s) =>
+    const verified = allServants.filter((s) => s.verificationStatus === 'VERIFIED').length
+    const pending = allServants.filter((s) =>
       ['PENDING', 'UNDER_REVIEW'].includes(s.verificationStatus),
     ).length
-    return { total: servants.length, verified, pending }
-  }, [servants])
+    return { total: allServants.length, verified, pending }
+  }, [allServants])
 
   return (
     <div className="space-y-6">
@@ -117,7 +128,7 @@ export default function ServantList() {
       >
         <SelectFilter value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
         <SelectFilter value={status} onChange={setStatus} options={STATUS_OPTIONS} />
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by name…" />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by name, mobile no…" />
       </FilterBar>
 
       {isLoading ? (

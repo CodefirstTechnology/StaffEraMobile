@@ -40,7 +40,9 @@ exports.adminCreateSkill = async (req, res) => {
   const { label, code: rawCode, sortOrder } = req.body;
   const code = normalizeSkillCode(rawCode || codeFromLabel(label));
 
-  if (!code) throw new ApiError(400, "Skill code is required");
+  if (!code) {
+    throw new ApiError(400, "Skill label must contain at least one letter or number and cannot contain only special characters");
+  }
 
   const existing = await prisma.skill.findUnique({ where: { code } });
   if (existing) throw new ApiError(400, "A skill with this code already exists");

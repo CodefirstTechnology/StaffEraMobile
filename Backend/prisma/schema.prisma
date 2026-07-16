@@ -147,6 +147,9 @@ model Servant {
   bookings           Booking[]
   timeEntries        TimeEntry[]
   zones              Zone[]
+  isActive           Boolean            @default(true)
+  statusReason       String?
+  statusChangedAt    DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 }
