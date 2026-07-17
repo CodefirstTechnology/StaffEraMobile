@@ -3,13 +3,16 @@ const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 const {
   checkBookingConflict,
+  filterServantsAvailableForBooking,
+  hasServantScheduleConflict,
+  toConflictData,
   parseJsonArray,
   expireStaleSessionBookings,
   isSessionPast,
   computeBookingEarnings,
   normalizeBookingRow
 } = require("../services/bookingService");
-const { createNotification } = require("../services/notificationService");
+const { createNotification, findUsersNotifiedForOpenBooking } = require("../services/notificationService");
 const {
   issueWorkStartOtp,
   verifyWorkStartOtp,
@@ -165,8 +168,14 @@ exports.createBooking = async (req, res) => {
       skill: bookingData.requestedSkill
     });
 
+    const availableServants = await filterServantsAvailableForBooking(
+      nearbyServants,
+      bookingData,
+      booking.id
+    );
+
     await Promise.all(
-      nearbyServants.map((servant) =>
+      availableServants.map((servant) =>
         createNotification({
           userId: servant.user.id,
           title: "Job request in your area",
@@ -182,8 +191,9 @@ exports.createBooking = async (req, res) => {
       {
         booking,
         broadcast: {
-          notifiedServants: nearbyServants.length,
-          helperNames: nearbyServants.map((s) => s.user.name)
+          notifiedServants: availableServants.length,
+          helperNames: availableServants.map((s) => s.user.name),
+          skippedBusy: nearbyServants.length - availableServants.length
         }
       },
       201
@@ -313,14 +323,26 @@ exports.listOpenRequests = async (req, res) => {
   });
   const declinedIds = new Set(declinedRows.map((row) => row.bookingId));
 
-  const requests = openBookings.filter(
+  const filtered = openBookings.filter(
     (booking) =>
       !declinedIds.has(booking.id) &&
       servantCoversLocation(servant, booking.latitude, booking.longitude) &&
       bookingMatchesServantSkill(booking, servant) &&
       ((booking.bookingType === "SESSION" && servant.offersSession) ||
-       (booking.bookingType === "MONTHLY" && servant.offersMonthly))
+        (booking.bookingType === "MONTHLY" && servant.offersMonthly))
   );
+
+  const availability = await Promise.all(
+    filtered.map(async (booking) => ({
+      booking,
+      busy: await hasServantScheduleConflict(
+        servant.id,
+        toConflictData(booking),
+        booking.id
+      )
+    }))
+  );
+  const requests = availability.filter((row) => !row.busy).map((row) => row.booking);
 
   sendSuccess(res, { requests });
 };
@@ -419,16 +441,7 @@ exports.confirmBooking = async (req, res) => {
       throw new ApiError(403, "This request does not match your skills");
     }
 
-    const conflictData = {
-      bookingType: booking.bookingType,
-      sessionDate: booking.sessionDate,
-      sessionStartTime: booking.sessionStartTime,
-      sessionEndTime: booking.sessionEndTime,
-      monthlyStartDate: booking.monthlyStartDate,
-      monthlyEndDate: booking.monthlyEndDate,
-      workingDays: booking.workingDays,
-      hoursPerDay: booking.hoursPerDay
-    };
+    const conflictData = toConflictData(booking);
     await checkBookingConflict(servant.id, conflictData, booking.id);
 
     const claimed = await prisma.booking.updateMany({
@@ -473,17 +486,11 @@ exports.confirmBooking = async (req, res) => {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    const conflictData = {
-      bookingType: booking.bookingType,
-      sessionDate: booking.sessionDate,
-      sessionStartTime: booking.sessionStartTime,
-      sessionEndTime: booking.sessionEndTime,
-      monthlyStartDate: booking.monthlyStartDate,
-      monthlyEndDate: booking.monthlyEndDate,
-      workingDays: booking.workingDays,
-      hoursPerDay: booking.hoursPerDay
-    };
-    await checkBookingConflict(booking.servantId, conflictData, booking.id);
+    await checkBookingConflict(
+      booking.servantId,
+      toConflictData(booking),
+      booking.id
+    );
 
     return tx.booking.update({
       where: { id },
@@ -649,24 +656,41 @@ exports.cancelBooking = async (req, res) => {
       ...cancelPayload
     });
   } else if (booking.latitude != null && booking.longitude != null) {
-    const nearbyServants = await findServantsNearLocation(booking.latitude, booking.longitude, {
-      skill: booking.requestedSkill
-    });
     const declinedRows = await prisma.openRequestDecline.findMany({
       where: { bookingId: id },
       select: { servantId: true }
     });
     const declinedServantIds = new Set(declinedRows.map((row) => row.servantId));
 
+    let notifyUserIds = await findUsersNotifiedForOpenBooking(id);
+
+    if (notifyUserIds.length === 0) {
+      const nearbyServants = await findServantsNearLocation(booking.latitude, booking.longitude, {
+        skill: booking.requestedSkill
+      });
+      const eligible = nearbyServants.filter((servant) => !declinedServantIds.has(servant.id));
+      const availableServants = await filterServantsAvailableForBooking(
+        eligible,
+        toConflictData(booking),
+        id
+      );
+      notifyUserIds = availableServants.map((servant) => servant.user.id);
+    } else if (declinedServantIds.size > 0) {
+      const declinedServants = await prisma.servant.findMany({
+        where: { id: { in: [...declinedServantIds] } },
+        select: { userId: true }
+      });
+      const declinedUserIds = new Set(declinedServants.map((row) => row.userId));
+      notifyUserIds = notifyUserIds.filter((userId) => !declinedUserIds.has(userId));
+    }
+
     await Promise.all(
-      nearbyServants
-        .filter((servant) => !declinedServantIds.has(servant.id))
-        .map((servant) =>
-          createNotification({
-            userId: servant.user.id,
-            ...cancelPayload
-          })
-        )
+      notifyUserIds.map((userId) =>
+        createNotification({
+          userId,
+          ...cancelPayload
+        })
+      )
     );
   }
 

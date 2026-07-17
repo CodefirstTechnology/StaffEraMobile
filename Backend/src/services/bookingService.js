@@ -263,37 +263,81 @@ const checkBookingConflict = async (
     }
   }
 
-  if (bookingData.bookingType === "SESSION") {
-    const conflict = await checkSessionConflict(
-      servantId,
-      bookingData,
-      excludeBookingId
-    );
-    if (conflict) {
+  const conflict = await hasServantScheduleConflict(
+    servantId,
+    bookingData,
+    excludeBookingId
+  );
+  if (conflict) {
+    if (bookingData.bookingType === "SESSION") {
       throw new ApiError(
         409,
         "This helper is not available for that visit time. Choose another date, time, or helper."
       );
     }
-  }
-
-  if (bookingData.bookingType === "MONTHLY") {
-    const conflict = await checkMonthlyConflict(
-      servantId,
-      bookingData,
-      excludeBookingId
-    );
-    if (conflict) {
+    if (bookingData.bookingType === "MONTHLY") {
       throw new ApiError(
         409,
         "This helper already has a monthly booking in that period. Choose different dates or another helper."
       );
     }
+    throw new ApiError(409, "This helper is not available for that time.");
   }
+};
+
+const toConflictData = (booking) => ({
+  bookingType: booking.bookingType,
+  sessionDate: booking.sessionDate,
+  sessionStartTime: booking.sessionStartTime,
+  sessionEndTime: booking.sessionEndTime,
+  sessionSlots: booking.sessionSlots,
+  monthlyStartDate: booking.monthlyStartDate,
+  monthlyEndDate: booking.monthlyEndDate,
+  workingDays: booking.workingDays,
+  hoursPerDay: booking.hoursPerDay
+});
+
+/** True when the servant already has a pending/confirmed/active booking overlapping this slot. */
+const hasServantScheduleConflict = async (servantId, bookingData, excludeBookingId) => {
+  if (bookingData.bookingType === "SESSION") {
+    return checkSessionConflict(servantId, bookingData, excludeBookingId);
+  }
+  if (bookingData.bookingType === "MONTHLY") {
+    return checkMonthlyConflict(servantId, bookingData, excludeBookingId);
+  }
+  return false;
+};
+
+const servantOffersBookingType = (servant, bookingData) =>
+  (bookingData.bookingType === "SESSION" && servant.offersSession) ||
+  (bookingData.bookingType === "MONTHLY" && servant.offersMonthly);
+
+/** Keep only servants who offer this booking type and have no schedule overlap. */
+const filterServantsAvailableForBooking = async (
+  servants,
+  bookingData,
+  excludeBookingId
+) => {
+  const results = await Promise.all(
+    servants.map(async (servant) => {
+      if (!servantOffersBookingType(servant, bookingData)) return null;
+      const busy = await hasServantScheduleConflict(
+        servant.id,
+        bookingData,
+        excludeBookingId
+      );
+      return busy ? null : servant;
+    })
+  );
+  return results.filter(Boolean);
 };
 
 module.exports = {
   checkBookingConflict,
+  hasServantScheduleConflict,
+  filterServantsAvailableForBooking,
+  toConflictData,
+  servantOffersBookingType,
   parseJsonArray,
   getBookingSlots,
   getSessionEndAt,

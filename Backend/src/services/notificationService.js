@@ -12,4 +12,19 @@ const createNotification = async ({ userId, title, body, type, data }) => {
   }
 };
 
-module.exports = { createNotification };
+/** Servants who received the open-request alert for this booking (BOOKING_OPEN). */
+const findUsersNotifiedForOpenBooking = async (bookingId) => {
+  const rows = await prisma.notification.findMany({
+    where: {
+      type: "BOOKING_OPEN",
+      data: {
+        path: ["bookingId"],
+        equals: bookingId
+      }
+    },
+    select: { userId: true }
+  });
+  return [...new Set(rows.map((row) => row.userId))];
+};
+
+module.exports = { createNotification, findUsersNotifiedForOpenBooking };
