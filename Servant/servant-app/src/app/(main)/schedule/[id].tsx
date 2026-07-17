@@ -13,6 +13,7 @@ import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
 import { formatVisitAddressLines } from '@/lib/visitAddress';
 import { LocationMapPreview } from '@/components/ui/LocationMapPreview';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { useToast } from '@/providers/ToastProvider';
 import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
@@ -31,6 +32,7 @@ import { declineBooking } from '@/lib/declineBooking';
 
 export default function ScheduleDetailScreen() {
   const { t } = useTranslation();
+  const toast = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
   const bookingId = id ? parseInt(id, 10) : null;
   const qc = useQueryClient();
@@ -173,7 +175,7 @@ export default function ScheduleDetailScreen() {
         qc.invalidateQueries({ queryKey: ['booking', id] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
       ]);
-      Alert.alert(t('workOtp.requestedTitle'), t('workOtp.requestedBody'));
+      toast.info(t('workOtp.requestedBody'));
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotStart'), apiError(e, t('servantHome.checkConfirmed')));
     }

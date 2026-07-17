@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { useToast } from '@/providers/ToastProvider';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
@@ -62,6 +63,7 @@ type Booking = {
 
 export default function ServantHomeScreen() {
   const { t } = useTranslation();
+  const toast = useToast();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const qc = useQueryClient();
@@ -212,7 +214,7 @@ export default function ServantHomeScreen() {
       await api.patch(`/bookings/${bookingId}/arrived`);
       setOnWayBookingId(null);
       await refreshBookings();
-      Alert.alert(t('workOtp.requestedTitle'), t('workOtp.requestedBody'));
+      toast.info(t('workOtp.requestedBody'));
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotStart'), apiError(e, t('servantHome.checkConfirmed')));
     }
