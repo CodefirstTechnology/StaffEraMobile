@@ -47,6 +47,41 @@ function ServantPhoto({ name, profilePhoto }) {
   return <Avatar name={name} />
 }
 
+export function getPhoneDisplayParts(user) {
+  if (!user || !user.phone) return { countryCode: '—', mobileNumber: '—' }
+  
+  if (user.phoneCountryCode) {
+    return {
+      countryCode: user.phoneCountryCode,
+      mobileNumber: user.phone
+    }
+  }
+
+  let phoneVal = user.phone
+  let ccVal = '—'
+  if (phoneVal.startsWith('+91')) {
+    ccVal = '+91'
+    phoneVal = phoneVal.substring(3)
+  } else if (phoneVal.startsWith('91') && phoneVal.length > 10) {
+    ccVal = '+91'
+    phoneVal = phoneVal.substring(2)
+  } else if (phoneVal.length > 10) {
+    if (phoneVal.startsWith('+')) {
+      const match = phoneVal.match(/^\+(\d{1,4})(.*)$/)
+      if (match) {
+        ccVal = '+' + match[1]
+        phoneVal = match[2]
+      }
+    } else {
+      const ccLen = phoneVal.length - 10
+      ccVal = '+' + phoneVal.substring(0, ccLen)
+      phoneVal = phoneVal.substring(ccLen)
+    }
+  }
+
+  return { countryCode: ccVal, mobileNumber: phoneVal }
+}
+
 export default function ServantList() {
   const [searchParams] = useSearchParams()
   const [status, setStatus] = useState('')
@@ -142,50 +177,18 @@ export default function ServantList() {
       ) : (
         <>
           <div className="grid gap-4 lg:hidden">
-            {servants.map((s) => (
-              <MobileCard key={s.id}>
-                <div className="flex items-start gap-3">
-                  <ServantPhoto name={s.user.name} profilePhoto={s.profilePhoto} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        to={`/servants/${s.id}`}
-                        className="font-semibold text-primary hover:text-secondary"
-                      >
-                        {s.user.name}
-                      </Link>
-                      {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
-                    </div>
-                    <p className="text-sm text-on-surface-variant">{s.user.phone || 'No phone'}</p>
-                  </div>
-                  <Badge status={s.verificationStatus} />
-                </div>
-                <div className="mt-3">
-                  <SkillChips skills={s.skills} />
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <Link to={`/servants/${s.id}`} className="flex-1">
-                    <Button variant="gradient" className="w-full text-sm">
-                      View
-                    </Button>
-                  </Link>
-                  <Link to={`/servants/${s.id}/edit`} className="flex-1">
-                    <Button variant="secondary" className="w-full text-sm">
-                      Edit
-                    </Button>
-                  </Link>
-                </div>
-              </MobileCard>
-            ))}
-          </div>
-
-          <DataTable columns={['Servant', 'Phone', 'Skills', 'Status', 'Actions']}>
-            {servants.map((s) => (
-              <TableRow key={s.id}>
-                <td className="px-4 py-4">
-                  <div className="flex items-center gap-3">
+            {servants.map((s) => {
+              const { countryCode, mobileNumber } = getPhoneDisplayParts(s.user)
+              const phoneText = s.user.phone
+                ? countryCode !== '—'
+                  ? `${countryCode} ${mobileNumber}`
+                  : mobileNumber
+                : 'No phone'
+              return (
+                <MobileCard key={s.id}>
+                  <div className="flex items-start gap-3">
                     <ServantPhoto name={s.user.name} profilePhoto={s.profilePhoto} />
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <Link
                           to={`/servants/${s.id}`}
@@ -195,11 +198,54 @@ export default function ServantList() {
                         </Link>
                         {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
                       </div>
-                      <p className="text-xs text-on-surface-variant">{s.user.email}</p>
+                      <p className="text-sm text-on-surface-variant">{phoneText}</p>
                     </div>
+                    <Badge status={s.verificationStatus} />
                   </div>
-                </td>
-                <td className="px-4 py-4 text-on-surface-variant">{s.user.phone || '—'}</td>
+                  <div className="mt-3">
+                    <SkillChips skills={s.skills} />
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Link to={`/servants/${s.id}`} className="flex-1">
+                      <Button variant="gradient" className="w-full text-sm">
+                        View
+                      </Button>
+                    </Link>
+                    <Link to={`/servants/${s.id}/edit`} className="flex-1">
+                      <Button variant="secondary" className="w-full text-sm">
+                        Edit
+                      </Button>
+                    </Link>
+                  </div>
+                </MobileCard>
+              )
+            })}
+          </div>
+
+          <DataTable columns={['Servant', 'Country Code', 'Mobile Number', 'Skills', 'Status', 'Actions']}>
+            {servants.map((s) => {
+              const { countryCode, mobileNumber } = getPhoneDisplayParts(s.user)
+              return (
+                <TableRow key={s.id}>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center gap-3">
+                      <ServantPhoto name={s.user.name} profilePhoto={s.profilePhoto} />
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            to={`/servants/${s.id}`}
+                            className="font-semibold text-primary hover:text-secondary"
+                          >
+                            {s.user.name}
+                          </Link>
+                          {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
+                        </div>
+                        <p className="text-xs text-on-surface-variant">{s.user.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-on-surface-variant">{countryCode}</td>
+                  <td className="px-4 py-4 text-on-surface-variant">{mobileNumber}</td>
                 <td className="px-4 py-4 max-w-[200px]">
                   <SkillChips skills={s.skills} max={2} />
                 </td>
@@ -223,7 +269,8 @@ export default function ServantList() {
                   </div>
                 </td>
               </TableRow>
-            ))}
+            )
+          })}
           </DataTable>
         </>
       )}
