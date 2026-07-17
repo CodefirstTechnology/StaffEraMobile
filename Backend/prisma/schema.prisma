@@ -51,7 +51,8 @@ model User {
   id            Int            @id @default(autoincrement())
   name          String
   email         String         @unique
-  phone         String?        @unique
+  phone            String?
+  phoneCountryCode String?
   password      String
   roleId        Int            @default(4)
   role          Role           @relation(fields: [roleId], references: [id])
