@@ -26,12 +26,14 @@ import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
 import { DeclineReasonSheet } from '@/components/bookings/DeclineReasonSheet';
 import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
 import { useZoneGate } from '@/hooks/useZoneGate';
+import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
 import {
   stopPendingRequestVibration,
   syncPendingRequestVibration,
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
 import { isCancelled, isPendingRequest, isTodayJob } from '@/lib/bookingVisibility';
+import { declineBooking } from '@/lib/declineBooking';
 
 type Booking = {
   id: number;
@@ -82,6 +84,7 @@ export default function ServantHomeScreen() {
       qc.invalidateQueries({ queryKey: ['bookings'] }),
       qc.invalidateQueries({ queryKey: ['open-requests'] }),
       qc.invalidateQueries({ queryKey: ['notifications'] }),
+      qc.invalidateQueries({ queryKey: ['declined-open-booking-ids'] }),
       qc.invalidateQueries({ queryKey: ['schedule'] }),
     ]);
 
@@ -128,6 +131,7 @@ export default function ServantHomeScreen() {
   });
 
   const { data: notifications } = useNotifications();
+  const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
 
   const { data: today, refetch: refetchToday } = useQuery({
     queryKey: ['time-today'],
@@ -275,19 +279,30 @@ export default function ServantHomeScreen() {
     }
   };
 
-  const openDecline = (id: number) => {
+  const openDecline = (id: number, isOpenRequest: boolean) => {
     if (actingId != null) return;
-    if (!requireZone()) return;
+    if (!isOpenRequest && !requireZone()) return;
     setDeclineTargetId(id);
   };
 
   const submitDecline = async (reason: string) => {
     if (declineTargetId == null) return;
-    const wasOpenRequest = openRequests?.some((r) => r.id === declineTargetId) ?? false;
+    const id = declineTargetId;
+    const wasOpenRequest = openRequests?.some((r) => r.id === id) ?? false;
     setDeclineLoading(true);
-    setActingId(declineTargetId);
+    setActingId(id);
     try {
-      await api.patch(`/bookings/${declineTargetId}/reject`, { reason });
+      await declineBooking(id, reason, wasOpenRequest);
+
+      if (wasOpenRequest) {
+        qc.setQueryData<Booking[]>(['open-requests'], (prev) =>
+          (prev ?? []).filter((row) => row.id !== id),
+        );
+        qc.setQueryData<number[]>(['declined-open-booking-ids'], (prev) =>
+          Array.from(new Set([...(prev ?? []), id])),
+        );
+      }
+
       await refreshBookings();
       setDeclineTargetId(null);
       Alert.alert(
@@ -309,7 +324,14 @@ export default function ServantHomeScreen() {
     }
   };
 
-  const unread = (notifications || []).filter((n) => !n.isRead).length;
+  const unread = (notifications || []).filter((n) => {
+    if (n.isRead) return false;
+    const bookingId = n.data?.bookingId;
+    if (n.type === 'BOOKING_CANCELLED' && typeof bookingId === 'number') {
+      return !isDeclinedOpenBooking(bookingId, declinedOpenIds);
+    }
+    return true;
+  }).length;
 
   const openJobDetail = (bookingId: number) => {
     router.push(`/(main)/schedule/${bookingId}`);
@@ -498,9 +520,9 @@ export default function ServantHomeScreen() {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.reject, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
-                  onPress={() => openDecline(b.id)}
-                  disabled={actingId != null || actionsBlocked}
+                  style={[styles.reject, actingId === b.id && styles.btnDisabled]}
+                  onPress={() => openDecline(b.id, true)}
+                  disabled={actingId != null}
                 >
                   <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
                 </TouchableOpacity>
@@ -545,9 +567,9 @@ export default function ServantHomeScreen() {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.reject, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
-                  onPress={() => openDecline(b.id)}
-                  disabled={actingId != null || actionsBlocked}
+                  style={[styles.reject, actingId === b.id && styles.btnDisabled]}
+                  onPress={() => openDecline(b.id, false)}
+                  disabled={actingId != null}
                 >
                   <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
                 </TouchableOpacity>

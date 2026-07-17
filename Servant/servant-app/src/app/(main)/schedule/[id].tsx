@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +25,9 @@ import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
 import { DeclineReasonSheet } from '@/components/bookings/DeclineReasonSheet';
 import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
 import { useZoneGate } from '@/hooks/useZoneGate';
+import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
 import { isActionableBooking, isCancelled } from '@/lib/bookingVisibility';
+import { declineBooking } from '@/lib/declineBooking';
 
 export default function ScheduleDetailScreen() {
   const { t } = useTranslation();
@@ -38,8 +40,9 @@ export default function ScheduleDetailScreen() {
   const [declineLoading, setDeclineLoading] = useState(false);
   const { hasZones, requireZone, goAddZone } = useZoneGate();
   const actionsBlocked = !hasZones;
+  const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
 
-  const { data: booking, isLoading } = useQuery({
+  const { data: booking, isLoading, isError } = useQuery({
     queryKey: ['booking', id],
     enabled: !!id,
     refetchInterval: (query) => {
@@ -51,6 +54,13 @@ export default function ScheduleDetailScreen() {
       return res.data.data.booking;
     },
   });
+
+  useEffect(() => {
+    if (!isError || bookingId == null) return;
+    if (isDeclinedOpenBooking(bookingId, declinedOpenIds)) {
+      router.back();
+    }
+  }, [isError, bookingId, declinedOpenIds]);
 
   const { data: today } = useQuery({
     queryKey: ['time-today'],
@@ -109,21 +119,33 @@ export default function ScheduleDetailScreen() {
 
   const openDecline = () => {
     if (acting) return;
-    if (!requireZone()) return;
+    const isOpenRequest = booking?.servantId == null;
+    if (!isOpenRequest && !requireZone()) return;
     setDeclineOpen(true);
   };
 
   const submitDecline = async (reason: string) => {
-    if (acting) return;
+    if (acting || bookingId == null) return;
     const wasOpenRequest = booking?.servantId == null;
     setDeclineLoading(true);
     setActing(true);
     try {
-      await api.patch(`/bookings/${id}/reject`, { reason });
+      await declineBooking(bookingId, reason, wasOpenRequest);
+
+      if (wasOpenRequest) {
+        qc.setQueryData(['open-requests'], (prev: { id: number }[] | undefined) =>
+          (prev ?? []).filter((row) => row.id !== bookingId),
+        );
+        qc.setQueryData<number[]>(['declined-open-booking-ids'], (prev) =>
+          Array.from(new Set([...(prev ?? []), bookingId])),
+        );
+      }
+
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['booking', id] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
         qc.invalidateQueries({ queryKey: ['open-requests'] }),
+        qc.invalidateQueries({ queryKey: ['declined-open-booking-ids'] }),
         qc.invalidateQueries({ queryKey: ['schedule'] }),
       ]);
       setDeclineOpen(false);
@@ -165,10 +187,21 @@ export default function ScheduleDetailScreen() {
     ]);
   };
 
-  if (isLoading || !booking) {
+  if (isLoading) {
     return (
       <View style={styles.center}>
         <Text style={styles.muted}>{t('common.loading')}</Text>
+      </View>
+    );
+  }
+
+  if (isError || !booking) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.muted}>{t('servantHome.requestHandled')}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 12 }}>
+          <Text style={{ color: Stitch.colors.primary, fontWeight: '600' }}>{t('common.back')}</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -328,9 +361,9 @@ export default function ScheduleDetailScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.reject, (acting || actionsBlocked) && styles.btnDisabled]}
+            style={[styles.reject, acting && styles.btnDisabled]}
             onPress={openDecline}
-            disabled={acting || actionsBlocked}
+            disabled={acting}
           >
             <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
           </TouchableOpacity>

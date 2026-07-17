@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
 import { stopPendingRequestVibration } from '@/lib/bookingRequestVibration';
 import { localizeNotification } from '@/lib/i18n/notifications';
 
@@ -10,15 +11,24 @@ const CANCELLATION_TYPES = new Set(['BOOKING_CANCELLED']);
 
 type BookingRow = { id: number; status: string };
 
-/** Refresh lists and alert when a booking cancellation notification arrives or status becomes CANCELLED. */
+/** Refresh lists and alert when a booking cancellation arrives — skip bookings the servant already declined. */
 export function useBookingCancellationAlerts() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: notifications = [] } = useNotifications();
+  const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
+  const declinedOpenIdsRef = useRef(declinedOpenIds);
   const seenNotificationIds = useRef<Set<number>>(new Set());
   const seenCancelledBookingIds = useRef<Set<number>>(new Set());
   const previousStatuses = useRef<Map<number, string>>(new Map());
   const bootstrapped = useRef(false);
+
+  useEffect(() => {
+    declinedOpenIdsRef.current = declinedOpenIds;
+  }, [declinedOpenIds]);
+
+  const shouldIgnoreBooking = (bookingId: number) =>
+    isDeclinedOpenBooking(bookingId, declinedOpenIdsRef.current);
 
   const invalidateBookingQueries = (bookingIds: number[] = []) => {
     stopPendingRequestVibration();
@@ -26,6 +36,7 @@ export function useBookingCancellationAlerts() {
       qc.invalidateQueries({ queryKey: ['bookings'] }),
       qc.invalidateQueries({ queryKey: ['open-requests'] }),
       qc.invalidateQueries({ queryKey: ['notifications'] }),
+      qc.invalidateQueries({ queryKey: ['declined-open-booking-ids'] }),
       qc.invalidateQueries({ queryKey: ['schedule'] }),
       ...bookingIds.map((bookingId) =>
         qc.invalidateQueries({ queryKey: ['booking', String(bookingId)] }),
@@ -34,6 +45,7 @@ export function useBookingCancellationAlerts() {
   };
 
   const markCancelled = (bookingId: number) => {
+    if (shouldIgnoreBooking(bookingId)) return false;
     if (seenCancelledBookingIds.current.has(bookingId)) return false;
     seenCancelledBookingIds.current.add(bookingId);
     return true;
@@ -66,7 +78,9 @@ export function useBookingCancellationAlerts() {
       Alert.alert(title, body);
     });
 
-    invalidateBookingQueries(bookingIds);
+    if (bookingIds.length > 0) {
+      invalidateBookingQueries(bookingIds);
+    }
   }, [notifications, qc]);
 
   useEffect(() => {

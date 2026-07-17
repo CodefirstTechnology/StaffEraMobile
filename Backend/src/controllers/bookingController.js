@@ -267,6 +267,9 @@ exports.listBookings = async (req, res) => {
     const s = await prisma.servant.findUnique({ where: { userId: req.user.id } });
     if (!s) throw new ApiError(403, "Servant profile required");
     where.servantId = s.id;
+    if (!status) {
+      where.status = { notIn: ["CANCELLED", "REJECTED", "EXPIRED"] };
+    }
   } else {
     throw new ApiError(403, "Not allowed");
   }
@@ -320,6 +323,18 @@ exports.listOpenRequests = async (req, res) => {
   );
 
   sendSuccess(res, { requests });
+};
+
+exports.listDeclinedOpenBookingIds = async (req, res) => {
+  const servant = await prisma.servant.findUnique({ where: { userId: req.user.id } });
+  if (!servant) throw new ApiError(403, "Servant profile required");
+
+  const rows = await prisma.openRequestDecline.findMany({
+    where: { servantId: servant.id },
+    select: { bookingId: true }
+  });
+
+  sendSuccess(res, { bookingIds: rows.map((row) => row.bookingId) });
 };
 
 exports.getBooking = async (req, res) => {
@@ -495,6 +510,60 @@ exports.confirmBooking = async (req, res) => {
   sendSuccess(res, { booking: updated });
 };
 
+const canServantViewOpenRequest = (servant, booking) =>
+  booking.servantId == null &&
+  booking.status === "PENDING" &&
+  booking.latitude != null &&
+  booking.longitude != null &&
+  servantCoversLocation(servant, booking.latitude, booking.longitude) &&
+  bookingMatchesServantSkill(booking, servant) &&
+  ((booking.bookingType === "SESSION" && servant.offersSession) ||
+    (booking.bookingType === "MONTHLY" && servant.offersMonthly));
+
+const recordOpenRequestDecline = async (servant, bookingId, reason) => {
+  const existing = await prisma.openRequestDecline.findUnique({
+    where: {
+      bookingId_servantId: { bookingId, servantId: servant.id }
+    }
+  });
+  if (existing) return existing;
+
+  return prisma.openRequestDecline.create({
+    data: { bookingId, servantId: servant.id, reason }
+  });
+};
+
+exports.declineOpenRequest = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const booking = await loadBooking(id);
+
+  if (!booking) throw new ApiError(404, "Booking not found");
+  if (booking.status !== "PENDING") {
+    throw new ApiError(400, "Booking is not pending");
+  }
+  if (booking.servantId != null) {
+    throw new ApiError(400, "This booking is assigned to you — use reject instead");
+  }
+
+  const reason = String(req.body.reason ?? "").trim();
+  if (!reason) {
+    throw new ApiError(400, "Decline reason is required");
+  }
+
+  const servant = await prisma.servant.findUnique({
+    where: { userId: req.user.id },
+    include: { skills: true, zones: true }
+  });
+  if (!servant) throw new ApiError(403, "Servant profile required");
+
+  if (!canServantViewOpenRequest(servant, booking)) {
+    throw new ApiError(403, "Not your booking");
+  }
+
+  await recordOpenRequestDecline(servant, id, reason);
+  sendSuccess(res, { booking: normalizeBookingRow(booking), declined: true });
+};
+
 exports.rejectBooking = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const booking = await loadBooking(id);
@@ -516,35 +585,7 @@ exports.rejectBooking = async (req, res) => {
   if (!servant) throw new ApiError(403, "Servant profile required");
 
   if (booking.servantId == null) {
-    if (
-      booking.latitude == null ||
-      booking.longitude == null ||
-      !servantCoversLocation(servant, booking.latitude, booking.longitude) ||
-      !bookingMatchesServantSkill(booking, servant) ||
-      !(
-        (booking.bookingType === "SESSION" && servant.offersSession) ||
-        (booking.bookingType === "MONTHLY" && servant.offersMonthly)
-      )
-    ) {
-      throw new ApiError(403, "Not your booking");
-    }
-
-    const existing = await prisma.openRequestDecline.findUnique({
-      where: {
-        bookingId_servantId: { bookingId: id, servantId: servant.id }
-      }
-    });
-    if (existing) {
-      sendSuccess(res, { booking: normalizeBookingRow(booking), declined: true });
-      return;
-    }
-
-    await prisma.openRequestDecline.create({
-      data: { bookingId: id, servantId: servant.id, reason }
-    });
-
-    sendSuccess(res, { booking: normalizeBookingRow(booking), declined: true });
-    return;
+    throw new ApiError(400, "Use decline-open for open area requests");
   }
 
   if (booking.servant.userId !== req.user.id) {
@@ -611,13 +652,21 @@ exports.cancelBooking = async (req, res) => {
     const nearbyServants = await findServantsNearLocation(booking.latitude, booking.longitude, {
       skill: booking.requestedSkill
     });
+    const declinedRows = await prisma.openRequestDecline.findMany({
+      where: { bookingId: id },
+      select: { servantId: true }
+    });
+    const declinedServantIds = new Set(declinedRows.map((row) => row.servantId));
+
     await Promise.all(
-      nearbyServants.map((servant) =>
-        createNotification({
-          userId: servant.user.id,
-          ...cancelPayload
-        })
-      )
+      nearbyServants
+        .filter((servant) => !declinedServantIds.has(servant.id))
+        .map((servant) =>
+          createNotification({
+            userId: servant.user.id,
+            ...cancelPayload
+          })
+        )
     );
   }
 
