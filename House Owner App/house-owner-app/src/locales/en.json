@@ -78,6 +78,7 @@
     "createAccount": "Create account",
     "passwordMismatch": "Passwords do not match",
     "registrationFailed": "Registration failed",
+    "registrationSuccess": "User created successfully",
     "homeLocationOptional": "Home location (optional)",
     "searchPlaceholder": "Search your society, street, or area",
     "cityIfNoLocation": "City (if location not set)",

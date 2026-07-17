@@ -77,6 +77,7 @@
     "createAccount": "खाता बनाएं",
     "passwordMismatch": "पासवर्ड मेल नहीं खाते",
     "registrationFailed": "पंजीकरण विफल",
+    "registrationSuccess": "उपयोगकर्ता सफलतापूर्वक बनाया गया",
     "homeLocationOptional": "घर का स्थान (वैकल्पिक)",
     "searchPlaceholder": "सोसाइटी, गली या इलाका खोजें",
     "cityIfNoLocation": "शहर (यदि स्थान सेट नहीं)",

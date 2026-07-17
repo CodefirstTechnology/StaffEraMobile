@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/AddressUnitFields';
 import type { LocationValue } from '@/lib/locationTypes';
 import { digitsOnlyPhone, getPhoneValidationKind } from '@/lib/phone';
+import { setPendingToast } from '@/lib/pendingToast';
 
 function phoneErrorMessage(
   kind: ReturnType<typeof getPhoneValidationKind>,
@@ -71,6 +72,7 @@ export default function RegisterScreen() {
         latitude: homeLocation?.latitude,
         longitude: homeLocation?.longitude,
       });
+      setPendingToast(t('auth.registrationSuccess'), 'success');
       router.replace('/(main)/home');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
