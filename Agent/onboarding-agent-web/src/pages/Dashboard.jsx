@@ -285,7 +285,13 @@ export default function Dashboard() {
                       {s.user.name}
                     </Link>
                   </td>
-                  <td className="p-4">{s.user.phone || '—'}</td>
+                  <td className="p-4">
+                    {s.user.phone
+                      ? s.user.phoneCountryCode
+                        ? `${s.user.phoneCountryCode} ${s.user.phone}`
+                        : s.user.phone
+                      : '—'}
+                  </td>
                   <td className="p-4">
                     <span className="rounded-full bg-tertiary-accent/20 px-2.5 py-0.5 text-xs font-semibold text-tertiary">
                       {s.verificationStatus}

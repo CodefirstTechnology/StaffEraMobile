@@ -119,6 +119,7 @@ export default function AdminSkills() {
   const [fieldErrors, setFieldErrors] = useState({ label: '', sortOrder: '' })
   const [submitting, setSubmitting] = useState(false)
   const [skillToRemove, setSkillToRemove] = useState(null)
+  const [skillToToggle, setSkillToToggle] = useState(null)
   const [removeLoading, setRemoveLoading] = useState(false)
   const [removeError, setRemoveError] = useState('')
 
@@ -342,7 +343,7 @@ export default function AdminSkills() {
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" onClick={() => toggleActive(skill)}>
+                    <Button variant="secondary" onClick={() => setSkillToToggle(skill)}>
                       {skill.isActive ? 'Deactivate' : 'Activate'}
                     </Button>
                     <Button
@@ -380,7 +381,7 @@ export default function AdminSkills() {
                       Sort order: {skill.sortOrder}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <Button variant="secondary" onClick={() => toggleActive(skill)}>
+                      <Button variant="secondary" onClick={() => setSkillToToggle(skill)}>
                         {skill.isActive ? 'Deactivate' : 'Activate'}
                       </Button>
                       <Button
@@ -421,6 +422,27 @@ export default function AdminSkills() {
             setRemoveError('')
           }
         }}
+      />
+      <ConfirmDialog
+        open={skillToToggle !== null}
+        title={skillToToggle?.isActive ? 'Deactivate skill?' : 'Activate skill?'}
+        description={
+          skillToToggle
+            ? `Are you sure you want to ${
+                skillToToggle.isActive ? 'deactivate' : 'activate'
+              } the skill "${skillToToggle.label}"?`
+            : ''
+        }
+        confirmLabel={skillToToggle?.isActive ? 'Deactivate' : 'Activate'}
+        cancelLabel="Cancel"
+        variant={skillToToggle?.isActive ? 'danger' : 'success'}
+        onConfirm={async () => {
+          if (skillToToggle) {
+            await toggleActive(skillToToggle)
+            setSkillToToggle(null)
+          }
+        }}
+        onClose={() => setSkillToToggle(null)}
       />
     </div>
   )

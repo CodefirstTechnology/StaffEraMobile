@@ -18,6 +18,7 @@ import { AadhaarXmlVerify } from '../components/AadhaarXmlVerify'
 import { ServiceZonesEditor } from '../components/ServiceZonesEditor'
 import { useToast } from '../context/ToastContext'
 import { copyText } from '../lib/copyToClipboard'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { validatePhoneRequired, digitsOnlyPhone } from '../lib/phone'
 import {
   emptySkillsRateErrors,
@@ -135,13 +136,13 @@ const calculateHours = (start, end) => {
 
 function Field({ label, required, children }) {
   return (
-    <label className="block space-y-1.5">
+    <div className="block space-y-1.5">
       <span className="text-sm font-medium text-gray-700">
         {label}
         {required ? <span className="text-error"> *</span> : null}
       </span>
       {children}
-    </label>
+    </div>
   )
 }
 
@@ -246,39 +247,9 @@ export default function EditServant() {
   )
 
   useEffect(() => {
-    if (blocker.state === 'blocked') {
-      const proceed = window.confirm('You have unsaved changes. Are you sure you want to leave?')
-      if (proceed) {
-        blocker.proceed()
-      } else {
-        blocker.reset()
-      }
-    }
-  }, [blocker.state])
-
-  useEffect(() => {
     if (!servant) return
     let phoneVal = servant.user?.phone || ''
-    let ccVal = '+91'
-    if (phoneVal.startsWith('91') && phoneVal.length > 10) {
-      ccVal = '+91'
-      phoneVal = phoneVal.substring(2)
-    } else if (phoneVal.startsWith('+91')) {
-      ccVal = '+91'
-      phoneVal = phoneVal.substring(3)
-    } else if (phoneVal.length > 10) {
-      if (phoneVal.startsWith('+')) {
-        const match = phoneVal.match(/^\+(\d{1,4})(.*)$/)
-        if (match) {
-          ccVal = '+' + match[1]
-          phoneVal = match[2]
-        }
-      } else {
-        const ccLen = phoneVal.length - 10
-        ccVal = '+' + phoneVal.substring(0, ccLen)
-        phoneVal = phoneVal.substring(ccLen)
-      }
-    }
+    let ccVal = servant.user?.phoneCountryCode || '+91'
     setCountryCode(ccVal)
     setForm({
       name: servant.user?.name || '',
@@ -373,8 +344,8 @@ export default function EditServant() {
       } else if (typeof v === 'boolean') {
         fd.append(k, v ? 'true' : 'false')
       } else if (k === 'phone') {
-        const cc = countryCode.replace(/\D/g, '')
-        fd.append(k, cc + v)
+        fd.append('phone', v)
+        fd.append('phoneCountryCode', countryCode)
       } else if (v !== '' && v !== null && v !== undefined) {
         fd.append(k, String(v))
       }
@@ -512,20 +483,19 @@ export default function EditServant() {
           <Field key={key} label={key === 'hourlyRate' || key === 'monthlyRate' ? `${label} (₹)` : label}>
             <input
               placeholder={key === 'experience' ? 'e.g. 3' : key === 'hourlyRate' ? 'e.g. 150' : 'e.g. 15000'}
-              type="number"
-              min={0}
-              step={key === 'experience' ? 1 : 'any'}
+              type="text"
+              inputMode={key === 'experience' ? 'numeric' : 'decimal'}
               value={form[key]}
               onChange={(e) => {
                 update(key, sanitizeNonNegativeInput(e.target.value))
                 setSkillsRateErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
               }}
-                onBlur={() =>
-                  setSkillsRateErrors((prev) => ({
-                    ...prev,
-                    [key]: validateSkillsRateFields(form, { required: false })[key],
-                  }))
-                }
+              onBlur={() =>
+                setSkillsRateErrors((prev) => ({
+                  ...prev,
+                  [key]: validateSkillsRateFields(form, { required: false })[key],
+                }))
+              }
               aria-invalid={skillsRateErrors[key] ? 'true' : undefined}
               className={`${inputClassName()}${skillsRateErrors[key] ? ' border-error' : ''}`}
             />
@@ -716,10 +686,16 @@ export default function EditServant() {
                   setIdProof(null)
                   return
                 }
+                if (file.size > 5 * 1024 * 1024) {
+                  toast.error('ID proof document file size must be 5 MB or less')
+                  e.target.value = ''
+                  setIdProof(null)
+                  return
+                }
               }
               setIdProof(file)
             }}
-            className="w-full text-sm"
+            className="w-fit text-sm"
           />
         </Field>
         {servant.profilePhoto && (
@@ -747,10 +723,16 @@ export default function EditServant() {
                   setProfilePhoto(null)
                   return
                 }
+                if (file.size > 5 * 1024 * 1024) {
+                  toast.error('Profile photo file size must be 5 MB or less')
+                  e.target.value = ''
+                  setProfilePhoto(null)
+                  return
+                }
               }
               setProfilePhoto(file)
             }}
-            className="w-full text-sm"
+            className="w-fit text-sm"
           />
         </Field>
       </div>
@@ -821,6 +803,16 @@ export default function EditServant() {
           Cancel
         </Button>
       </div>
+      <ConfirmDialog
+        open={blocker.state === 'blocked'}
+        title="Unsaved Changes"
+        description="You have unsaved changes. Are you sure you want to leave?"
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        variant="danger"
+        onConfirm={() => blocker.proceed()}
+        onClose={() => blocker.reset()}
+      />
     </div>
   )
 }
