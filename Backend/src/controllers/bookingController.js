@@ -372,6 +372,9 @@ exports.confirmBooking = async (req, res) => {
     include: { skills: true, zones: true, user: { select: { name: true } } }
   });
   if (!servant) throw new ApiError(403, "Servant profile required");
+  if (!servant.zones?.length) {
+    throw new ApiError(400, "Add at least one service zone before accepting jobs");
+  }
 
   if (booking.servantId == null) {
     if (

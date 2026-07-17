@@ -10,15 +10,17 @@ type Props = {
   expiresAt?: string | null;
   onVerified: () => void;
   onResend: () => void;
+  disabled?: boolean;
 };
 
-export function WorkStartOtpPanel({ bookingId, expiresAt, onVerified, onResend }: Props) {
+export function WorkStartOtpPanel({ bookingId, expiresAt, onVerified, onResend, disabled }: Props) {
   const { t } = useTranslation();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
   const submit = async () => {
+    if (disabled) return;
     if (!/^\d{4}$/.test(otp)) {
       Alert.alert(t('workOtp.invalidTitle'), t('workOtp.invalidBody'));
       return;
@@ -38,6 +40,7 @@ export function WorkStartOtpPanel({ bookingId, expiresAt, onVerified, onResend }
   };
 
   const resend = async () => {
+    if (disabled) return;
     setResending(true);
     try {
       await api.post(`/bookings/${bookingId}/resend-work-otp`);
@@ -59,16 +62,22 @@ export function WorkStartOtpPanel({ bookingId, expiresAt, onVerified, onResend }
         <Text style={styles.expires}>{t('workOtp.expiresHint')}</Text>
       ) : null}
       <TextInput
-        style={styles.input}
+        style={[styles.input, disabled && styles.inputDisabled]}
         value={otp}
         onChangeText={(v) => setOtp(v.replace(/\D/g, '').slice(0, 4))}
         keyboardType="number-pad"
         maxLength={4}
         placeholder={t('workOtp.placeholder')}
         placeholderTextColor={Stitch.colors.onSurfaceVariant}
+        editable={!disabled}
       />
-      <GradientButton title={t('workOtp.verifyStart')} onPress={submit} loading={loading} />
-      <TouchableOpacity style={styles.resend} onPress={resend} disabled={resending}>
+      <GradientButton
+        title={t('workOtp.verifyStart')}
+        onPress={submit}
+        loading={loading}
+        disabled={disabled}
+      />
+      <TouchableOpacity style={styles.resend} onPress={resend} disabled={resending || disabled}>
         <Text style={styles.resendText}>
           {resending ? t('workOtp.resending') : t('workOtp.resend')}
         </Text>
@@ -99,6 +108,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: Stitch.colors.primary,
   },
+  inputDisabled: { opacity: 0.5 },
   resend: { marginTop: 10, alignItems: 'center' },
   resendText: { color: Stitch.colors.primary, fontWeight: '600', fontSize: 13 },
 });

@@ -446,7 +446,12 @@
     "noZonesList": "No zones yet. Add your first service area.",
     "couldNotSaveZone": "Could not save zone",
     "screenTitle": "Service zones",
-    "screenSub": "Add areas where you are available to work. House owners can find you by zone."
+    "screenSub": "Add areas where you are available to work. House owners can find you by zone.",
+    "dashboardAlertTitle": "Service zone required",
+    "dashboardAlertSub": "Add at least one area where you work. Nearby jobs and open requests only reach helpers with a service zone.",
+    "actionBlocked": "Add a service zone before you can accept or start jobs.",
+    "cityRequired": "City is required.",
+    "zoneAdded": "Service zone saved. You can now accept nearby jobs."
   },
   "servantProfile": {
     "rating": "Rating",

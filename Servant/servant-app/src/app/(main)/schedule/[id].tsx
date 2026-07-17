@@ -22,6 +22,8 @@ import {
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
 import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
+import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
+import { useZoneGate } from '@/hooks/useZoneGate';
 
 export default function ScheduleDetailScreen() {
   const { t } = useTranslation();
@@ -30,6 +32,8 @@ export default function ScheduleDetailScreen() {
   const qc = useQueryClient();
   const [sharingLocation, setSharingLocation] = useState(false);
   const [acting, setActing] = useState(false);
+  const { hasZones, requireZone, goAddZone } = useZoneGate();
+  const actionsBlocked = !hasZones;
 
   const { data: booking, isLoading } = useQuery({
     queryKey: ['booking', id],
@@ -70,6 +74,7 @@ export default function ScheduleDetailScreen() {
 
   const confirm = async () => {
     if (acting) return;
+    if (!requireZone()) return;
     setActing(true);
     stopPendingRequestVibration();
     try {
@@ -92,6 +97,7 @@ export default function ScheduleDetailScreen() {
 
   const reject = async () => {
     if (acting) return;
+    if (!requireZone()) return;
     setActing(true);
     try {
       await api.patch(`/bookings/${id}/reject`, { reason: t('servantHome.rejectReason') });
@@ -110,6 +116,7 @@ export default function ScheduleDetailScreen() {
   };
 
   const markArrived = async () => {
+    if (!requireZone()) return;
     try {
       await api.patch(`/bookings/${id}/arrived`);
       setSharingLocation(false);
@@ -160,6 +167,8 @@ export default function ScheduleDetailScreen() {
         <Text style={styles.headerTitle}>{t('schedule.jobDetails')}</Text>
         <View style={styles.backBtn} />
       </View>
+
+      {!hasZones ? <ZoneRequiredBanner onAddZone={goAddZone} /> : null}
 
       <GlassCard>
         <Text style={styles.title}>{booking.houseOwner.user.name}</Text>
@@ -228,8 +237,12 @@ export default function ScheduleDetailScreen() {
           {booking.status === 'CONFIRMED' && !clockedInHere && (
             <>
               <TouchableOpacity
-                style={styles.onWayBtn}
-                onPress={() => setSharingLocation((v) => !v)}
+                style={[styles.onWayBtn, actionsBlocked && styles.btnDisabled]}
+                onPress={() => {
+                  if (!requireZone()) return;
+                  setSharingLocation((v) => !v);
+                }}
+                disabled={actionsBlocked}
               >
                 <Text style={styles.onWayText}>
                   {sharingLocation
@@ -243,12 +256,14 @@ export default function ScheduleDetailScreen() {
                   expiresAt={booking.workOtpExpiresAt}
                   onVerified={onWorkOtpVerified}
                   onResend={() => qc.invalidateQueries({ queryKey: ['booking', id] })}
+                  disabled={actionsBlocked}
                 />
               ) : (
                 <GradientButton
                   title={t('workOtp.requestOtp')}
                   onPress={markArrived}
                   style={{ marginTop: 12 }}
+                  disabled={actionsBlocked}
                 />
               )}
             </>
@@ -269,18 +284,18 @@ export default function ScheduleDetailScreen() {
       {booking.status === 'PENDING' && (
         <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.accept, acting && styles.btnDisabled]}
+            style={[styles.accept, (acting || actionsBlocked) && styles.btnDisabled]}
             onPress={confirm}
-            disabled={acting}
+            disabled={acting || actionsBlocked}
           >
             <Text style={styles.btnText}>
               {acting ? t('servantHome.pleaseWait') : t('schedule.accept')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.reject, acting && styles.btnDisabled]}
+            style={[styles.reject, (acting || actionsBlocked) && styles.btnDisabled]}
             onPress={reject}
-            disabled={acting}
+            disabled={acting || actionsBlocked}
           >
             <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
           </TouchableOpacity>

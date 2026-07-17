@@ -23,6 +23,8 @@ import { formatDate, formatCurrency } from '@/lib/i18n/format';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
+import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
+import { useZoneGate } from '@/hooks/useZoneGate';
 import {
   stopPendingRequestVibration,
   syncPendingRequestVibration,
@@ -65,6 +67,8 @@ export default function ServantHomeScreen() {
   );
   const [actingId, setActingId] = useState<number | null>(null);
   const [onWayBookingId, setOnWayBookingId] = useState<number | null>(null);
+  const { hasZones, requireZone, goAddZone } = useZoneGate();
+  const actionsBlocked = !hasZones;
 
   const trackingBookingId = activeBookingId ?? onWayBookingId;
   useServantLocationReporter(trackingBookingId, trackingBookingId != null);
@@ -186,6 +190,7 @@ export default function ServantHomeScreen() {
   };
 
   const markArrived = async (bookingId: number) => {
+    if (!requireZone()) return;
     try {
       await api.patch(`/bookings/${bookingId}/arrived`);
       setOnWayBookingId(null);
@@ -231,6 +236,7 @@ export default function ServantHomeScreen() {
 
   const confirm = async (id: number) => {
     if (actingId != null) return;
+    if (!requireZone()) return;
     setActingId(id);
     stopPendingRequestVibration();
     try {
@@ -254,6 +260,7 @@ export default function ServantHomeScreen() {
 
   const reject = async (id: number) => {
     if (actingId != null) return;
+    if (!requireZone()) return;
     setActingId(id);
     try {
       await api.patch(`/bookings/${id}/reject`, { reason: t('servantHome.rejectReason') });
@@ -314,6 +321,8 @@ export default function ServantHomeScreen() {
           />
         </View>
       </View>
+
+      {!hasZones ? <ZoneRequiredBanner onAddZone={goAddZone} /> : null}
 
       <View style={styles.earnRow}>
         <View>
@@ -448,9 +457,9 @@ export default function ServantHomeScreen() {
                 height={140}
               />
               <TouchableOpacity
-                style={[styles.accept, actingId === b.id && styles.btnDisabled]}
+                style={[styles.accept, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
                 onPress={() => confirm(b.id)}
-                disabled={actingId != null}
+                disabled={actingId != null || actionsBlocked}
               >
                 <Text style={styles.acceptText}>
                   {actingId === b.id ? t('servantHome.accepting') : t('servantHome.acceptJobFirstWins')}
@@ -487,18 +496,18 @@ export default function ServantHomeScreen() {
               />
               <View style={styles.row}>
                 <TouchableOpacity
-                  style={[styles.accept, actingId === b.id && styles.btnDisabled]}
+                  style={[styles.accept, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
                   onPress={() => confirm(b.id)}
-                  disabled={actingId != null}
+                  disabled={actingId != null || actionsBlocked}
                 >
                   <Text style={styles.acceptText}>
                     {actingId === b.id ? t('servantHome.pleaseWait') : t('schedule.accept')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.reject, actingId === b.id && styles.btnDisabled]}
+                  style={[styles.reject, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
                   onPress={() => reject(b.id)}
-                  disabled={actingId != null}
+                  disabled={actingId != null || actionsBlocked}
                 >
                   <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
                 </TouchableOpacity>
@@ -576,10 +585,12 @@ export default function ServantHomeScreen() {
               {!activeEntry && b.status === 'CONFIRMED' && (
                 <>
                   <TouchableOpacity
-                    style={styles.onWayBtn}
-                    onPress={() =>
-                      setOnWayBookingId((prev) => (prev === b.id ? null : b.id))
-                    }
+                    style={[styles.onWayBtn, actionsBlocked && styles.btnDisabled]}
+                    onPress={() => {
+                      if (!requireZone()) return;
+                      setOnWayBookingId((prev) => (prev === b.id ? null : b.id));
+                    }}
+                    disabled={actionsBlocked}
                   >
                     <Text style={styles.onWayText}>
                       {onWayBookingId === b.id
@@ -593,12 +604,14 @@ export default function ServantHomeScreen() {
                       expiresAt={b.workOtpExpiresAt}
                       onVerified={() => onWorkOtpVerified(b.id)}
                       onResend={() => refreshBookings()}
+                      disabled={actionsBlocked}
                     />
                   ) : (
                     <GradientButton
                       title={t('workOtp.requestOtp')}
                       onPress={() => markArrived(b.id)}
                       style={{ marginTop: 12 }}
+                      disabled={actionsBlocked}
                     />
                   )}
                 </>
