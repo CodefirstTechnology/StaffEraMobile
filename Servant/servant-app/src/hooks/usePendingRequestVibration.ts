@@ -8,7 +8,7 @@ import {
 
 type BookingRow = { id: number; status: string };
 
-/** Repeat vibration while open or direct pending booking requests need a response. */
+/** Ringtone + vibration while open or direct pending booking requests need a response. */
 export function usePendingRequestVibration() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const qc = useQueryClient();

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import { VisitAddressBanner } from '@/components/ui/VisitAddressBanner';
 import { formatVisitAddressLines } from '@/lib/visitAddress';
 import { LocationMapPreview } from '@/components/ui/LocationMapPreview';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { useToast } from '@/providers/ToastProvider';
 import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
@@ -22,23 +23,46 @@ import {
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
 import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
+import { DeclineReasonSheet } from '@/components/bookings/DeclineReasonSheet';
+import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
+import { useZoneGate } from '@/hooks/useZoneGate';
+import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
+import { isActionableBooking, isCancelled } from '@/lib/bookingVisibility';
+import { declineBooking } from '@/lib/declineBooking';
 
 export default function ScheduleDetailScreen() {
   const { t } = useTranslation();
+  const toast = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
   const bookingId = id ? parseInt(id, 10) : null;
   const qc = useQueryClient();
   const [sharingLocation, setSharingLocation] = useState(false);
   const [acting, setActing] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineLoading, setDeclineLoading] = useState(false);
+  const { hasZones, requireZone, goAddZone } = useZoneGate();
+  const actionsBlocked = !hasZones;
+  const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
 
-  const { data: booking, isLoading } = useQuery({
+  const { data: booking, isLoading, isError } = useQuery({
     queryKey: ['booking', id],
     enabled: !!id,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status as string | undefined;
+      return status && isActionableBooking(status) ? 2000 : false;
+    },
     queryFn: async () => {
       const res = await api.get(`/bookings/${id}`);
       return res.data.data.booking;
     },
   });
+
+  useEffect(() => {
+    if (!isError || bookingId == null) return;
+    if (isDeclinedOpenBooking(bookingId, declinedOpenIds)) {
+      router.back();
+    }
+  }, [isError, bookingId, declinedOpenIds]);
 
   const { data: today } = useQuery({
     queryKey: ['time-today'],
@@ -50,8 +74,12 @@ export default function ScheduleDetailScreen() {
 
   const openEntry = today?.entries?.find((e: { clockOut: string | null }) => !e.clockOut);
   const clockedInHere = openEntry?.bookingId === bookingId;
+  const bookingCancelled = booking ? isCancelled(booking.status) : false;
+  const bookingActionable = booking ? isActionableBooking(booking.status) : false;
   const trackEnabled =
-    bookingId != null && (clockedInHere || (sharingLocation && booking?.status === 'CONFIRMED'));
+    !bookingCancelled &&
+    bookingId != null &&
+    (clockedInHere || (sharingLocation && booking?.status === 'CONFIRMED'));
 
   useServantLocationReporter(bookingId, trackEnabled);
 
@@ -70,6 +98,7 @@ export default function ScheduleDetailScreen() {
 
   const confirm = async () => {
     if (acting) return;
+    if (!requireZone()) return;
     setActing(true);
     stopPendingRequestVibration();
     try {
@@ -90,26 +119,55 @@ export default function ScheduleDetailScreen() {
     }
   };
 
-  const reject = async () => {
+  const openDecline = () => {
     if (acting) return;
+    const isOpenRequest = booking?.servantId == null;
+    if (!isOpenRequest && !requireZone()) return;
+    setDeclineOpen(true);
+  };
+
+  const submitDecline = async (reason: string) => {
+    if (acting || bookingId == null) return;
+    const wasOpenRequest = booking?.servantId == null;
+    setDeclineLoading(true);
     setActing(true);
     try {
-      await api.patch(`/bookings/${id}/reject`, { reason: t('servantHome.rejectReason') });
+      await declineBooking(bookingId, reason, wasOpenRequest);
+
+      if (wasOpenRequest) {
+        qc.setQueryData(['open-requests'], (prev: { id: number }[] | undefined) =>
+          (prev ?? []).filter((row) => row.id !== bookingId),
+        );
+        qc.setQueryData<number[]>(['declined-open-booking-ids'], (prev) =>
+          Array.from(new Set([...(prev ?? []), bookingId])),
+        );
+      }
+
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['booking', id] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
         qc.invalidateQueries({ queryKey: ['open-requests'] }),
+        qc.invalidateQueries({ queryKey: ['declined-open-booking-ids'] }),
         qc.invalidateQueries({ queryKey: ['schedule'] }),
       ]);
-      Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
+      setDeclineOpen(false);
+      Alert.alert(
+        t('servantHome.declinedTitle'),
+        wasOpenRequest ? t('servantHome.openRequestPassed') : t('servantHome.customerNotified'),
+      );
+      if (wasOpenRequest) {
+        router.back();
+      }
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotDecline'), apiError(e, t('auth.tryAgain')));
     } finally {
+      setDeclineLoading(false);
       setActing(false);
     }
   };
 
   const markArrived = async () => {
+    if (!requireZone()) return;
     try {
       await api.patch(`/bookings/${id}/arrived`);
       setSharingLocation(false);
@@ -117,7 +175,7 @@ export default function ScheduleDetailScreen() {
         qc.invalidateQueries({ queryKey: ['booking', id] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
       ]);
-      Alert.alert(t('workOtp.requestedTitle'), t('workOtp.requestedBody'));
+      toast.info(t('workOtp.requestedBody'));
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotStart'), apiError(e, t('servantHome.checkConfirmed')));
     }
@@ -131,10 +189,21 @@ export default function ScheduleDetailScreen() {
     ]);
   };
 
-  if (isLoading || !booking) {
+  if (isLoading) {
     return (
       <View style={styles.center}>
         <Text style={styles.muted}>{t('common.loading')}</Text>
+      </View>
+    );
+  }
+
+  if (isError || !booking) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.muted}>{t('servantHome.requestHandled')}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 12 }}>
+          <Text style={{ color: Stitch.colors.primary, fontWeight: '600' }}>{t('common.back')}</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -152,6 +221,7 @@ export default function ScheduleDetailScreen() {
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -160,6 +230,15 @@ export default function ScheduleDetailScreen() {
         <Text style={styles.headerTitle}>{t('schedule.jobDetails')}</Text>
         <View style={styles.backBtn} />
       </View>
+
+      {!hasZones ? <ZoneRequiredBanner onAddZone={goAddZone} /> : null}
+
+      {bookingCancelled ? (
+        <GlassCard style={styles.cancelledBanner}>
+          <MaterialIcons name="event-busy" size={22} color={Stitch.colors.error} />
+          <Text style={styles.cancelledText}>{t('bookings.bookingCancelled')}</Text>
+        </GlassCard>
+      ) : null}
 
       <GlassCard>
         <Text style={styles.title}>{booking.houseOwner.user.name}</Text>
@@ -205,7 +284,7 @@ export default function ScheduleDetailScreen() {
         ) : null}
       </GlassCard>
 
-      {home && ['CONFIRMED', 'ACTIVE'].includes(booking.status) ? (
+      {home && bookingActionable && ['CONFIRMED', 'ACTIVE'].includes(booking.status) ? (
         <>
           <JobTrackingMap
             home={home}
@@ -228,8 +307,12 @@ export default function ScheduleDetailScreen() {
           {booking.status === 'CONFIRMED' && !clockedInHere && (
             <>
               <TouchableOpacity
-                style={styles.onWayBtn}
-                onPress={() => setSharingLocation((v) => !v)}
+                style={[styles.onWayBtn, actionsBlocked && styles.btnDisabled]}
+                onPress={() => {
+                  if (!requireZone()) return;
+                  setSharingLocation((v) => !v);
+                }}
+                disabled={actionsBlocked}
               >
                 <Text style={styles.onWayText}>
                   {sharingLocation
@@ -243,12 +326,14 @@ export default function ScheduleDetailScreen() {
                   expiresAt={booking.workOtpExpiresAt}
                   onVerified={onWorkOtpVerified}
                   onResend={() => qc.invalidateQueries({ queryKey: ['booking', id] })}
+                  disabled={actionsBlocked}
                 />
               ) : (
                 <GradientButton
                   title={t('workOtp.requestOtp')}
                   onPress={markArrived}
                   style={{ marginTop: 12 }}
+                  disabled={actionsBlocked}
                 />
               )}
             </>
@@ -266,12 +351,12 @@ export default function ScheduleDetailScreen() {
         />
       ) : null}
 
-      {booking.status === 'PENDING' && (
+      {booking.status === 'PENDING' && bookingActionable && (
         <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.accept, acting && styles.btnDisabled]}
+            style={[styles.accept, (acting || actionsBlocked) && styles.btnDisabled]}
             onPress={confirm}
-            disabled={acting}
+            disabled={acting || actionsBlocked}
           >
             <Text style={styles.btnText}>
               {acting ? t('servantHome.pleaseWait') : t('schedule.accept')}
@@ -279,7 +364,7 @@ export default function ScheduleDetailScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.reject, acting && styles.btnDisabled]}
-            onPress={reject}
+            onPress={openDecline}
             disabled={acting}
           >
             <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
@@ -287,6 +372,13 @@ export default function ScheduleDetailScreen() {
         </View>
       )}
     </ScrollView>
+    <DeclineReasonSheet
+      visible={declineOpen}
+      loading={declineLoading}
+      onClose={() => !declineLoading && setDeclineOpen(false)}
+      onConfirm={submitDecline}
+    />
+    </>
   );
 }
 
@@ -338,4 +430,18 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#fff', fontWeight: '700' },
   rejectText: { color: Stitch.colors.error, fontWeight: '700' },
+  cancelledBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: Stitch.spacing.padding,
+    marginBottom: 12,
+    backgroundColor: Stitch.colors.errorContainer,
+  },
+  cancelledText: {
+    flex: 1,
+    color: Stitch.colors.error,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
 });

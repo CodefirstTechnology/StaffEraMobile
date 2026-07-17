@@ -75,7 +75,11 @@ const reviewSchema = z.object({
 
 const rejectBookingSchema = z.object({
   body: z.object({
-    reason: z.string().optional()
+    reason: z
+      .string({ required_error: "Decline reason is required" })
+      .trim()
+      .min(3, "Decline reason must be at least 3 characters")
+      .max(500, "Decline reason cannot exceed 500 characters")
   })
 });
 

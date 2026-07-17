@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
+import { PasswordStrengthIndicator } from '@/components/ui/PasswordStrengthIndicator';
 import { LocationPicker } from '@/components/ui/LocationPicker';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import {
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/AddressUnitFields';
 import type { LocationValue } from '@/lib/locationTypes';
 import { digitsOnlyPhone, getPhoneValidationKind } from '@/lib/phone';
+import { setPendingToast } from '@/lib/pendingToast';
 
 function phoneErrorMessage(
   kind: ReturnType<typeof getPhoneValidationKind>,
@@ -71,6 +73,7 @@ export default function RegisterScreen() {
         latitude: homeLocation?.latitude,
         longitude: homeLocation?.longitude,
       });
+      setPendingToast(t('auth.registrationSuccess'), 'success');
       router.replace('/(main)/home');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
@@ -94,28 +97,30 @@ export default function RegisterScreen() {
       <Text style={styles.logo}>{t('auth.joinTitle')}</Text>
       <Text style={styles.sub}>{t('auth.joinSubtitle')}</Text>
       {fields.map((f) => (
-        <GhostInput
-          key={f.key}
-          label={f.label}
-          secureTextEntry={f.secure}
-          {...('keyboard' in f ? { keyboardType: f.keyboard } : {})}
-          autoCapitalize={f.key === 'email' ? 'none' : 'words'}
-          value={form[f.key]}
-          error={f.key === 'phone' ? phoneError : undefined}
-          onChangeText={(v) => {
-            const next = f.key === 'phone' ? digitsOnlyPhone(v) : v;
-            setForm((prev) => ({ ...prev, [f.key]: next }));
-            if (f.key === 'phone') setPhoneError('');
-          }}
-          onBlur={
-            f.key === 'phone'
-              ? () => {
-                  validatePhoneField(form.phone);
-                }
-              : undefined
-          }
-          required={f.required}
-        />
+        <View key={f.key}>
+          <GhostInput
+            label={f.label}
+            secureTextEntry={f.secure}
+            {...('keyboard' in f ? { keyboardType: f.keyboard } : {})}
+            autoCapitalize={f.key === 'email' ? 'none' : 'words'}
+            value={form[f.key]}
+            error={f.key === 'phone' ? phoneError : undefined}
+            onChangeText={(v) => {
+              const next = f.key === 'phone' ? digitsOnlyPhone(v) : v;
+              setForm((prev) => ({ ...prev, [f.key]: next }));
+              if (f.key === 'phone') setPhoneError('');
+            }}
+            onBlur={
+              f.key === 'phone'
+                ? () => {
+                    validatePhoneField(form.phone);
+                  }
+                : undefined
+            }
+            required={f.required}
+          />
+          {f.key === 'password' ? <PasswordStrengthIndicator password={form.password} /> : null}
+        </View>
       ))}
 
       <AddressUnitFields value={addressUnit} onChange={setAddressUnit} />

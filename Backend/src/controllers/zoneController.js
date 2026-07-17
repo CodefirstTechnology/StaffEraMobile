@@ -17,3 +17,24 @@ exports.listMyZones = async (req, res) => {
   sendSuccess(res, { zones });
 };
 
+exports.createMyZone = async (req, res) => {
+  const servant = await getServantForUser(req.user.id);
+  const { name, description, city, latitude, longitude } = req.body;
+
+  if (!name?.trim()) throw new ApiError(400, "Zone name is required");
+  if (!city?.trim()) throw new ApiError(400, "City is required");
+
+  const zone = await prisma.zone.create({
+    data: {
+      servantId: servant.id,
+      name: name.trim(),
+      description: description?.trim() || null,
+      city: city.trim(),
+      latitude: latitude ?? undefined,
+      longitude: longitude ?? undefined
+    }
+  });
+
+  sendSuccess(res, { zone }, 201);
+};
+

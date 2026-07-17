@@ -5,15 +5,23 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { useBookingRequestAlerts } from '@/hooks/useBookingRequestAlerts';
+import { useBookingCancellationAlerts } from '@/hooks/useBookingCancellationAlerts';
+import { useBookingRealtimeSync } from '@/hooks/useBookingRealtimeSync';
 import { usePendingRequestVibration } from '@/hooks/usePendingRequestVibration';
+import { useLocationGate } from '@/hooks/useLocationGate';
+import { LocationRequiredScreen } from '@/components/location/LocationRequiredScreen';
 
 export default function MainLayout() {
   const { t } = useTranslation();
   const { isAuthenticated, isLoading } = useAuthStore();
   useBookingRequestAlerts();
+  useBookingCancellationAlerts();
+  useBookingRealtimeSync();
   usePendingRequestVibration();
+  const { checking: locationChecking, blocked: locationBlocked, retry: retryLocation } =
+    useLocationGate();
 
-  if (isLoading) {
+  if (isLoading || locationChecking) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color={Stitch.colors.primary} />
@@ -22,6 +30,10 @@ export default function MainLayout() {
   }
 
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
+
+  if (locationBlocked) {
+    return <LocationRequiredScreen onRetry={retryLocation} checking={locationChecking} />;
+  }
 
   return (
     <Tabs

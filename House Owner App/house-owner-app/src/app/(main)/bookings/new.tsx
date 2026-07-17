@@ -15,6 +15,7 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { BackHeader } from '@/components/ui/BackHeader';
 import { GhostInput } from '@/components/ui/GhostInput';
 import { BookingLocationSection } from '@/components/ui/BookingLocationSection';
 import type { LocationValue } from '@/lib/locationTypes';
@@ -151,13 +152,9 @@ export default function NewBookingScreen() {
   };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>← {t('common.back')}</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>
-        {t('bookings.bookHelperTitle', { name: servant?.user?.name || t('common.helper') })}
-      </Text>
+    <View style={styles.root}>
+      <BackHeader title={t('bookings.bookHelperTitle', { name: servant?.user?.name || t('common.helper') })} />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
 
       <View style={styles.toggle}>
         {(['SESSION', 'MONTHLY'] as const).map((bt) => (
@@ -221,15 +218,15 @@ export default function NewBookingScreen() {
       </Text>
 
       <GradientButton title={t('bookings.sendBookingRequest')} onPress={submit} loading={loading} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Stitch.colors.background },
-  scroll: { padding: Stitch.spacing.padding, paddingTop: 52, paddingBottom: 40 },
-  back: { color: Stitch.colors.primary, fontWeight: '600', marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '700', color: Stitch.colors.primary, marginBottom: 20 },
+  scroll: { flex: 1 },
+  scrollContent: { padding: Stitch.spacing.padding, paddingBottom: 40 },
   toggle: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   toggleBtn: {
     flex: 1,

@@ -15,6 +15,7 @@ import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useNotifications, type AppNotification } from '@/hooks/useNotifications';
+import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
 import { localizeNotification } from '@/lib/i18n/notifications';
 import { formatRelativeTime } from '@/lib/i18n/format';
 
@@ -27,7 +28,17 @@ export default function NotificationsScreen() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: notifications = [], isLoading, refetch, isRefetching } = useNotifications();
-  const unread = notifications.filter((n) => !n.isRead).length;
+  const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
+
+  const visibleNotifications = notifications.filter((n) => {
+    const bookingId = getBookingId(n);
+    if (n.type === 'BOOKING_CANCELLED' && bookingId != null) {
+      return !isDeclinedOpenBooking(bookingId, declinedOpenIds);
+    }
+    return true;
+  });
+
+  const unread = visibleNotifications.filter((n) => !n.isRead).length;
 
   const openNotification = async (n: AppNotification) => {
     if (!n.isRead) {
@@ -36,6 +47,14 @@ export default function NotificationsScreen() {
     }
 
     const bookingId = getBookingId(n);
+    if (bookingId != null && isDeclinedOpenBooking(bookingId, declinedOpenIds)) {
+      if (!n.isRead) {
+        await api.patch(`/notifications/${n.id}/read`);
+        qc.invalidateQueries({ queryKey: ['notifications'] });
+      }
+      return;
+    }
+
     if (bookingId) {
       router.push(`/(main)/schedule/${bookingId}`);
     }
@@ -66,7 +85,7 @@ export default function NotificationsScreen() {
         <ActivityIndicator style={styles.loader} color={Stitch.colors.primary} />
       ) : (
         <FlatList
-          data={notifications}
+          data={visibleNotifications}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
           refreshing={isRefetching}

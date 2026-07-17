@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { formatTime } from '@/lib/i18n/format';
+import { formatDurationFromHours } from '@/lib/formatDuration';
 
 export default function TimeScreen() {
   const { t } = useTranslation();
@@ -32,7 +33,9 @@ export default function TimeScreen() {
     <View style={styles.root}>
       <Text style={styles.title}>{t('time.todayTitle')}</Text>
       <Text style={styles.sub}>
-        {t('time.totalHoursLabel', { hours: data?.totalHours?.toFixed(1) ?? '0.0' })}
+        {t('time.totalHoursLabel', {
+          duration: formatDurationFromHours(data?.totalHours ?? 0),
+        })}
       </Text>
       <FlatList
         data={entries}
@@ -56,7 +59,9 @@ export default function TimeScreen() {
                 : t('time.onDuty')}
             </Text>
             {item.hoursWorked != null && (
-              <Text style={styles.hours}>{t('time.hoursShort', { hours: item.hoursWorked })}</Text>
+              <Text style={styles.hours}>
+                {t('time.hoursShort', { duration: formatDurationFromHours(item.hoursWorked) })}
+              </Text>
             )}
           </GlassCard>
         )}

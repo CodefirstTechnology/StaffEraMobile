@@ -116,9 +116,18 @@ export default function ProfileScreen() {
     }
   };
 
-  const signOut = async () => {
-    await logout();
-    router.replace('/(auth)/login');
+  const signOut = () => {
+    Alert.alert(t('auth.logoutConfirmTitle'), t('auth.logoutConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('auth.signOut'),
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/(auth)/login');
+        },
+      },
+    ]);
   };
 
   const openMaps = () => {

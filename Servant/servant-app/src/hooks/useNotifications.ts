@@ -22,6 +22,6 @@ export function useNotifications() {
       return res.data.data.notifications as AppNotification[];
     },
     enabled: isAuthenticated,
-    refetchInterval: isAuthenticated ? 15000 : false,
+    staleTime: 0,
   });
 }

@@ -63,6 +63,8 @@
     "password": "पासवर्ड",
     "signIn": "साइन इन",
     "signOut": "साइन आउट",
+    "logoutConfirmTitle": "साइन आउट करें?",
+    "logoutConfirmMessage": "क्या आप वाकई लॉग आउट करना चाहते हैं?",
     "newAccount": "नए हैं? खाता बनाएं",
     "loginFailed": "लॉगिन विफल",
     "tryAgain": "कृपया पुनः प्रयास करें",
@@ -291,12 +293,12 @@
     "estimatedEarnings": "अनुमानित कमाई",
     "noEntries": "अभी कोई समय प्रविष्टि नहीं",
     "todayTitle": "Today's time",
-    "totalHoursLabel": "Total hours: {{hours}}",
+    "totalHoursLabel": "कुल: {{duration}}",
     "clockInHint": "Clock in from Home when you reach the customer",
     "clockInAt": "In: {{time}}",
     "clockOutAt": "Out: {{time}}",
     "onDuty": "On duty",
-    "hoursShort": "{{hours}} hrs",
+    "hoursShort": "{{duration}}",
     "historyTitle": "समय इतिहास"
   },
   "earnings": {
@@ -315,7 +317,7 @@
     "monthVisitsHint": "इस कैलेंडर माह की पूर्ण विज़िट",
     "oneJobToday": "आज 1 पूर्ण नौकरी",
     "jobsTodayCount": "आज {{count}} पूर्ण नौकरियाँ",
-    "hoursRateHint": "{{hours}} घंटे × {{rate}}/घंटा",
+    "hoursRateHint": "{{duration}} × {{rate}}/घंटा",
     "updatesHint": "क्लॉक आउट या स्लॉट समाप्त पर अपडेट",
     "noMonthJobs": "इस माह अभी कोई पूर्ण नौकरी नहीं",
     "todaySection": "आज की पूर्ण नौकरियाँ",
@@ -349,7 +351,12 @@
     "noZonesList": "अभी कोई ज़ोन नहीं। पहला सेवा क्षेत्र जोड़ें।",
     "couldNotSaveZone": "ज़ोन सेव नहीं हो सका",
     "screenTitle": "सेवा क्षेत्र",
-    "screenSub": "जहाँ आप काम के लिए उपलब्ध हैं वे इलाके जोड़ें। घर मालिक ज़ोन से आपको खोज सकते हैं।"
+    "screenSub": "जहाँ आप काम के लिए उपलब्ध हैं वे इलाके जोड़ें। घर मालिक ज़ोन से आपको खोज सकते हैं।",
+    "dashboardAlertTitle": "सेवा क्षेत्र आवश्यक",
+    "dashboardAlertSub": "कम से कम एक काम का इलाका जोड़ें। पास की नौकरियाँ और खुले अनुरोध केवल सेवा क्षेत्र वाले सहायकों तक पहुँचते हैं।",
+    "actionBlocked": "नौकरी स्वीकार या शुरू करने से पहले सेवा क्षेत्र जोड़ें।",
+    "cityRequired": "शहर आवश्यक है।",
+    "zoneAdded": "सेवा क्षेत्र सेव हो गया। अब आप पास की नौकरियाँ स्वीकार कर सकते हैं।"
   },
   "servantProfile": {
     "rating": "रेटिंग",
@@ -358,6 +365,27 @@
     "yourSkills": "आपके कौशल",
     "aboutYou": "आपके बारे में",
     "serviceZonesSub": "एजेंट द्वारा सेट — इन इलाकों के पास ग्राहक आपके अनुरोध देखते हैं"
+  },
+  "decline": {
+    "title": "बुकिंग अस्वीकार करें",
+    "sub": "कारण चुनें ताकि ग्राहक जान सके कि आप यह काम क्यों नहीं ले सकते।",
+    "confirm": "नौकरी अस्वीकार करें",
+    "reasonRequired": "कृपया एक कारण चुनें",
+    "customReasonRequired": "कृपया कम से कम 3 अक्षर लिखें",
+    "customPlaceholder": "अस्वीकार का कारण लिखें…",
+    "reasons": {
+      "unavailable": "इस समय उपलब्ध नहीं",
+      "scheduleConflict": "दूसरी नौकरी से समय टकराव",
+      "tooFar": "स्थान बहुत दूर है",
+      "personalEmergency": "व्यक्तिगत आपात स्थिति",
+      "other": "अन्य (नीचे लिखें)"
+    }
+  },
+  "locationGate": {
+    "title": "लोकेशन आवश्यक",
+    "sub": "StaffEra को पास की नौकरियाँ दिखाने, रास्ता साझा करने और सेवा क्षेत्र सत्यापित करने के लिए लोकेशन चाहिए। जारी रखने के लिए लोकेशन सक्षम करें।",
+    "enable": "लोकेशन सक्षम करें",
+    "openSettings": "सेटिंग्स खोलें"
   },
   "workOtp": {
     "requestOtp": "पहुँचा — OTP लें",
@@ -375,6 +403,7 @@
     "failedTitle": "सत्यापन विफल",
     "invalidTitle": "अमान्य OTP",
     "invalidBody": "गृहस्वामी का 4 अंकीय कोड दर्ज करें।",
+    "expiredBody": "OTP समाप्त हो गया। नया OTP पाने के लिए पहुँचा — OTP लें दबाएँ।",
     "resentTitle": "नया OTP भेजा",
     "resentBody": "गृहस्वामी को नया कोड भेजा गया।"
   },
@@ -411,6 +440,10 @@
     "BOOKING_ACTIVE": {
       "title": "सहायक पहुँचा",
       "body": "सहायक ने काम शुरू किया"
+    },
+    "BOOKING_CANCELLED": {
+      "title": "बुकिंग रद्द",
+      "body": "ग्राहक ने यह बुकिंग रद्द कर दी"
     }
   },
   "servantHome": {
@@ -427,6 +460,7 @@
     "requestHandled": "This request was already accepted or declined.",
     "couldNotAccept": "Could not accept",
     "declinedTitle": "Declined",
+    "openRequestPassed": "This request was removed from your list.",
     "couldNotDecline": "Could not decline",
     "arrivedStartWork": "I arrived — start work",
     "openRequests": "Open requests",
@@ -440,7 +474,7 @@
     "todayEarningsLabel": "आज की कमाई",
     "jobsLabel": "नौकरियाँ",
     "jobsCompletedToday": "आज {{count}} नौकरी पूर्ण",
-    "hoursLoggedToday": "आज {{hours}} घंटे लॉग",
+    "hoursLoggedToday": "आज {{duration}} लॉग",
     "earningsUpdateHint": "स्लॉट समाप्त या क्लॉक आउट पर कमाई अपडेट",
     "monthCardLabel": "इस माह · {{month}}",
     "monthJobsSub": "इस माह {{count}} नौकरी पूर्ण",
