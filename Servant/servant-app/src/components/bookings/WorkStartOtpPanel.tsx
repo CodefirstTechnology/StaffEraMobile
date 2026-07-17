@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { useToast } from '@/providers/ToastProvider';
+import { workOtpFeedback, workOtpVerifyErrorFeedback } from '@/lib/workOtpFeedback';
 import api from '@/lib/api';
 
 type Props = {
@@ -10,17 +12,21 @@ type Props = {
   expiresAt?: string | null;
   onVerified: () => void;
   onResend: () => void;
+  disabled?: boolean;
 };
 
-export function WorkStartOtpPanel({ bookingId, expiresAt, onVerified, onResend }: Props) {
+export function WorkStartOtpPanel({ bookingId, expiresAt, onVerified, onResend, disabled }: Props) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
   const submit = async () => {
+    if (disabled) return;
     if (!/^\d{4}$/.test(otp)) {
-      Alert.alert(t('workOtp.invalidTitle'), t('workOtp.invalidBody'));
+      const { message, type } = workOtpFeedback('invalid', t);
+      toast.show(message, type);
       return;
     }
     setLoading(true);
@@ -28,24 +34,28 @@ export function WorkStartOtpPanel({ bookingId, expiresAt, onVerified, onResend }
       await api.post(`/bookings/${bookingId}/verify-work-otp`, { otp });
       setOtp('');
       onVerified();
-      Alert.alert(t('workOtp.successTitle'), t('workOtp.successBody'));
+      const { message, type } = workOtpFeedback('success', t);
+      toast.show(message, type);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(t('workOtp.failedTitle'), err.response?.data?.message || t('auth.tryAgain'));
+      const { message, type } = workOtpVerifyErrorFeedback(t, err.response?.data?.message);
+      toast.show(message, type);
     } finally {
       setLoading(false);
     }
   };
 
   const resend = async () => {
+    if (disabled) return;
     setResending(true);
     try {
       await api.post(`/bookings/${bookingId}/resend-work-otp`);
       onResend();
-      Alert.alert(t('workOtp.resentTitle'), t('workOtp.resentBody'));
+      toast.info(t('workOtp.resentBody'));
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(t('workOtp.failedTitle'), err.response?.data?.message || t('auth.tryAgain'));
+      const { message, type } = workOtpVerifyErrorFeedback(t, err.response?.data?.message);
+      toast.show(message, type);
     } finally {
       setResending(false);
     }
@@ -59,16 +69,22 @@ export function WorkStartOtpPanel({ bookingId, expiresAt, onVerified, onResend }
         <Text style={styles.expires}>{t('workOtp.expiresHint')}</Text>
       ) : null}
       <TextInput
-        style={styles.input}
+        style={[styles.input, disabled && styles.inputDisabled]}
         value={otp}
         onChangeText={(v) => setOtp(v.replace(/\D/g, '').slice(0, 4))}
         keyboardType="number-pad"
         maxLength={4}
         placeholder={t('workOtp.placeholder')}
         placeholderTextColor={Stitch.colors.onSurfaceVariant}
+        editable={!disabled}
       />
-      <GradientButton title={t('workOtp.verifyStart')} onPress={submit} loading={loading} />
-      <TouchableOpacity style={styles.resend} onPress={resend} disabled={resending}>
+      <GradientButton
+        title={t('workOtp.verifyStart')}
+        onPress={submit}
+        loading={loading}
+        disabled={disabled}
+      />
+      <TouchableOpacity style={styles.resend} onPress={resend} disabled={resending || disabled}>
         <Text style={styles.resendText}>
           {resending ? t('workOtp.resending') : t('workOtp.resend')}
         </Text>
@@ -99,6 +115,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: Stitch.colors.primary,
   },
+  inputDisabled: { opacity: 0.5 },
   resend: { marginTop: 10, alignItems: 'center' },
   resendText: { color: Stitch.colors.primary, fontWeight: '600', fontSize: 13 },
 });

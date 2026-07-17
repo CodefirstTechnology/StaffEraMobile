@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { useToast } from '@/providers/ToastProvider';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
@@ -20,14 +21,21 @@ import { formatSessionSlotsLabel } from '@/lib/timeSlots';
 import { computeTodayEarnings, computeMonthlyEarnings } from '@/lib/earnings';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import { formatDurationFromHours, formatDurationFromSeconds } from '@/lib/formatDuration';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
+import { DeclineReasonSheet } from '@/components/bookings/DeclineReasonSheet';
+import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
+import { useZoneGate } from '@/hooks/useZoneGate';
+import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
 import {
   stopPendingRequestVibration,
   syncPendingRequestVibration,
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
+import { isCancelled, isPendingRequest, isTodayJob } from '@/lib/bookingVisibility';
+import { declineBooking } from '@/lib/declineBooking';
 
 type Booking = {
   id: number;
@@ -55,6 +63,7 @@ type Booking = {
 
 export default function ServantHomeScreen() {
   const { t } = useTranslation();
+  const toast = useToast();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const qc = useQueryClient();
@@ -64,7 +73,11 @@ export default function ServantHomeScreen() {
     null,
   );
   const [actingId, setActingId] = useState<number | null>(null);
+  const [declineTargetId, setDeclineTargetId] = useState<number | null>(null);
+  const [declineLoading, setDeclineLoading] = useState(false);
   const [onWayBookingId, setOnWayBookingId] = useState<number | null>(null);
+  const { hasZones, requireZone, goAddZone } = useZoneGate();
+  const actionsBlocked = !hasZones;
 
   const trackingBookingId = activeBookingId ?? onWayBookingId;
   useServantLocationReporter(trackingBookingId, trackingBookingId != null);
@@ -74,6 +87,7 @@ export default function ServantHomeScreen() {
       qc.invalidateQueries({ queryKey: ['bookings'] }),
       qc.invalidateQueries({ queryKey: ['open-requests'] }),
       qc.invalidateQueries({ queryKey: ['notifications'] }),
+      qc.invalidateQueries({ queryKey: ['declined-open-booking-ids'] }),
       qc.invalidateQueries({ queryKey: ['schedule'] }),
     ]);
 
@@ -89,8 +103,7 @@ export default function ServantHomeScreen() {
       return res.data.data.bookings as Booking[];
     },
     enabled: isAuthenticated,
-    staleTime: 5000,
-    refetchInterval: isAuthenticated ? 12000 : false,
+    staleTime: 0,
     refetchOnMount: 'always',
   });
 
@@ -117,10 +130,11 @@ export default function ServantHomeScreen() {
       return res.data.data.requests as Booking[];
     },
     enabled: isAuthenticated,
-    refetchInterval: isAuthenticated ? 12000 : false,
+    staleTime: 0,
   });
 
   const { data: notifications } = useNotifications();
+  const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
 
   const { data: today, refetch: refetchToday } = useQuery({
     queryKey: ['time-today'],
@@ -170,15 +184,24 @@ export default function ServantHomeScreen() {
     return () => clearInterval(t);
   }, [activeEntry]);
 
-  const pending = (bookings || []).filter((b) => b.status === 'PENDING');
-  const todayJobs = (bookings || []).filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.status));
+  const pending = (bookings || []).filter((b) => isPendingRequest(b.status));
+  const todayJobs = (bookings || []).filter((b) => isTodayJob(b.status));
 
-  const formatElapsed = (s: number) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = Math.floor(s % 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-  };
+  useEffect(() => {
+    if (!bookings?.length) return;
+    const cancelledIds = new Set(
+      bookings.filter((b) => isCancelled(b.status)).map((b) => b.id),
+    );
+    if (onWayBookingId != null && cancelledIds.has(onWayBookingId)) {
+      setOnWayBookingId(null);
+    }
+    if (activeBookingId != null && cancelledIds.has(activeBookingId)) {
+      setActiveBookingId(null);
+      setActiveEntry(null);
+    }
+  }, [bookings, onWayBookingId, activeBookingId]);
+
+  const formatElapsed = (s: number) => formatDurationFromSeconds(s);
 
   const apiError = (e: unknown, fallback: string) => {
     const err = e as { response?: { data?: { message?: string } } };
@@ -186,11 +209,12 @@ export default function ServantHomeScreen() {
   };
 
   const markArrived = async (bookingId: number) => {
+    if (!requireZone()) return;
     try {
       await api.patch(`/bookings/${bookingId}/arrived`);
       setOnWayBookingId(null);
       await refreshBookings();
-      Alert.alert(t('workOtp.requestedTitle'), t('workOtp.requestedBody'));
+      toast.info(t('workOtp.requestedBody'));
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotStart'), apiError(e, t('servantHome.checkConfirmed')));
     }
@@ -231,6 +255,7 @@ export default function ServantHomeScreen() {
 
   const confirm = async (id: number) => {
     if (actingId != null) return;
+    if (!requireZone()) return;
     setActingId(id);
     stopPendingRequestVibration();
     try {
@@ -252,27 +277,59 @@ export default function ServantHomeScreen() {
     }
   };
 
-  const reject = async (id: number) => {
+  const openDecline = (id: number, isOpenRequest: boolean) => {
     if (actingId != null) return;
+    if (!isOpenRequest && !requireZone()) return;
+    setDeclineTargetId(id);
+  };
+
+  const submitDecline = async (reason: string) => {
+    if (declineTargetId == null) return;
+    const id = declineTargetId;
+    const wasOpenRequest = openRequests?.some((r) => r.id === id) ?? false;
+    setDeclineLoading(true);
     setActingId(id);
     try {
-      await api.patch(`/bookings/${id}/reject`, { reason: t('servantHome.rejectReason') });
+      await declineBooking(id, reason, wasOpenRequest);
+
+      if (wasOpenRequest) {
+        qc.setQueryData<Booking[]>(['open-requests'], (prev) =>
+          (prev ?? []).filter((row) => row.id !== id),
+        );
+        qc.setQueryData<number[]>(['declined-open-booking-ids'], (prev) =>
+          Array.from(new Set([...(prev ?? []), id])),
+        );
+      }
+
       await refreshBookings();
-      Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
+      setDeclineTargetId(null);
+      Alert.alert(
+        t('servantHome.declinedTitle'),
+        wasOpenRequest ? t('servantHome.openRequestPassed') : t('servantHome.customerNotified'),
+      );
     } catch (e: unknown) {
       const message = apiError(e, 'Try again');
       if (message.toLowerCase().includes('not pending')) {
         await refreshBookings();
+        setDeclineTargetId(null);
         Alert.alert(t('servantHome.alreadyHandled'), t('servantHome.requestHandled'));
       } else {
         Alert.alert(t('servantHome.couldNotDecline'), message);
       }
     } finally {
+      setDeclineLoading(false);
       setActingId(null);
     }
   };
 
-  const unread = (notifications || []).filter((n) => !n.isRead).length;
+  const unread = (notifications || []).filter((n) => {
+    if (n.isRead) return false;
+    const bookingId = n.data?.bookingId;
+    if (n.type === 'BOOKING_CANCELLED' && typeof bookingId === 'number') {
+      return !isDeclinedOpenBooking(bookingId, declinedOpenIds);
+    }
+    return true;
+  }).length;
 
   const openJobDetail = (bookingId: number) => {
     router.push(`/(main)/schedule/${bookingId}`);
@@ -289,6 +346,7 @@ export default function ServantHomeScreen() {
   const monthLabel = monthStats?.monthLabel ?? monthlyFromBookings.monthLabel;
 
   return (
+    <>
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <View style={styles.topBar}>
         <View style={styles.proRow}>
@@ -315,6 +373,8 @@ export default function ServantHomeScreen() {
         </View>
       </View>
 
+      {!hasZones ? <ZoneRequiredBanner onAddZone={goAddZone} /> : null}
+
       <View style={styles.earnRow}>
         <View>
           <Text style={styles.earnLabel}>{t('servantHome.todayEarningsLabel')}</Text>
@@ -326,7 +386,9 @@ export default function ServantHomeScreen() {
             {todayStats.completedCount > 0
               ? t('servantHome.jobsCompletedToday', { count: todayStats.completedCount })
               : todayStats.hoursToday > 0
-                ? t('servantHome.hoursLoggedToday', { hours: todayStats.hoursToday.toFixed(1) })
+                ? t('servantHome.hoursLoggedToday', {
+                    duration: formatDurationFromHours(todayStats.hoursToday),
+                  })
                 : t('servantHome.earningsUpdateHint')}
           </Text>
         </View>
@@ -447,15 +509,24 @@ export default function ServantHomeScreen() {
                 address={b.address}
                 height={140}
               />
-              <TouchableOpacity
-                style={[styles.accept, actingId === b.id && styles.btnDisabled]}
-                onPress={() => confirm(b.id)}
-                disabled={actingId != null}
-              >
-                <Text style={styles.acceptText}>
-                  {actingId === b.id ? t('servantHome.accepting') : t('servantHome.acceptJobFirstWins')}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.row}>
+                <TouchableOpacity
+                  style={[styles.accept, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
+                  onPress={() => confirm(b.id)}
+                  disabled={actingId != null || actionsBlocked}
+                >
+                  <Text style={styles.acceptText}>
+                    {actingId === b.id ? t('servantHome.pleaseWait') : t('schedule.accept')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.reject, actingId === b.id && styles.btnDisabled]}
+                  onPress={() => openDecline(b.id, true)}
+                  disabled={actingId != null}
+                >
+                  <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
+                </TouchableOpacity>
+              </View>
             </GlassCard>
             );
           })}
@@ -487,9 +558,9 @@ export default function ServantHomeScreen() {
               />
               <View style={styles.row}>
                 <TouchableOpacity
-                  style={[styles.accept, actingId === b.id && styles.btnDisabled]}
+                  style={[styles.accept, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
                   onPress={() => confirm(b.id)}
-                  disabled={actingId != null}
+                  disabled={actingId != null || actionsBlocked}
                 >
                   <Text style={styles.acceptText}>
                     {actingId === b.id ? t('servantHome.pleaseWait') : t('schedule.accept')}
@@ -497,7 +568,7 @@ export default function ServantHomeScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.reject, actingId === b.id && styles.btnDisabled]}
-                  onPress={() => reject(b.id)}
+                  onPress={() => openDecline(b.id, false)}
                   disabled={actingId != null}
                 >
                   <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
@@ -576,10 +647,12 @@ export default function ServantHomeScreen() {
               {!activeEntry && b.status === 'CONFIRMED' && (
                 <>
                   <TouchableOpacity
-                    style={styles.onWayBtn}
-                    onPress={() =>
-                      setOnWayBookingId((prev) => (prev === b.id ? null : b.id))
-                    }
+                    style={[styles.onWayBtn, actionsBlocked && styles.btnDisabled]}
+                    onPress={() => {
+                      if (!requireZone()) return;
+                      setOnWayBookingId((prev) => (prev === b.id ? null : b.id));
+                    }}
+                    disabled={actionsBlocked}
                   >
                     <Text style={styles.onWayText}>
                       {onWayBookingId === b.id
@@ -593,12 +666,14 @@ export default function ServantHomeScreen() {
                       expiresAt={b.workOtpExpiresAt}
                       onVerified={() => onWorkOtpVerified(b.id)}
                       onResend={() => refreshBookings()}
+                      disabled={actionsBlocked}
                     />
                   ) : (
                     <GradientButton
                       title={t('workOtp.requestOtp')}
                       onPress={() => markArrived(b.id)}
                       style={{ marginTop: 12 }}
+                      disabled={actionsBlocked}
                     />
                   )}
                 </>
@@ -611,6 +686,13 @@ export default function ServantHomeScreen() {
         })
       )}
     </ScrollView>
+    <DeclineReasonSheet
+      visible={declineTargetId != null}
+      loading={declineLoading}
+      onClose={() => !declineLoading && setDeclineTargetId(null)}
+      onConfirm={submitDecline}
+    />
+    </>
   );
 }
 

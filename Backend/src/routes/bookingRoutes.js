@@ -25,6 +25,12 @@ router.get(
   requireRole("SERVANT"),
   bookingController.listOpenRequests
 );
+router.get(
+  "/declined-open-ids",
+  authenticate,
+  requireRole("SERVANT"),
+  bookingController.listDeclinedOpenBookingIds
+);
 router.get("/:id", authenticate, bookingController.getBooking);
 router.get("/:id/tracking", authenticate, bookingController.getBookingTracking);
 router.post(
@@ -46,6 +52,13 @@ router.patch(
   requireRole("SERVANT"),
   validate(rejectBookingSchema),
   bookingController.rejectBooking
+);
+router.patch(
+  "/:id/decline-open",
+  authenticate,
+  requireRole("SERVANT"),
+  validate(rejectBookingSchema),
+  bookingController.declineOpenRequest
 );
 router.patch(
   "/:id/arrived",

@@ -63,6 +63,8 @@
     "password": "Password",
     "signIn": "Sign in",
     "signOut": "Sign out",
+    "logoutConfirmTitle": "Sign out?",
+    "logoutConfirmMessage": "Are you sure you want to log out?",
     "newAccount": "New here? Create your account",
     "loginFailed": "Login failed",
     "tryAgain": "Please try again",
@@ -261,6 +263,7 @@
     "requestHandled": "This request was already accepted or declined.",
     "couldNotAccept": "Could not accept",
     "declinedTitle": "Declined",
+    "openRequestPassed": "This request was removed from your list.",
     "couldNotDecline": "Could not decline",
     "arrivedStartWork": "I arrived — start work",
     "openRequests": "Open requests",
@@ -274,7 +277,7 @@
     "todayEarningsLabel": "TODAY'S EARNINGS",
     "jobsLabel": "JOBS",
     "jobsCompletedToday": "{{count}} job(s) completed today",
-    "hoursLoggedToday": "{{hours}} hrs logged today",
+    "hoursLoggedToday": "{{duration}} logged today",
     "earningsUpdateHint": "Earnings update when slots end or you clock out",
     "monthCardLabel": "THIS MONTH · {{month}}",
     "monthJobsSub": "{{count}} completed job(s) this month",
@@ -382,7 +385,7 @@
     "title": "Time",
     "today": "Today",
     "todayTitle": "Today's time",
-    "totalHoursLabel": "Total hours: {{hours}}",
+    "totalHoursLabel": "Total: {{duration}}",
     "history": "History",
     "historyTitle": "Time history",
     "clockedIn": "Clocked in",
@@ -394,7 +397,7 @@
     "clockInAt": "In: {{time}}",
     "clockOutAt": "Out: {{time}}",
     "onDuty": "On duty",
-    "hoursShort": "{{hours}} hrs"
+    "hoursShort": "{{duration}}",
   },
   "earnings": {
     "title": "Earnings",
@@ -412,7 +415,7 @@
     "monthVisitsHint": "Completed visits in this calendar month",
     "oneJobToday": "1 completed job today",
     "jobsTodayCount": "{{count}} completed jobs today",
-    "hoursRateHint": "{{hours}} hours × {{rate}}/hr",
+    "hoursRateHint": "{{duration}} × {{rate}}/hr",
     "updatesHint": "Updates when you clock out or visit slots end",
     "noMonthJobs": "No completed jobs this month yet",
     "todaySection": "Today's completed jobs",
@@ -446,7 +449,12 @@
     "noZonesList": "No zones yet. Add your first service area.",
     "couldNotSaveZone": "Could not save zone",
     "screenTitle": "Service zones",
-    "screenSub": "Add areas where you are available to work. House owners can find you by zone."
+    "screenSub": "Add areas where you are available to work. House owners can find you by zone.",
+    "dashboardAlertTitle": "Service zone required",
+    "dashboardAlertSub": "Add at least one area where you work. Nearby jobs and open requests only reach helpers with a service zone.",
+    "actionBlocked": "Add a service zone before you can accept or start jobs.",
+    "cityRequired": "City is required.",
+    "zoneAdded": "Service zone saved. You can now accept nearby jobs."
   },
   "servantProfile": {
     "rating": "Rating",
@@ -455,6 +463,27 @@
     "yourSkills": "Your skills",
     "aboutYou": "About you",
     "serviceZonesSub": "Set by your agent — customers near these areas see your open requests"
+  },
+  "decline": {
+    "title": "Decline booking",
+    "sub": "Choose a reason so the customer knows why you cannot take this job.",
+    "confirm": "Decline job",
+    "reasonRequired": "Please select a reason",
+    "customReasonRequired": "Please enter at least 3 characters",
+    "customPlaceholder": "Describe why you are declining…",
+    "reasons": {
+      "unavailable": "Unavailable at this time",
+      "scheduleConflict": "Schedule conflict with another job",
+      "tooFar": "Location is too far",
+      "personalEmergency": "Personal emergency",
+      "other": "Other (specify below)"
+    }
+  },
+  "locationGate": {
+    "title": "Location required",
+    "sub": "StaffEra needs location access to show nearby jobs, share your route, and verify service zones. Enable location services to continue.",
+    "enable": "Enable location",
+    "openSettings": "Open settings"
   },
   "workOtp": {
     "requestOtp": "I arrived — get OTP",
@@ -472,6 +501,7 @@
     "failedTitle": "Could not verify",
     "invalidTitle": "Invalid OTP",
     "invalidBody": "Enter the 4-digit code from the home owner.",
+    "expiredBody": "OTP expired. Tap I arrived to get a new code.",
     "resentTitle": "New OTP sent",
     "resentBody": "A new code was sent to the home owner."
   },
@@ -508,6 +538,10 @@
     "BOOKING_ACTIVE": {
       "title": "Helper has arrived",
       "body": "Your helper started work at your location"
+    },
+    "BOOKING_CANCELLED": {
+      "title": "Booking cancelled",
+      "body": "The customer cancelled this booking"
     }
   }
 }

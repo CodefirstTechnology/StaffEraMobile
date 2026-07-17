@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { BackHeader } from '@/components/ui/BackHeader';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatCurrency } from '@/lib/i18n/format';
@@ -48,28 +49,30 @@ export default function ServantDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.muted}>{t('browse.loadingProfile')}</Text>
+      <View style={styles.root}>
+        <BackHeader />
+        <View style={styles.center}>
+          <Text style={styles.muted}>{t('browse.loadingProfile')}</Text>
+        </View>
       </View>
     );
   }
 
   if (error || !servant) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.muted}>{t('browse.helperNotInArea')}</Text>
-        <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}>
-          <Text style={styles.backLink}>← {t('browse.backToBrowse')}</Text>
-        </Pressable>
+      <View style={styles.root}>
+        <BackHeader />
+        <View style={styles.center}>
+          <Text style={styles.muted}>{t('browse.helperNotInArea')}</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Pressable onPress={() => router.back()} style={styles.back}>
-        <MaterialIcons name="arrow-back" size={28} color={Stitch.colors.primary} />
-      </Pressable>
+    <View style={styles.root}>
+      <BackHeader title={servant.user.name} />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
       <GlassCard>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{servant.user.name[0]}</Text>
@@ -119,17 +122,17 @@ export default function ServantDetailScreen() {
         }
         style={{ marginTop: 20 }}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Stitch.colors.background },
-  scroll: { padding: Stitch.spacing.padding, paddingTop: 52, paddingBottom: 40 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  muted: { color: Stitch.colors.onSurfaceVariant },
-  backLink: { color: Stitch.colors.primary, fontWeight: '600' },
-  back: { marginBottom: 16 },
+  scroll: { flex: 1 },
+  scrollContent: { padding: Stitch.spacing.padding, paddingBottom: 40 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Stitch.spacing.padding },
+  muted: { color: Stitch.colors.onSurfaceVariant, textAlign: 'center' },
   avatar: {
     width: 72,
     height: 72,

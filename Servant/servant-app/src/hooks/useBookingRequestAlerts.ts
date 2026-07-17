@@ -8,7 +8,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 
 /** Vibrate and play alert when a new home-owner booking request notification arrives. */
 export function useBookingRequestAlerts() {
-  const { data: notifications = [] } = useNotifications();
+  const { data: notifications = [], isSuccess: notificationsReady } = useNotifications();
   const seenIds = useRef<Set<number>>(new Set());
   const bootstrapped = useRef(false);
 
@@ -17,6 +17,8 @@ export function useBookingRequestAlerts() {
   }, []);
 
   useEffect(() => {
+    if (!notificationsReady) return;
+
     const bookingNotes = notifications.filter((n) => BOOKING_REQUEST_TYPES.has(n.type));
 
     if (!bootstrapped.current) {
@@ -30,5 +32,5 @@ export function useBookingRequestAlerts() {
       seenIds.current.add(n.id);
       void alertBookingRequest(n);
     });
-  }, [notifications]);
+  }, [notifications, notificationsReady]);
 }

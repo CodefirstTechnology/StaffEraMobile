@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { SCHEDULE_VISIBLE_STATUSES } from '@/lib/bookingVisibility';
 
 type ScheduleBooking = {
   id: number;
@@ -18,7 +19,7 @@ type ScheduleBooking = {
   houseOwner: { user: { name: string } };
 };
 
-const SCHEDULE_STATUSES = new Set(['PENDING', 'CONFIRMED', 'ACTIVE']);
+const SCHEDULE_STATUSES = SCHEDULE_VISIBLE_STATUSES;
 
 export default function ScheduleScreen() {
   const { t } = useTranslation();
