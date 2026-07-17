@@ -24,6 +24,7 @@ import {
 import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
 import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
 import { useZoneGate } from '@/hooks/useZoneGate';
+import { isActionableBooking, isCancelled } from '@/lib/bookingVisibility';
 
 export default function ScheduleDetailScreen() {
   const { t } = useTranslation();
@@ -38,6 +39,10 @@ export default function ScheduleDetailScreen() {
   const { data: booking, isLoading } = useQuery({
     queryKey: ['booking', id],
     enabled: !!id,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status as string | undefined;
+      return status && isActionableBooking(status) ? 12000 : false;
+    },
     queryFn: async () => {
       const res = await api.get(`/bookings/${id}`);
       return res.data.data.booking;
@@ -54,8 +59,12 @@ export default function ScheduleDetailScreen() {
 
   const openEntry = today?.entries?.find((e: { clockOut: string | null }) => !e.clockOut);
   const clockedInHere = openEntry?.bookingId === bookingId;
+  const bookingCancelled = booking ? isCancelled(booking.status) : false;
+  const bookingActionable = booking ? isActionableBooking(booking.status) : false;
   const trackEnabled =
-    bookingId != null && (clockedInHere || (sharingLocation && booking?.status === 'CONFIRMED'));
+    !bookingCancelled &&
+    bookingId != null &&
+    (clockedInHere || (sharingLocation && booking?.status === 'CONFIRMED'));
 
   useServantLocationReporter(bookingId, trackEnabled);
 
@@ -170,6 +179,13 @@ export default function ScheduleDetailScreen() {
 
       {!hasZones ? <ZoneRequiredBanner onAddZone={goAddZone} /> : null}
 
+      {bookingCancelled ? (
+        <GlassCard style={styles.cancelledBanner}>
+          <MaterialIcons name="event-busy" size={22} color={Stitch.colors.error} />
+          <Text style={styles.cancelledText}>{t('bookings.bookingCancelled')}</Text>
+        </GlassCard>
+      ) : null}
+
       <GlassCard>
         <Text style={styles.title}>{booking.houseOwner.user.name}</Text>
         <StatusPill status={booking.status} />
@@ -214,7 +230,7 @@ export default function ScheduleDetailScreen() {
         ) : null}
       </GlassCard>
 
-      {home && ['CONFIRMED', 'ACTIVE'].includes(booking.status) ? (
+      {home && bookingActionable && ['CONFIRMED', 'ACTIVE'].includes(booking.status) ? (
         <>
           <JobTrackingMap
             home={home}
@@ -281,7 +297,7 @@ export default function ScheduleDetailScreen() {
         />
       ) : null}
 
-      {booking.status === 'PENDING' && (
+      {booking.status === 'PENDING' && bookingActionable && (
         <View style={styles.actions}>
           <TouchableOpacity
             style={[styles.accept, (acting || actionsBlocked) && styles.btnDisabled]}
@@ -353,4 +369,18 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#fff', fontWeight: '700' },
   rejectText: { color: Stitch.colors.error, fontWeight: '700' },
+  cancelledBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: Stitch.spacing.padding,
+    marginBottom: 12,
+    backgroundColor: Stitch.colors.errorContainer,
+  },
+  cancelledText: {
+    flex: 1,
+    color: Stitch.colors.error,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
 });

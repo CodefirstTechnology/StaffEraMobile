@@ -522,10 +522,7 @@ exports.rejectBooking = async (req, res) => {
 
 exports.cancelBooking = async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const booking = await prisma.booking.findUnique({
-    where: { id },
-    include: { houseOwner: true }
-  });
+  const booking = await loadBooking(id);
 
   if (!booking) throw new ApiError(404, "Booking not found");
   if (booking.houseOwner.userId !== req.user.id) {
@@ -541,7 +538,33 @@ exports.cancelBooking = async (req, res) => {
     include: bookingInclude
   });
 
-  sendSuccess(res, { booking: updated });
+  const cancelPayload = {
+    title: "Booking cancelled",
+    body: "The customer cancelled this booking",
+    type: "BOOKING_CANCELLED",
+    data: { bookingId: id }
+  };
+
+  if (booking.servant?.user?.id) {
+    await createNotification({
+      userId: booking.servant.user.id,
+      ...cancelPayload
+    });
+  } else if (booking.latitude != null && booking.longitude != null) {
+    const nearbyServants = await findServantsNearLocation(booking.latitude, booking.longitude, {
+      skill: booking.requestedSkill
+    });
+    await Promise.all(
+      nearbyServants.map((servant) =>
+        createNotification({
+          userId: servant.user.id,
+          ...cancelPayload
+        })
+      )
+    );
+  }
+
+  sendSuccess(res, { booking: normalizeBookingRow(updated) });
 };
 
 exports.completeBooking = async (req, res) => {

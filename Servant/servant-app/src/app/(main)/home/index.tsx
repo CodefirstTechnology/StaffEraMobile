@@ -30,6 +30,7 @@ import {
   syncPendingRequestVibration,
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
+import { isCancelled, isPendingRequest, isTodayJob } from '@/lib/bookingVisibility';
 
 type Booking = {
   id: number;
@@ -174,8 +175,22 @@ export default function ServantHomeScreen() {
     return () => clearInterval(t);
   }, [activeEntry]);
 
-  const pending = (bookings || []).filter((b) => b.status === 'PENDING');
-  const todayJobs = (bookings || []).filter((b) => ['CONFIRMED', 'ACTIVE'].includes(b.status));
+  const pending = (bookings || []).filter((b) => isPendingRequest(b.status));
+  const todayJobs = (bookings || []).filter((b) => isTodayJob(b.status));
+
+  useEffect(() => {
+    if (!bookings?.length) return;
+    const cancelledIds = new Set(
+      bookings.filter((b) => isCancelled(b.status)).map((b) => b.id),
+    );
+    if (onWayBookingId != null && cancelledIds.has(onWayBookingId)) {
+      setOnWayBookingId(null);
+    }
+    if (activeBookingId != null && cancelledIds.has(activeBookingId)) {
+      setActiveBookingId(null);
+      setActiveEntry(null);
+    }
+  }, [bookings, onWayBookingId, activeBookingId]);
 
   const formatElapsed = (s: number) => {
     const h = Math.floor(s / 3600);

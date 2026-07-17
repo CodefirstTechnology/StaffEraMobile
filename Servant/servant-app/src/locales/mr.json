@@ -416,6 +416,10 @@
     "BOOKING_ACTIVE": {
       "title": "सहाय्यक आला",
       "body": "सहाय्यकाने काम सुरू केले"
+    },
+    "BOOKING_CANCELLED": {
+      "title": "बुकिंग रद्द",
+      "body": "ग्राहकाने ही बुकिंग रद्द केली"
     }
   },
   "servantHome": {

@@ -5,12 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { useBookingRequestAlerts } from '@/hooks/useBookingRequestAlerts';
+import { useBookingCancellationAlerts } from '@/hooks/useBookingCancellationAlerts';
 import { usePendingRequestVibration } from '@/hooks/usePendingRequestVibration';
 
 export default function MainLayout() {
   const { t } = useTranslation();
   const { isAuthenticated, isLoading } = useAuthStore();
   useBookingRequestAlerts();
+  useBookingCancellationAlerts();
   usePendingRequestVibration();
 
   if (isLoading) {

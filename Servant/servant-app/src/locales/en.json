@@ -513,6 +513,10 @@
     "BOOKING_ACTIVE": {
       "title": "Helper has arrived",
       "body": "Your helper started work at your location"
+    },
+    "BOOKING_CANCELLED": {
+      "title": "Booking cancelled",
+      "body": "The customer cancelled this booking"
     }
   }
 }
