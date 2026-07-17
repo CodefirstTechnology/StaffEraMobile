@@ -51,7 +51,12 @@ export default function VerifyAadhaarScreen() {
       copyToCacheDirectory: true,
     });
     if (!result.canceled && result.assets?.[0]) {
-      setZip(result.assets[0]);
+      const asset = result.assets[0];
+      if (asset.size && asset.size > 5 * 1024 * 1024) {
+        Alert.alert('File Too Large', 'Aadhaar ZIP file must be 5 MB or less.');
+        return;
+      }
+      setZip(asset);
     }
   };
 

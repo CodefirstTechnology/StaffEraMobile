@@ -191,7 +191,8 @@ exports.createServant = async (req, res) => {
     bankAccountNumber,
     bankName,
     bankIfsc,
-    bankUpiId
+    bankUpiId,
+    phoneCountryCode
   } = req.body;
 
   const email = normalizeEmail(rawEmail);
@@ -201,7 +202,12 @@ exports.createServant = async (req, res) => {
   if (existing) throw new ApiError(400, "Email already registered");
 
   if (phone) {
-    const phoneTaken = await prisma.user.findFirst({ where: { phone } });
+    const phoneTaken = await prisma.user.findFirst({
+      where: {
+        phone,
+        roleId: 3 // ROLE_IDS.SERVANT
+      }
+    });
     if (phoneTaken) throw new ApiError(400, "Phone number already registered");
   }
 
@@ -226,6 +232,7 @@ exports.createServant = async (req, res) => {
       name,
       email,
       phone,
+      phoneCountryCode,
       password: hashed,
       roleId: ROLE_IDS.SERVANT,
       servant: {
@@ -404,6 +411,7 @@ exports.updateServant = async (req, res) => {
   const {
     name,
     phone: rawPhone,
+    phoneCountryCode,
     bio,
     experience,
     hourlyRate,
@@ -434,7 +442,11 @@ exports.updateServant = async (req, res) => {
 
   if (phone) {
     const phoneTaken = await prisma.user.findFirst({
-      where: { phone, id: { not: existing.userId } }
+      where: {
+        phone,
+        roleId: 3, // ROLE_IDS.SERVANT
+        id: { not: existing.userId }
+      }
     });
     if (phoneTaken) throw new ApiError(400, "Phone number already registered");
   }
@@ -466,7 +478,8 @@ exports.updateServant = async (req, res) => {
   const servant = await prisma.$transaction(async (tx) => {
     const userPatch = {
       ...(name && { name }),
-      ...(phone !== undefined && { phone })
+      ...(phone !== undefined && { phone }),
+      ...(phoneCountryCode !== undefined && { phoneCountryCode })
     };
     if (loginPassword && isAppRegistration) {
       userPatch.password = await bcrypt.hash(loginPassword, 12);
@@ -840,7 +853,12 @@ exports.checkDuplicate = async (req, res) => {
 
   if (rawPhone) {
     const phone = normalizePhone(rawPhone);
-    const phoneTaken = await prisma.user.findFirst({ where: { phone } });
+    const phoneTaken = await prisma.user.findFirst({
+      where: {
+        phone,
+        roleId: 3 // ROLE_IDS.SERVANT
+      }
+    });
     if (phoneTaken) {
       throw new ApiError(400, "Phone number already registered");
     }

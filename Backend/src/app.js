@@ -102,6 +102,20 @@ app.get("/health", async (req, res) => {
 app.use((err, req, res, next) => {
   logger.error(err.message, { stack: err.stack, path: req.path });
 
+  const multer = require("multer");
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        success: false,
+        message: "File size limit exceeded. Maximum file size allowed is 5 MB."
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: err.message
+    });
+  }
+
   if (err.code === "P2002") {
     const fields = err.meta?.target || ["field"];
     const field = Array.isArray(fields) ? fields.join(", ") : fields;

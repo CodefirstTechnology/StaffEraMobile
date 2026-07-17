@@ -27,7 +27,7 @@ const zipFilter = (_req, file, cb) => {
 const uploadAadhaarZip = multer({
   storage,
   fileFilter: zipFilter,
-  limits: { fileSize: 10 * 1024 * 1024 }
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
 module.exports = { uploadAadhaarZip };
