@@ -14,6 +14,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { BackHeader } from '@/components/ui/BackHeader';
 import { useNotifications, type AppNotification } from '@/hooks/useNotifications';
 import { localizeNotification } from '@/lib/i18n/notifications';
 import { formatRelativeTime } from '@/lib/i18n/format';
@@ -48,19 +49,16 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <MaterialIcons name="arrow-back" size={24} color={Stitch.colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.title}>{t('notifications.title')}</Text>
-        {unread > 0 ? (
-          <TouchableOpacity onPress={markAllRead}>
-            <Text style={styles.markAll}>{t('notifications.markAllRead')}</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.backBtn} />
-        )}
-      </View>
+      <BackHeader
+        title={t('notifications.title')}
+        right={
+          unread > 0 ? (
+            <TouchableOpacity onPress={markAllRead}>
+              <Text style={styles.markAll}>{t('notifications.markAllRead')}</Text>
+            </TouchableOpacity>
+          ) : null
+        }
+      />
 
       {isLoading ? (
         <ActivityIndicator style={styles.loader} color={Stitch.colors.primary} />
@@ -82,7 +80,9 @@ export default function NotificationsScreen() {
             const localized = localizeNotification(item);
             return (
               <Pressable onPress={() => openNotification(item)}>
-                <GlassCard style={[styles.card, !item.isRead ? styles.unreadCard : undefined]}>
+                <GlassCard
+                  style={StyleSheet.flatten([styles.card, !item.isRead && styles.unreadCard])}
+                >
                   <View style={styles.cardRow}>
                     <View style={[styles.iconWrap, !item.isRead && styles.iconUnread]}>
                       <MaterialIcons
@@ -117,20 +117,7 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Stitch.colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 52,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.5)',
-    backgroundColor: 'rgba(252, 248, 255, 0.92)',
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { ...Stitch.typography.headline, color: Stitch.colors.primary },
-  markAll: { fontSize: 13, fontWeight: '600', color: Stitch.colors.secondary },
+  markAll: { fontSize: 13, fontWeight: '600', color: Stitch.colors.secondary, textAlign: 'right' },
   loader: { marginTop: 40 },
   list: { padding: 16, gap: 10, paddingBottom: 32 },
   card: { marginBottom: 0 },

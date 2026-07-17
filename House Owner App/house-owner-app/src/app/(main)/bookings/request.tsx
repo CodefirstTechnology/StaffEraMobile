@@ -14,6 +14,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { BackHeader } from '@/components/ui/BackHeader';
 import { GhostInput } from '@/components/ui/GhostInput';
 import { BookingLocationSection } from '@/components/ui/BookingLocationSection';
 import { TimeSlotPicker } from '@/components/ui/TimeSlotPicker';
@@ -199,11 +200,9 @@ export default function AreaBookingRequestScreen() {
   };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={styles.back}>← {t('common.back')}</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>{t('bookings.requestHelpArea')}</Text>
+    <View style={styles.root}>
+      <BackHeader title={t('bookings.requestHelpArea')} />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
       <Text style={styles.sub}>{t('bookings.requestHelpSub')}</Text>
 
       <View style={styles.categoryBox}>
@@ -321,15 +320,15 @@ export default function AreaBookingRequestScreen() {
         onPress={submit}
         loading={loading}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Stitch.colors.background },
-  scroll: { padding: Stitch.spacing.padding, paddingTop: 52, paddingBottom: 40 },
-  back: { color: Stitch.colors.primary, fontWeight: '600', marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '700', color: Stitch.colors.primary, marginBottom: 8 },
+  scroll: { flex: 1 },
+  scrollContent: { padding: Stitch.spacing.padding, paddingBottom: 40 },
   sub: { fontSize: 14, color: Stitch.colors.onSurfaceVariant, marginBottom: 20, lineHeight: 20 },
   categoryBox: {
     backgroundColor: Stitch.colors.primaryFixed,

@@ -1,11 +1,12 @@
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { BackHeader } from '@/components/ui/BackHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { JobTrackingMap } from '@/components/ui/JobTrackingMap';
@@ -91,8 +92,11 @@ export default function BookingDetailScreen() {
 
   if (isLoading || !booking) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.muted}>{t('common.loading')}</Text>
+      <View style={styles.root}>
+        <BackHeader title={t('bookings.bookingDetails')} />
+        <View style={styles.center}>
+          <Text style={styles.muted}>{t('common.loading')}</Text>
+        </View>
       </View>
     );
   }
@@ -125,10 +129,9 @@ export default function BookingDetailScreen() {
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Text style={styles.back} onPress={() => router.back()}>
-        ← {t('common.back')}
-      </Text>
+    <View style={styles.root}>
+      <BackHeader title={t('bookings.bookingDetails')} />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
       <GlassCard>
         <View style={styles.nameRow}>
           <Text style={styles.name}>
@@ -207,16 +210,17 @@ export default function BookingDetailScreen() {
           style={{ marginTop: 20 }}
         />
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Stitch.colors.background },
-  scroll: { padding: Stitch.spacing.padding, paddingTop: 52, paddingBottom: 40 },
+  scroll: { flex: 1 },
+  scrollContent: { padding: Stitch.spacing.padding, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   muted: { color: Stitch.colors.onSurfaceVariant },
-  back: { color: Stitch.colors.primary, fontWeight: '600', marginBottom: 16 },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
