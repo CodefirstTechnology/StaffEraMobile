@@ -375,10 +375,6 @@ function AgentEditPanel({
                     value={form.serviceRadiusKm}
                     onChange={(e) => {
                       let next = e.target.value.replace(/[^0-9.]/g, '')
-                      const num = parseFloat(next)
-                      if (!isNaN(num) && num > maxRadius) {
-                        next = String(maxRadius)
-                      }
                       setForm((f) => ({ ...f, serviceRadiusKm: next }))
                       updateFieldError(
                         setFieldErrors,
@@ -518,7 +514,7 @@ export default function AdminAgents() {
       return res.data.data
     },
   })
-  const MAX_RADIUS = adminStats?.maxServiceRadiusKm || Number(import.meta.env.VITE_MAX_SERVICE_RADIUS) || 50
+  const MAX_RADIUS = Number(import.meta.env.VITE_MAX_SERVICE_RADIUS) || adminStats?.maxServiceRadiusKm || 50
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -1123,10 +1119,6 @@ export default function AdminAgents() {
                 value={serviceRadiusKm}
                 onChange={(e) => {
                   let next = e.target.value.replace(/[^0-9.]/g, '')
-                  const num = parseFloat(next)
-                  if (!isNaN(num) && num > MAX_RADIUS) {
-                    next = String(MAX_RADIUS)
-                  }
                   setServiceRadiusKm(next)
                   updateFieldError(
                     setFieldErrors,

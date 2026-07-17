@@ -1,8 +1,5 @@
-/** Reject minus sign while typing numeric rate/experience fields. */
 export function sanitizeNonNegativeInput(value) {
-  const raw = String(value ?? "");
-  if (!raw.includes("-")) return raw;
-  return raw.replace(/-/g, "");
+  return value;
 }
 
 /** Validate optional non-negative number. Returns error message or empty string. */

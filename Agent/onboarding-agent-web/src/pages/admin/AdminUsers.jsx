@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 import {
   PageHeader,
   StatCard,
@@ -42,6 +43,7 @@ function houseOwnerMeta(user) {
 export default function AdminUsers() {
   const [role, setRole] = useState('')
   const [search, setSearch] = useState('')
+  const [confirmTarget, setConfirmTarget] = useState(null)
   const qc = useQueryClient()
   const toast = useToast()
 
@@ -173,7 +175,7 @@ export default function AdminUsers() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => toggle(u)}
+                  onClick={() => setConfirmTarget(u)}
                   disabled={u.role === 'ADMIN' && u.isActive}
                   title={u.role === 'ADMIN' && u.isActive ? 'Admin users cannot be deactivated' : undefined}
                   className={`mt-4 w-full rounded-xl border py-2 text-sm font-medium ${
@@ -213,7 +215,7 @@ export default function AdminUsers() {
                 <td className="px-4 py-4">
                   <button
                     type="button"
-                    onClick={() => toggle(u)}
+                    onClick={() => setConfirmTarget(u)}
                     disabled={u.role === 'ADMIN' && u.isActive}
                     title={u.role === 'ADMIN' && u.isActive ? 'Admin users cannot be deactivated' : undefined}
                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
@@ -232,6 +234,24 @@ export default function AdminUsers() {
           </DataTable>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        title={confirmTarget?.isActive ? 'Deactivate User' : 'Activate User'}
+        description={`Are you sure you want to ${
+          confirmTarget?.isActive ? 'deactivate' : 'activate'
+        } the user "${confirmTarget ? displayName(confirmTarget) : ''}"?`}
+        confirmLabel={confirmTarget?.isActive ? 'Deactivate' : 'Activate'}
+        cancelLabel="Cancel"
+        variant={confirmTarget?.isActive ? 'danger' : 'success'}
+        onConfirm={async () => {
+          if (confirmTarget) {
+            await toggle(confirmTarget)
+            setConfirmTarget(null)
+          }
+        }}
+        onClose={() => setConfirmTarget(null)}
+      />
     </div>
   )
 }

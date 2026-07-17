@@ -388,7 +388,9 @@ export default function ServantDetail() {
                 {servant.user.phone && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container px-3 py-1 text-xs font-medium text-on-surface-variant">
                     <Phone size={13} className="text-secondary" />
-                    {servant.user.phone}
+                    {servant.user.phoneCountryCode
+                      ? `${servant.user.phoneCountryCode} ${servant.user.phone}`
+                      : servant.user.phone}
                   </span>
                 )}
                 {(servant.address || servant.city) && (

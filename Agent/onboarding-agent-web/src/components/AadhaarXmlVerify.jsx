@@ -120,15 +120,15 @@ export function AadhaarXmlVerify({ servantId, servant, compact = false }) {
         <li>Upload the ZIP and share code below</li>
       </ol>
 
-      <label className="block space-y-1.5">
+      <div className="block space-y-1.5">
         <span className="text-sm font-medium text-gray-700">Aadhaar ZIP file</span>
         <input
           type="file"
           accept=".zip,application/zip"
           onChange={(e) => setZipFile(e.target.files?.[0] || null)}
-          className="w-full text-sm"
+          className="w-fit text-sm"
         />
-      </label>
+      </div>
 
       <label className="block space-y-1.5">
         <span className="text-sm font-medium text-gray-700">Share code (4 digits)</span>

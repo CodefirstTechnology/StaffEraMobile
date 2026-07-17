@@ -16,7 +16,11 @@ const navLinkClass = ({ isActive }) => (isActive ? NAV_ACTIVE : NAV_INACTIVE)
 function AdminOverviewLink() {
   const { pathname } = useLocation()
   const isExact = pathname === '/admin'
-  const isChildRoute = pathname.startsWith('/admin/')
+  const isChildRoute =
+    pathname.startsWith('/admin/') &&
+    !['/admin/agents', '/admin/users', '/admin/bookings', '/admin/servants', '/admin/skills'].some(
+      (route) => pathname.startsWith(route)
+    )
 
   let className = NAV_INACTIVE
   if (isExact) className = NAV_ACTIVE
