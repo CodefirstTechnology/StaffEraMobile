@@ -18,6 +18,18 @@ const formatDays = (wd) => {
   }
 }
 
+const formatTime12 = (timeStr) => {
+  if (!timeStr) return ''
+  const [hStr, mStr] = timeStr.split(':')
+  let h = Number(hStr)
+  const m = mStr || '00'
+  if (isNaN(h)) return timeStr
+  const period = h < 12 ? 'AM' : 'PM'
+  let h12 = h % 12
+  if (h12 === 0) h12 = 12
+  return `${String(h12).padStart(2, '0')}:${m} ${period}`
+}
+
 export function buildReportFromForm(form, skillsCatalog = [], files = {}) {
   const skillLabels = (form.skills || []).map(
     (code) => skillsCatalog.find((s) => s.code === code)?.label || code.replace(/_/g, ' '),
@@ -44,7 +56,7 @@ export function buildReportFromForm(form, skillsCatalog = [], files = {}) {
       offersMonthly: form.offersMonthly,
       sessionHours:
         (form.offersSession || form.offersMonthly) && form.availableFrom && form.availableTo
-          ? `${form.availableFrom} – ${form.availableTo}`
+          ? `${formatTime12(form.availableFrom)} – ${formatTime12(form.availableTo)}`
           : null,
       workingDays: form.offersMonthly ? form.workingDays : [],
       hoursPerDay: form.hoursPerDay,
@@ -105,7 +117,7 @@ export function buildReportFromServant(servant) {
       offersMonthly: servant.offersMonthly !== false,
       sessionHours:
         servant.availableFrom && servant.availableTo
-          ? `${servant.availableFrom} – ${servant.availableTo}`
+          ? `${formatTime12(servant.availableFrom)} – ${formatTime12(servant.availableTo)}`
           : null,
       workingDays: formatDays(servant.workingDays).split(', ').filter(Boolean),
       hoursPerDay: servant.hoursPerDay,

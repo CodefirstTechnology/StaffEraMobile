@@ -33,6 +33,7 @@ import {
 } from '../components/ServiceZonesEditor'
 import { generateServantPassword, validateServantPassword, checkPasswordStrength } from '../lib/generatePassword'
 import { copyText } from '../lib/copyToClipboard'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 const emptyPersonalErrors = () => ({
   name: '',
@@ -69,6 +70,12 @@ const parseTimeTo12Hour = (timeStr) => {
   if (h12 === 0) h12 = 12
   const time12 = `${String(h12).padStart(2, '0')}:${m}`
   return { time12, period }
+}
+
+const formatTo12HourStr = (timeStr) => {
+  if (!timeStr) return ''
+  const { time12, period } = parseTimeTo12Hour(timeStr)
+  return `${time12} ${period}`
 }
 
 const formatTo24Hour = (time12, period) => {
@@ -170,13 +177,13 @@ const PERSONAL_FIELDS = [
 
 function Field({ label, required, children }) {
   return (
-    <label className="block space-y-1.5">
+    <div className="block space-y-1.5">
       <span className="text-sm font-medium text-gray-700">
         {label}
         {required ? <span className="text-error"> *</span> : null}
       </span>
       {children}
-    </label>
+    </div>
   )
 }
 
@@ -330,17 +337,6 @@ export default function OnboardServant() {
   )
 
   useEffect(() => {
-    if (blocker.state === 'blocked') {
-      const proceed = window.confirm('You have unsaved changes. Are you sure you want to leave?')
-      if (proceed) {
-        blocker.proceed()
-      } else {
-        blocker.reset()
-      }
-    }
-  }, [blocker.state])
-
-  useEffect(() => {
     if (form.availableFrom && form.availableTo) {
       const calculated = calculateHours(form.availableFrom, form.availableTo)
       setForm((f) => {
@@ -359,11 +355,14 @@ export default function OnboardServant() {
       setPersonalErrors((prev) => (prev.phone ? { ...prev, phone: '' } : prev))
       return
     }
+    const localErr = validatePhoneRequired(form.phone, countryCode)
+    if (localErr) {
+      setPersonalErrors((prev) => ({ ...prev, phone: localErr }))
+      return
+    }
     const handler = setTimeout(() => {
-      const digits = countryCode.replace(/\D/g, '')
-      const fullPhone = digits + form.phone
       api
-        .get('/agent/servants/check-duplicate', { params: { phone: fullPhone } })
+        .get('/agent/servants/check-duplicate', { params: { phone: form.phone } })
         .then(() => {
           setPersonalErrors((prev) => (prev.phone ? { ...prev, phone: '' } : prev))
         })
@@ -372,7 +371,6 @@ export default function OnboardServant() {
           if (msg === 'Phone number already registered') {
             setPersonalErrors((prev) => ({ ...prev, phone: 'This mobile number is already registered.' }))
           }
-          // other errors (network etc.) are silently ignored here; the Next button check handles them
         })
     }, 600)
     return () => clearTimeout(handler)
@@ -537,7 +535,7 @@ export default function OnboardServant() {
         await api.get('/agent/servants/check-duplicate', {
           params: {
             email: form.email || undefined,
-            phone: form.phone ? (countryCode + form.phone) : undefined,
+            phone: form.phone || undefined,
           },
         })
       } catch (err) {
@@ -595,8 +593,8 @@ export default function OnboardServant() {
       } else if (typeof v === 'boolean') {
         fd.append(k, v ? 'true' : 'false')
       } else if (k === 'phone') {
-        const cc = countryCode.replace(/\D/g, '')
-        fd.append(k, cc + v)
+        fd.append('phone', v)
+        fd.append('phoneCountryCode', countryCode)
       } else {
         fd.append(k, String(v))
       }
@@ -859,9 +857,8 @@ export default function OnboardServant() {
             >
               <input
                 placeholder={key === 'experience' ? 'e.g. 3' : key === 'hourlyRate' ? 'e.g. 150' : 'e.g. 15000'}
-                type="number"
-                min={0}
-                step={key === 'experience' ? 1 : 'any'}
+                type="text"
+                inputMode={key === 'experience' ? 'numeric' : 'decimal'}
                 value={form[key]}
                 onChange={(e) => {
                   update(key, sanitizeNonNegativeInput(e.target.value))
@@ -1058,6 +1055,7 @@ export default function OnboardServant() {
           </Field>
           <Field label="ID proof document" required>
             <input
+              key={idProof ? idProof.name : 'empty-idproof'}
               type="file"
               accept="image/jpeg,image/png,application/pdf"
               onChange={(e) => {
@@ -1074,11 +1072,20 @@ export default function OnboardServant() {
                     setIdProof(null)
                     return
                   }
+                  if (file.size > 5 * 1024 * 1024) {
+                    setDocumentErrors((prev) => ({
+                      ...prev,
+                      idProof: 'ID proof document file size must be 5 MB or less',
+                    }))
+                    e.target.value = ''
+                    setIdProof(null)
+                    return
+                  }
                 }
                 setIdProof(file)
                 setDocumentErrors((prev) => ({ ...prev, idProof: '' }))
               }}
-              className="w-full text-sm font-medium file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+              className="w-fit text-sm font-medium file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
             />
             {idProof && (
               <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
@@ -1123,6 +1130,7 @@ export default function OnboardServant() {
           </Field>
           <Field label="Profile photo" required>
             <input
+              key={profilePhoto ? profilePhoto.name : 'empty-profilephoto'}
               type="file"
               accept="image/jpeg,image/png"
               onChange={(e) => {
@@ -1139,11 +1147,20 @@ export default function OnboardServant() {
                     setProfilePhoto(null)
                     return
                   }
+                  if (file.size > 5 * 1024 * 1024) {
+                    setDocumentErrors((prev) => ({
+                      ...prev,
+                      profilePhoto: 'Profile photo file size must be 5 MB or less',
+                    }))
+                    e.target.value = ''
+                    setProfilePhoto(null)
+                    return
+                  }
                 }
                 setProfilePhoto(file)
                 setDocumentErrors((prev) => ({ ...prev, profilePhoto: '' }))
               }}
-              className="w-full text-sm font-medium file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+              className="w-fit text-sm font-medium file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
             />
             {profilePhoto && (
               <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50/50 p-3">
@@ -1279,7 +1296,7 @@ export default function OnboardServant() {
             {(form.offersSession || form.offersMonthly) && (
               <ReviewItem label="Available hours">
                 {form.availableFrom && form.availableTo
-                  ? `${form.availableFrom} – ${form.availableTo}`
+                  ? `${formatTo12HourStr(form.availableFrom)} – ${formatTo12HourStr(form.availableTo)}`
                   : '—'}
               </ReviewItem>
             )}
@@ -1371,6 +1388,16 @@ export default function OnboardServant() {
           </Button>
         )}
       </div>
+      <ConfirmDialog
+        open={blocker.state === 'blocked'}
+        title="Unsaved Changes"
+        description="You have unsaved changes. Are you sure you want to leave?"
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        variant="danger"
+        onConfirm={() => blocker.proceed()}
+        onClose={() => blocker.reset()}
+      />
     </div>
   )
 }
