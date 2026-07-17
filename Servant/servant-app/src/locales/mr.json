@@ -459,6 +459,7 @@
     "requestHandled": "This request was already accepted or declined.",
     "couldNotAccept": "Could not accept",
     "declinedTitle": "Declined",
+    "openRequestPassed": "This request was removed from your list.",
     "couldNotDecline": "Could not decline",
     "arrivedStartWork": "I arrived — start work",
     "openRequests": "Open requests",

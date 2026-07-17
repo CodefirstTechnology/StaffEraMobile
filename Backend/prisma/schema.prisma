@@ -145,6 +145,7 @@ model Servant {
   aadhaarNameMatch         Boolean?
   phoneVerified            Boolean   @default(false)
   bookings           Booking[]
+  openRequestDeclines OpenRequestDecline[]
   timeEntries        TimeEntry[]
   zones              Zone[]
   isActive           Boolean            @default(true)
@@ -245,8 +246,22 @@ model Booking {
   review           Review?
   workStartedAt    DateTime?
   workStartOtps    BookingWorkStartOtp[]
+  openRequestDeclines OpenRequestDecline[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+}
+
+model OpenRequestDecline {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  servantId Int
+  servant   Servant  @relation(fields: [servantId], references: [id], onDelete: Cascade)
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@unique([bookingId, servantId])
+  @@index([servantId])
 }
 
 model BookingWorkStartOtp {

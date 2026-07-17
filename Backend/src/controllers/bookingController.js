@@ -304,8 +304,15 @@ exports.listOpenRequests = async (req, res) => {
     take: 50
   });
 
+  const declinedRows = await prisma.openRequestDecline.findMany({
+    where: { servantId: servant.id },
+    select: { bookingId: true }
+  });
+  const declinedIds = new Set(declinedRows.map((row) => row.bookingId));
+
   const requests = openBookings.filter(
     (booking) =>
+      !declinedIds.has(booking.id) &&
       servantCoversLocation(servant, booking.latitude, booking.longitude) &&
       bookingMatchesServantSkill(booking, servant) &&
       ((booking.bookingType === "SESSION" && servant.offersSession) ||
@@ -349,6 +356,15 @@ const assertBookingAccess = async (req, booking) => {
       booking.longitude != null &&
       servantCoversLocation(servant, booking.latitude, booking.longitude) &&
       bookingMatchesServantSkill(booking, servant);
+
+    if (isOpenNearby) {
+      const declined = await prisma.openRequestDecline.findUnique({
+        where: {
+          bookingId_servantId: { bookingId: booking.id, servantId: servant.id }
+        }
+      });
+      if (declined) throw new ApiError(403, "Not your booking");
+    }
 
     if (!isAssigned && !isOpenNearby) {
       throw new ApiError(403, "Not your booking");
@@ -487,16 +503,52 @@ exports.rejectBooking = async (req, res) => {
   if (booking.status !== "PENDING") {
     throw new ApiError(400, "Booking is not pending");
   }
-  if (booking.servantId == null) {
-    throw new ApiError(400, "Open area requests cannot be declined — ignore if unavailable");
-  }
-  if (booking.servant.userId !== req.user.id) {
-    throw new ApiError(403, "Only the assigned servant can reject");
-  }
 
   const reason = String(req.body.reason ?? "").trim();
   if (!reason) {
     throw new ApiError(400, "Decline reason is required");
+  }
+
+  const servant = await prisma.servant.findUnique({
+    where: { userId: req.user.id },
+    include: { skills: true, zones: true }
+  });
+  if (!servant) throw new ApiError(403, "Servant profile required");
+
+  if (booking.servantId == null) {
+    if (
+      booking.latitude == null ||
+      booking.longitude == null ||
+      !servantCoversLocation(servant, booking.latitude, booking.longitude) ||
+      !bookingMatchesServantSkill(booking, servant) ||
+      !(
+        (booking.bookingType === "SESSION" && servant.offersSession) ||
+        (booking.bookingType === "MONTHLY" && servant.offersMonthly)
+      )
+    ) {
+      throw new ApiError(403, "Not your booking");
+    }
+
+    const existing = await prisma.openRequestDecline.findUnique({
+      where: {
+        bookingId_servantId: { bookingId: id, servantId: servant.id }
+      }
+    });
+    if (existing) {
+      sendSuccess(res, { booking: normalizeBookingRow(booking), declined: true });
+      return;
+    }
+
+    await prisma.openRequestDecline.create({
+      data: { bookingId: id, servantId: servant.id, reason }
+    });
+
+    sendSuccess(res, { booking: normalizeBookingRow(booking), declined: true });
+    return;
+  }
+
+  if (booking.servant.userId !== req.user.id) {
+    throw new ApiError(403, "Only the assigned servant can reject");
   }
 
   const updated = await prisma.booking.update({

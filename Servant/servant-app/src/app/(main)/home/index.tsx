@@ -97,8 +97,7 @@ export default function ServantHomeScreen() {
       return res.data.data.bookings as Booking[];
     },
     enabled: isAuthenticated,
-    staleTime: 5000,
-    refetchInterval: isAuthenticated ? 12000 : false,
+    staleTime: 0,
     refetchOnMount: 'always',
   });
 
@@ -125,7 +124,7 @@ export default function ServantHomeScreen() {
       return res.data.data.requests as Booking[];
     },
     enabled: isAuthenticated,
-    refetchInterval: isAuthenticated ? 12000 : false,
+    staleTime: 0,
   });
 
   const { data: notifications } = useNotifications();
@@ -284,13 +283,17 @@ export default function ServantHomeScreen() {
 
   const submitDecline = async (reason: string) => {
     if (declineTargetId == null) return;
+    const wasOpenRequest = openRequests?.some((r) => r.id === declineTargetId) ?? false;
     setDeclineLoading(true);
     setActingId(declineTargetId);
     try {
       await api.patch(`/bookings/${declineTargetId}/reject`, { reason });
       await refreshBookings();
       setDeclineTargetId(null);
-      Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
+      Alert.alert(
+        t('servantHome.declinedTitle'),
+        wasOpenRequest ? t('servantHome.openRequestPassed') : t('servantHome.customerNotified'),
+      );
     } catch (e: unknown) {
       const message = apiError(e, 'Try again');
       if (message.toLowerCase().includes('not pending')) {
@@ -484,15 +487,24 @@ export default function ServantHomeScreen() {
                 address={b.address}
                 height={140}
               />
-              <TouchableOpacity
-                style={[styles.accept, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
-                onPress={() => confirm(b.id)}
-                disabled={actingId != null || actionsBlocked}
-              >
-                <Text style={styles.acceptText}>
-                  {actingId === b.id ? t('servantHome.accepting') : t('servantHome.acceptJobFirstWins')}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.row}>
+                <TouchableOpacity
+                  style={[styles.accept, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
+                  onPress={() => confirm(b.id)}
+                  disabled={actingId != null || actionsBlocked}
+                >
+                  <Text style={styles.acceptText}>
+                    {actingId === b.id ? t('servantHome.pleaseWait') : t('schedule.accept')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.reject, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
+                  onPress={() => openDecline(b.id)}
+                  disabled={actingId != null || actionsBlocked}
+                >
+                  <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
+                </TouchableOpacity>
+              </View>
             </GlassCard>
             );
           })}

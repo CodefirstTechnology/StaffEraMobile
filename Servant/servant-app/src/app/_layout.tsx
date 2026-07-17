@@ -3,9 +3,19 @@ import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
 import { I18nGate } from '@/providers/I18nGate';
+import { setupQueryFocusManager } from '@/lib/queryFocus';
 import '@/lib/i18n';
 
-const queryClient = new QueryClient();
+setupQueryFocusManager();
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  },
+});
 
 export default function RootLayout() {
   const hydrate = useAuthStore((s) => s.hydrate);

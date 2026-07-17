@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { useBookingRequestAlerts } from '@/hooks/useBookingRequestAlerts';
 import { useBookingCancellationAlerts } from '@/hooks/useBookingCancellationAlerts';
+import { useBookingRealtimeSync } from '@/hooks/useBookingRealtimeSync';
 import { usePendingRequestVibration } from '@/hooks/usePendingRequestVibration';
 import { useLocationGate } from '@/hooks/useLocationGate';
 import { LocationRequiredScreen } from '@/components/location/LocationRequiredScreen';
@@ -15,6 +16,7 @@ export default function MainLayout() {
   const { isAuthenticated, isLoading } = useAuthStore();
   useBookingRequestAlerts();
   useBookingCancellationAlerts();
+  useBookingRealtimeSync();
   usePendingRequestVibration();
   const { checking: locationChecking, blocked: locationBlocked, retry: retryLocation } =
     useLocationGate();

@@ -44,7 +44,7 @@ export default function ScheduleDetailScreen() {
     enabled: !!id,
     refetchInterval: (query) => {
       const status = query.state.data?.status as string | undefined;
-      return status && isActionableBooking(status) ? 12000 : false;
+      return status && isActionableBooking(status) ? 2000 : false;
     },
     queryFn: async () => {
       const res = await api.get(`/bookings/${id}`);
@@ -115,6 +115,7 @@ export default function ScheduleDetailScreen() {
 
   const submitDecline = async (reason: string) => {
     if (acting) return;
+    const wasOpenRequest = booking?.servantId == null;
     setDeclineLoading(true);
     setActing(true);
     try {
@@ -126,7 +127,13 @@ export default function ScheduleDetailScreen() {
         qc.invalidateQueries({ queryKey: ['schedule'] }),
       ]);
       setDeclineOpen(false);
-      Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
+      Alert.alert(
+        t('servantHome.declinedTitle'),
+        wasOpenRequest ? t('servantHome.openRequestPassed') : t('servantHome.customerNotified'),
+      );
+      if (wasOpenRequest) {
+        router.back();
+      }
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotDecline'), apiError(e, t('auth.tryAgain')));
     } finally {
