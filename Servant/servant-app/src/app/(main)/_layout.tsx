@@ -32,7 +32,7 @@ export default function MainLayout() {
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
 
   if (locationBlocked) {
-    return <LocationRequiredScreen onRetry={retryLocation} />;
+    return <LocationRequiredScreen onRetry={retryLocation} checking={locationChecking} />;
   }
 
   return (

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotifications, type AppNotification } from '@/hooks/useNotifications';
 import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
 import { stopPendingRequestVibration } from '@/lib/bookingRequestVibration';
 import { localizeNotification } from '@/lib/i18n/notifications';
@@ -11,17 +11,18 @@ const CANCELLATION_TYPES = new Set(['BOOKING_CANCELLED']);
 
 type BookingRow = { id: number; status: string };
 
-/** Refresh lists and alert when a booking cancellation arrives — skip bookings the servant already declined. */
+/** One popup per cancelled booking — refresh lists when status or notifications change. */
 export function useBookingCancellationAlerts() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const { data: notifications = [] } = useNotifications();
+  const { data: notifications = [], isSuccess: notificationsReady } = useNotifications();
   const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
   const declinedOpenIdsRef = useRef(declinedOpenIds);
   const seenNotificationIds = useRef<Set<number>>(new Set());
-  const seenCancelledBookingIds = useRef<Set<number>>(new Set());
+  const alertedBookingIds = useRef<Set<number>>(new Set());
   const previousStatuses = useRef<Map<number, string>>(new Map());
-  const bootstrapped = useRef(false);
+  const notificationsBootstrapped = useRef(false);
+  const bookingsBootstrapped = useRef(false);
 
   useEffect(() => {
     declinedOpenIdsRef.current = declinedOpenIds;
@@ -44,44 +45,75 @@ export function useBookingCancellationAlerts() {
     ]);
   };
 
-  const markCancelled = (bookingId: number) => {
-    if (shouldIgnoreBooking(bookingId)) return false;
-    if (seenCancelledBookingIds.current.has(bookingId)) return false;
-    seenCancelledBookingIds.current.add(bookingId);
+  const alertCancellationOnce = (bookingId: number | undefined, notification?: AppNotification) => {
+    if (bookingId != null) {
+      if (shouldIgnoreBooking(bookingId) || alertedBookingIds.current.has(bookingId)) return false;
+      alertedBookingIds.current.add(bookingId);
+    }
+
+    if (notification) {
+      const { title, body } = localizeNotification(notification);
+      Alert.alert(title, body);
+    } else {
+      Alert.alert(
+        t('pushNotifications.BOOKING_CANCELLED.title'),
+        t('pushNotifications.BOOKING_CANCELLED.body'),
+      );
+    }
     return true;
   };
 
   useEffect(() => {
+    if (!notificationsReady) return;
+
     const cancelNotes = notifications.filter((n) => CANCELLATION_TYPES.has(n.type));
 
-    if (!bootstrapped.current) {
-      cancelNotes.forEach((n) => seenNotificationIds.current.add(n.id));
-      bootstrapped.current = true;
+    if (!notificationsBootstrapped.current) {
+      cancelNotes.forEach((n) => {
+        seenNotificationIds.current.add(n.id);
+        const bookingId = n.data?.bookingId;
+        if (typeof bookingId === 'number') {
+          alertedBookingIds.current.add(bookingId);
+        }
+      });
+      notificationsBootstrapped.current = true;
       return;
     }
 
     const fresh = cancelNotes.filter((n) => !seenNotificationIds.current.has(n.id));
     if (fresh.length === 0) return;
 
-    const bookingIds: number[] = [];
+    fresh.forEach((n) => seenNotificationIds.current.add(n.id));
+
+    const byBookingId = new Map<number, AppNotification>();
+    const withoutBookingId: AppNotification[] = [];
 
     fresh.forEach((n) => {
-      seenNotificationIds.current.add(n.id);
       const bookingId = n.data?.bookingId;
-      let shouldAlert = true;
       if (typeof bookingId === 'number') {
-        shouldAlert = markCancelled(bookingId);
-        if (shouldAlert) bookingIds.push(bookingId);
+        if (!byBookingId.has(bookingId)) byBookingId.set(bookingId, n);
+      } else {
+        withoutBookingId.push(n);
       }
-      if (!shouldAlert) return;
-      const { title, body } = localizeNotification(n);
+    });
+
+    const bookingIds: number[] = [];
+
+    byBookingId.forEach((note, bookingId) => {
+      if (alertCancellationOnce(bookingId, note)) {
+        bookingIds.push(bookingId);
+      }
+    });
+
+    withoutBookingId.forEach((note) => {
+      const { title, body } = localizeNotification(note);
       Alert.alert(title, body);
     });
 
     if (bookingIds.length > 0) {
       invalidateBookingQueries(bookingIds);
     }
-  }, [notifications, qc]);
+  }, [notifications, notificationsReady, qc, t]);
 
   useEffect(() => {
     const evaluateBookings = () => {
@@ -89,36 +121,37 @@ export function useBookingCancellationAlerts() {
       const openRequests = qc.getQueryData<BookingRow[]>(['open-requests']) ?? [];
       const rows = [...bookings, ...openRequests];
 
-      if (!bootstrapped.current) {
+      if (!bookingsBootstrapped.current) {
         rows.forEach((row) => previousStatuses.current.set(row.id, row.status));
+        bookingsBootstrapped.current = true;
         return;
       }
 
-      const newlyCancelled: number[] = [];
+      const changedIds: number[] = [];
 
       rows.forEach((row) => {
         const previous = previousStatuses.current.get(row.id);
-        if (
-          previous &&
-          previous !== 'CANCELLED' &&
-          row.status === 'CANCELLED' &&
-          markCancelled(row.id)
-        ) {
-          newlyCancelled.push(row.id);
+        if (previous && previous !== 'CANCELLED' && row.status === 'CANCELLED') {
+          changedIds.push(row.id);
         }
         previousStatuses.current.set(row.id, row.status);
       });
 
-      if (newlyCancelled.length > 0) {
-        Alert.alert(
-          t('pushNotifications.BOOKING_CANCELLED.title'),
-          t('pushNotifications.BOOKING_CANCELLED.body'),
-        );
-        invalidateBookingQueries(newlyCancelled);
+      previousStatuses.current.forEach((_, id) => {
+        if (!rows.some((row) => row.id === id)) {
+          previousStatuses.current.delete(id);
+        }
+      });
+
+      if (changedIds.length === 0) return;
+
+      const needsRefresh = changedIds.some((id) => !shouldIgnoreBooking(id));
+      if (needsRefresh) {
+        invalidateBookingQueries(changedIds);
       }
     };
 
     evaluateBookings();
     return qc.getQueryCache().subscribe(evaluateBookings);
-  }, [qc, t]);
+  }, [qc]);
 }

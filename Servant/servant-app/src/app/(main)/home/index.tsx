@@ -20,6 +20,7 @@ import { formatSessionSlotsLabel } from '@/lib/timeSlots';
 import { computeTodayEarnings, computeMonthlyEarnings } from '@/lib/earnings';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import { formatDurationFromHours, formatDurationFromSeconds } from '@/lib/formatDuration';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
@@ -198,12 +199,7 @@ export default function ServantHomeScreen() {
     }
   }, [bookings, onWayBookingId, activeBookingId]);
 
-  const formatElapsed = (s: number) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = Math.floor(s % 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-  };
+  const formatElapsed = (s: number) => formatDurationFromSeconds(s);
 
   const apiError = (e: unknown, fallback: string) => {
     const err = e as { response?: { data?: { message?: string } } };
@@ -388,7 +384,9 @@ export default function ServantHomeScreen() {
             {todayStats.completedCount > 0
               ? t('servantHome.jobsCompletedToday', { count: todayStats.completedCount })
               : todayStats.hoursToday > 0
-                ? t('servantHome.hoursLoggedToday', { hours: todayStats.hoursToday.toFixed(1) })
+                ? t('servantHome.hoursLoggedToday', {
+                    duration: formatDurationFromHours(todayStats.hoursToday),
+                  })
                 : t('servantHome.earningsUpdateHint')}
           </Text>
         </View>

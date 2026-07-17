@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { Brand } from '@/constants/theme';
 import { formatDate, formatTime } from '@/lib/i18n/format';
+import { formatDurationFromHours } from '@/lib/formatDuration';
 
 export default function TimeHistoryScreen() {
   const { t } = useTranslation();
@@ -25,7 +26,14 @@ export default function TimeHistoryScreen() {
           <View style={styles.card}>
             <Text style={styles.date}>{formatDate(item.date)}</Text>
             <Text>{formatTime(item.clockIn)}</Text>
-            <Text style={styles.hours}>{t('time.hoursShort', { hours: item.hoursWorked?.toFixed(1) ?? '—' })}</Text>
+            <Text style={styles.hours}>
+              {t('time.hoursShort', {
+                duration:
+                  item.hoursWorked != null
+                    ? formatDurationFromHours(item.hoursWorked)
+                    : '—',
+              })}
+            </Text>
           </View>
         )}
       />

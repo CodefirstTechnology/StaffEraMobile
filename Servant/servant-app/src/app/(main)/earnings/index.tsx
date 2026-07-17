@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { formatCurrency } from '@/lib/i18n/format';
+import { formatDurationFromHours } from '@/lib/formatDuration';
 import { GlassCard } from '@/components/ui/GlassCard';
 import {
   bookingEarningAmount,
@@ -105,7 +106,7 @@ export default function EarningsScreen() {
               : t('earnings.jobsTodayCount', { count: todayStats.completedCount })
             : todayStats.hoursToday > 0
               ? t('earnings.hoursRateHint', {
-                  hours: todayStats.hoursToday.toFixed(1),
+                  duration: formatDurationFromHours(todayStats.hoursToday),
                   rate: `${Stitch.copy.rupee}${hourlyRate}`,
                 })
               : t('earnings.updatesHint')}
