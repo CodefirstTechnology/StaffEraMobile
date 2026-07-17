@@ -23,6 +23,7 @@ import { formatDate, formatCurrency } from '@/lib/i18n/format';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
+import { DeclineReasonSheet } from '@/components/bookings/DeclineReasonSheet';
 import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
 import { useZoneGate } from '@/hooks/useZoneGate';
 import {
@@ -67,6 +68,8 @@ export default function ServantHomeScreen() {
     null,
   );
   const [actingId, setActingId] = useState<number | null>(null);
+  const [declineTargetId, setDeclineTargetId] = useState<number | null>(null);
+  const [declineLoading, setDeclineLoading] = useState(false);
   const [onWayBookingId, setOnWayBookingId] = useState<number | null>(null);
   const { hasZones, requireZone, goAddZone } = useZoneGate();
   const actionsBlocked = !hasZones;
@@ -273,23 +276,32 @@ export default function ServantHomeScreen() {
     }
   };
 
-  const reject = async (id: number) => {
+  const openDecline = (id: number) => {
     if (actingId != null) return;
     if (!requireZone()) return;
-    setActingId(id);
+    setDeclineTargetId(id);
+  };
+
+  const submitDecline = async (reason: string) => {
+    if (declineTargetId == null) return;
+    setDeclineLoading(true);
+    setActingId(declineTargetId);
     try {
-      await api.patch(`/bookings/${id}/reject`, { reason: t('servantHome.rejectReason') });
+      await api.patch(`/bookings/${declineTargetId}/reject`, { reason });
       await refreshBookings();
+      setDeclineTargetId(null);
       Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
       const message = apiError(e, 'Try again');
       if (message.toLowerCase().includes('not pending')) {
         await refreshBookings();
+        setDeclineTargetId(null);
         Alert.alert(t('servantHome.alreadyHandled'), t('servantHome.requestHandled'));
       } else {
         Alert.alert(t('servantHome.couldNotDecline'), message);
       }
     } finally {
+      setDeclineLoading(false);
       setActingId(null);
     }
   };
@@ -311,6 +323,7 @@ export default function ServantHomeScreen() {
   const monthLabel = monthStats?.monthLabel ?? monthlyFromBookings.monthLabel;
 
   return (
+    <>
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <View style={styles.topBar}>
         <View style={styles.proRow}>
@@ -521,7 +534,7 @@ export default function ServantHomeScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.reject, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
-                  onPress={() => reject(b.id)}
+                  onPress={() => openDecline(b.id)}
                   disabled={actingId != null || actionsBlocked}
                 >
                   <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
@@ -639,6 +652,13 @@ export default function ServantHomeScreen() {
         })
       )}
     </ScrollView>
+    <DeclineReasonSheet
+      visible={declineTargetId != null}
+      loading={declineLoading}
+      onClose={() => !declineLoading && setDeclineTargetId(null)}
+      onConfirm={submitDecline}
+    />
+    </>
   );
 }
 

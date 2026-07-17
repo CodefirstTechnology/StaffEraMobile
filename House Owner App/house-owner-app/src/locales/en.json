@@ -63,6 +63,8 @@
     "password": "Password",
     "signIn": "Sign in",
     "signOut": "Sign out",
+    "logoutConfirmTitle": "Sign out?",
+    "logoutConfirmMessage": "Are you sure you want to log out?",
     "newAccount": "New here? Create your account",
     "loginFailed": "Login failed",
     "tryAgain": "Please try again",

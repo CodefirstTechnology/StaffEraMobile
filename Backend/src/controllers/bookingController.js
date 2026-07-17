@@ -494,9 +494,14 @@ exports.rejectBooking = async (req, res) => {
     throw new ApiError(403, "Only the assigned servant can reject");
   }
 
+  const reason = String(req.body.reason ?? "").trim();
+  if (!reason) {
+    throw new ApiError(400, "Decline reason is required");
+  }
+
   const updated = await prisma.booking.update({
     where: { id },
-    data: { status: "REJECTED", notes: req.body.reason || booking.notes },
+    data: { status: "REJECTED", rejectReason: reason },
     include: bookingInclude
   });
 
@@ -511,7 +516,7 @@ exports.rejectBooking = async (req, res) => {
     await createNotification({
       userId: ownerUserId,
       title: "Booking declined",
-      body: req.body.reason || "The helper is unavailable for this booking",
+      body: reason,
       type: "BOOKING_REJECTED",
       data: { bookingId: id }
     });

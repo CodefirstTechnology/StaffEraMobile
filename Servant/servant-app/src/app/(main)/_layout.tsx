@@ -7,6 +7,8 @@ import { Stitch } from '@/theme/stitch';
 import { useBookingRequestAlerts } from '@/hooks/useBookingRequestAlerts';
 import { useBookingCancellationAlerts } from '@/hooks/useBookingCancellationAlerts';
 import { usePendingRequestVibration } from '@/hooks/usePendingRequestVibration';
+import { useLocationGate } from '@/hooks/useLocationGate';
+import { LocationRequiredScreen } from '@/components/location/LocationRequiredScreen';
 
 export default function MainLayout() {
   const { t } = useTranslation();
@@ -14,8 +16,10 @@ export default function MainLayout() {
   useBookingRequestAlerts();
   useBookingCancellationAlerts();
   usePendingRequestVibration();
+  const { checking: locationChecking, blocked: locationBlocked, retry: retryLocation } =
+    useLocationGate();
 
-  if (isLoading) {
+  if (isLoading || locationChecking) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color={Stitch.colors.primary} />
@@ -24,6 +28,10 @@ export default function MainLayout() {
   }
 
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
+
+  if (locationBlocked) {
+    return <LocationRequiredScreen onRetry={retryLocation} />;
+  }
 
   return (
     <Tabs

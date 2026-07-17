@@ -239,6 +239,7 @@ model Booking {
   isPaid           Boolean       @default(false)
   paymentId        String?
   notes            String?
+  rejectReason     String?
 
   timeEntries      TimeEntry[]
   review           Review?

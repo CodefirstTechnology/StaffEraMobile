@@ -63,6 +63,8 @@
     "password": "पासवर्ड",
     "signIn": "साइन इन",
     "signOut": "साइन आउट",
+    "logoutConfirmTitle": "साइन आउट करें?",
+    "logoutConfirmMessage": "क्या आप वाकई लॉग आउट करना चाहते हैं?",
     "newAccount": "नए हैं? खाता बनाएं",
     "loginFailed": "लॉगिन विफल",
     "tryAgain": "कृपया पुनः प्रयास करें",

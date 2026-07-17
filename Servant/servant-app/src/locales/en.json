@@ -63,6 +63,8 @@
     "password": "Password",
     "signIn": "Sign in",
     "signOut": "Sign out",
+    "logoutConfirmTitle": "Sign out?",
+    "logoutConfirmMessage": "Are you sure you want to log out?",
     "newAccount": "New here? Create your account",
     "loginFailed": "Login failed",
     "tryAgain": "Please try again",
@@ -460,6 +462,27 @@
     "yourSkills": "Your skills",
     "aboutYou": "About you",
     "serviceZonesSub": "Set by your agent — customers near these areas see your open requests"
+  },
+  "decline": {
+    "title": "Decline booking",
+    "sub": "Choose a reason so the customer knows why you cannot take this job.",
+    "confirm": "Decline job",
+    "reasonRequired": "Please select a reason",
+    "customReasonRequired": "Please enter at least 3 characters",
+    "customPlaceholder": "Describe why you are declining…",
+    "reasons": {
+      "unavailable": "Unavailable at this time",
+      "scheduleConflict": "Schedule conflict with another job",
+      "tooFar": "Location is too far",
+      "personalEmergency": "Personal emergency",
+      "other": "Other (specify below)"
+    }
+  },
+  "locationGate": {
+    "title": "Location required",
+    "sub": "StaffEra needs location access to show nearby jobs, share your route, and verify service zones. Enable location services to continue.",
+    "enable": "Enable location",
+    "openSettings": "Open settings"
   },
   "workOtp": {
     "requestOtp": "I arrived — get OTP",

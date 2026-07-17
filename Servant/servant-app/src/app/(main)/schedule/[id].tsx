@@ -22,6 +22,7 @@ import {
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
 import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
+import { DeclineReasonSheet } from '@/components/bookings/DeclineReasonSheet';
 import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
 import { useZoneGate } from '@/hooks/useZoneGate';
 import { isActionableBooking, isCancelled } from '@/lib/bookingVisibility';
@@ -33,6 +34,8 @@ export default function ScheduleDetailScreen() {
   const qc = useQueryClient();
   const [sharingLocation, setSharingLocation] = useState(false);
   const [acting, setActing] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineLoading, setDeclineLoading] = useState(false);
   const { hasZones, requireZone, goAddZone } = useZoneGate();
   const actionsBlocked = !hasZones;
 
@@ -104,22 +107,30 @@ export default function ScheduleDetailScreen() {
     }
   };
 
-  const reject = async () => {
+  const openDecline = () => {
     if (acting) return;
     if (!requireZone()) return;
+    setDeclineOpen(true);
+  };
+
+  const submitDecline = async (reason: string) => {
+    if (acting) return;
+    setDeclineLoading(true);
     setActing(true);
     try {
-      await api.patch(`/bookings/${id}/reject`, { reason: t('servantHome.rejectReason') });
+      await api.patch(`/bookings/${id}/reject`, { reason });
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['booking', id] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
         qc.invalidateQueries({ queryKey: ['open-requests'] }),
         qc.invalidateQueries({ queryKey: ['schedule'] }),
       ]);
+      setDeclineOpen(false);
       Alert.alert(t('servantHome.declinedTitle'), t('servantHome.customerNotified'));
     } catch (e: unknown) {
       Alert.alert(t('servantHome.couldNotDecline'), apiError(e, t('auth.tryAgain')));
     } finally {
+      setDeclineLoading(false);
       setActing(false);
     }
   };
@@ -168,6 +179,7 @@ export default function ScheduleDetailScreen() {
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -310,7 +322,7 @@ export default function ScheduleDetailScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.reject, (acting || actionsBlocked) && styles.btnDisabled]}
-            onPress={reject}
+            onPress={openDecline}
             disabled={acting || actionsBlocked}
           >
             <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
@@ -318,6 +330,13 @@ export default function ScheduleDetailScreen() {
         </View>
       )}
     </ScrollView>
+    <DeclineReasonSheet
+      visible={declineOpen}
+      loading={declineLoading}
+      onClose={() => !declineLoading && setDeclineOpen(false)}
+      onConfirm={submitDecline}
+    />
+    </>
   );
 }
 
