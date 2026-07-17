@@ -78,6 +78,17 @@
     "passwordMismatch": "पासवर्ड जुळत नाहीत",
     "registrationFailed": "नोंदणी अयशस्वी",
     "registrationSuccess": "वापरकर्ता यशस्वीरित्या तयार झाला",
+    "passwordStrength": {
+      "tooShort": "खूप लहान",
+      "weak": "कमकुवत",
+      "medium": "मध्यम",
+      "strong": "मजबूत",
+      "minLength": "किमान 6 अक्षरे",
+      "upper": "एक मोठे अक्षर",
+      "lower": "एक लहान अक्षर",
+      "digit": "एक अंक",
+      "special": "एक विशेष चिन्ह (!@#$…)"
+    },
     "homeLocationOptional": "घराचे स्थान (ऐच्छिक)",
     "searchPlaceholder": "सोसायटी, रस्ता किंवा परिसर शोधा",
     "cityIfNoLocation": "शहर (स्थान सेट नसेल तर)",

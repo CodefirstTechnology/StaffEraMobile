@@ -78,6 +78,17 @@
     "passwordMismatch": "पासवर्ड मेल नहीं खाते",
     "registrationFailed": "पंजीकरण विफल",
     "registrationSuccess": "उपयोगकर्ता सफलतापूर्वक बनाया गया",
+    "passwordStrength": {
+      "tooShort": "बहुत छोटा",
+      "weak": "कमज़ोर",
+      "medium": "मध्यम",
+      "strong": "मज़बूत",
+      "minLength": "कम से कम 6 अक्षर",
+      "upper": "एक बड़ा अक्षर",
+      "lower": "एक छोटा अक्षर",
+      "digit": "एक अंक",
+      "special": "एक विशेष वर्ण (!@#$…)"
+    },
     "homeLocationOptional": "घर का स्थान (वैकल्पिक)",
     "searchPlaceholder": "सोसाइटी, गली या इलाका खोजें",
     "cityIfNoLocation": "शहर (यदि स्थान सेट नहीं)",

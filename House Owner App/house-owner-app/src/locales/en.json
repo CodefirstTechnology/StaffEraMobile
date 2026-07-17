@@ -79,6 +79,17 @@
     "passwordMismatch": "Passwords do not match",
     "registrationFailed": "Registration failed",
     "registrationSuccess": "User created successfully",
+    "passwordStrength": {
+      "tooShort": "Too short",
+      "weak": "Weak",
+      "medium": "Medium",
+      "strong": "Strong",
+      "minLength": "At least 6 characters",
+      "upper": "One uppercase letter",
+      "lower": "One lowercase letter",
+      "digit": "One number",
+      "special": "One special character (!@#$…)"
+    },
     "homeLocationOptional": "Home location (optional)",
     "searchPlaceholder": "Search your society, street, or area",
     "cityIfNoLocation": "City (if location not set)",
