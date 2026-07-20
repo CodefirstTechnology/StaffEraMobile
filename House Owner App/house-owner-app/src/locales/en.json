@@ -487,6 +487,10 @@
       "title": "Booking completed",
       "body": "Your booking has been marked completed"
     },
+    "WORK_COMPLETED": {
+      "title": "Work Completed",
+      "body": "Your assigned helper has completed the scheduled work."
+    },
     "CLOCK_IN": {
       "title": "Helper has arrived",
       "body": "Your helper clocked in at your home"

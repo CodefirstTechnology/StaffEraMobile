@@ -10,7 +10,13 @@ export type AppNotification = {
   body: string;
   type: string;
   isRead: boolean;
-  data: { bookingId?: number } | null;
+  data: {
+    bookingId?: number;
+    helperName?: string;
+    completedAt?: string;
+    timeEntryId?: number;
+    workDetails?: Record<string, unknown>;
+  } | null;
   createdAt: string;
 };
 
@@ -47,7 +53,9 @@ export function useNotifications() {
 
     for (const notification of notifications) {
       if (seenIds.current.has(notification.id)) continue;
-      if (notification.type !== 'BOOKING_CONFIRMED') continue;
+      if (notification.type !== 'BOOKING_CONFIRMED' && notification.type !== 'WORK_COMPLETED') {
+        continue;
+      }
 
       const bookingId = notification.data?.bookingId;
       void qc.invalidateQueries({ queryKey: ['bookings'] });

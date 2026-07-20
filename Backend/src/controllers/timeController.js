@@ -1,7 +1,10 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
-const { createNotification } = require("../services/notificationService");
+const {
+  createNotification,
+  notifyWorkCompletedOnce
+} = require("../services/notificationService");
 const { hasPendingWorkOtp } = require("../services/workStartOtpService");
 const { computeBookingEarnings, isSessionPast, expireStaleSessionBookings } = require("../services/bookingService");
 
@@ -106,6 +109,26 @@ exports.clockOut = async (req, res) => {
 
   if (!openEntry) throw new ApiError(400, "No active clock-in session");
 
+  const booking = await prisma.booking.findUnique({
+    where: { id: openEntry.bookingId },
+    include: {
+      timeEntries: true,
+      servant: {
+        include: {
+          user: { select: { name: true } }
+        }
+      },
+      houseOwner: {
+        include: {
+          user: { select: { id: true } }
+        }
+      }
+    }
+  });
+
+  if (!booking) throw new ApiError(404, "Booking not found");
+
+  const wasAlreadyCompleted = booking.status === "COMPLETED";
   const now = new Date();
   const hoursWorked =
     (now.getTime() - new Date(openEntry.clockIn).getTime()) / (1000 * 60 * 60);
@@ -115,12 +138,7 @@ exports.clockOut = async (req, res) => {
     data: { clockOut: now, hoursWorked: Math.round(hoursWorked * 100) / 100 }
   });
 
-  const booking = await prisma.booking.findUnique({
-    where: { id: openEntry.bookingId },
-    include: { timeEntries: true, servant: { select: { hourlyRate: true } } }
-  });
-
-  if (booking && ["CONFIRMED", "ACTIVE"].includes(booking.status)) {
+  if (["CONFIRMED", "ACTIVE"].includes(booking.status)) {
     const totalAmount = computeBookingEarnings(
       { ...booking, timeEntries: booking.timeEntries },
       booking.servant?.hourlyRate
@@ -133,6 +151,16 @@ exports.clockOut = async (req, res) => {
         ...(totalAmount > 0 ? { totalAmount } : {}),
         ...(sessionEnded ? { status: "COMPLETED" } : {})
       }
+    });
+  }
+
+  if (!wasAlreadyCompleted && booking.houseOwner?.user?.id) {
+    await notifyWorkCompletedOnce({
+      userId: booking.houseOwner.user.id,
+      booking,
+      servant: booking.servant,
+      timeEntry: entry,
+      completedAt: now
     });
   }
 
