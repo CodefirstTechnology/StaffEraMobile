@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ import { localizedSkillLabel } from '@/lib/skills';
 import { useSkills } from '@/hooks/useSkills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { getBookingEditMode } from '@/lib/bookingEdit';
 
 export default function BookingDetailScreen() {
   const { t } = useTranslation();
@@ -127,6 +128,7 @@ export default function BookingDetailScreen() {
   const visitDate = booking.sessionDate ? formatDate(booking.sessionDate) : null;
   const visitType =
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
+  const editMode = getBookingEditMode(booking.status);
 
   return (
     <View style={styles.root}>
@@ -172,6 +174,9 @@ export default function BookingDetailScreen() {
             {formatCurrency(booking.totalAmount)}
           </Text>
         )}
+        {booking.notes ? (
+          <Text style={styles.row}>{t('bookings.notesRow', { notes: booking.notes })}</Text>
+        ) : null}
       </GlassCard>
 
       {helperSharing && canTrack && booking.status === 'CONFIRMED' ? (
@@ -200,6 +205,14 @@ export default function BookingDetailScreen() {
         <GlassCard style={styles.noMap}>
           <Text style={styles.noMapText}>{t('bookings.addAddressForMap')}</Text>
         </GlassCard>
+      ) : null}
+
+      {editMode !== 'none' ? (
+        <GradientButton
+          title={t('bookings.editBooking')}
+          onPress={() => router.push(`/(main)/bookings/edit/${id}`)}
+          style={{ marginTop: 20 }}
+        />
       ) : null}
 
       {['PENDING', 'CONFIRMED'].includes(booking.status) && (

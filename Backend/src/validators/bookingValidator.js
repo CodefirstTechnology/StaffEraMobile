@@ -96,8 +96,36 @@ const verifyWorkOtpSchema = z.object({
   })
 });
 
+const updateBookingSchema = z.object({
+  body: z
+    .object({
+      requestedSkill: z.string().optional(),
+      monthlyStartDate: z.string().min(1).optional(),
+      monthlyEndDate: z.string().min(1).optional(),
+      hoursPerDay: optionalNumber(),
+      workingDays: z.union([z.string(), z.array(z.string())]).optional(),
+      sessionDate: z.string().min(1).optional(),
+      sessionStartTime: z.string().optional(),
+      sessionEndTime: z.string().optional(),
+      sessionHours: optionalNumber(),
+      sessionSlots: z.array(sessionSlotSchema).optional(),
+      address: z.string().optional(),
+      flatNo: z.string().optional(),
+      building: z.string().optional(),
+      area: z.string().optional(),
+      latitude: optionalNumber(z.number().min(-90).max(90)),
+      longitude: optionalNumber(z.number().min(-180).max(180)),
+      notes: z.string().optional(),
+      totalAmount: optionalNumber()
+    })
+    .refine((data) => Object.keys(data).length > 0, {
+      message: "At least one field is required to update the booking"
+    })
+});
+
 module.exports = {
   createBookingSchema,
+  updateBookingSchema,
   reviewSchema,
   rejectBookingSchema,
   updateTrackingSchema,

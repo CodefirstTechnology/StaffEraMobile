@@ -625,6 +625,143 @@ exports.rejectBooking = async (req, res) => {
   sendSuccess(res, { booking: updated });
 };
 
+exports.updateBooking = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const booking = await loadBooking(id);
+
+  if (!booking) throw new ApiError(404, "Booking not found");
+  if (booking.houseOwner.userId !== req.user.id) {
+    throw new ApiError(403, "Only the house owner can edit this booking");
+  }
+
+  const readOnlyStatuses = ["COMPLETED", "CANCELLED", "REJECTED", "EXPIRED"];
+  if (readOnlyStatuses.includes(booking.status)) {
+    throw new ApiError(400, "Completed or cancelled bookings cannot be edited");
+  }
+
+  const body = req.body || {};
+
+  if (booking.status === "ACTIVE") {
+    const extraKeys = Object.keys(body).filter((key) => key !== "notes");
+    if (extraKeys.length > 0 || body.notes === undefined) {
+      throw new ApiError(400, "Only notes can be updated while work is in progress");
+    }
+
+    const updated = await prisma.booking.update({
+      where: { id },
+      data: { notes: body.notes?.trim() || null },
+      include: bookingInclude
+    });
+
+    return sendSuccess(res, {
+      booking: normalizeBookingRow(updated),
+      message: "Booking updated"
+    });
+  }
+
+  const data = {};
+
+  if (body.notes !== undefined) data.notes = body.notes?.trim() || null;
+  if (body.address !== undefined) data.address = body.address;
+  if (body.flatNo !== undefined) data.flatNo = body.flatNo?.trim() || null;
+  if (body.building !== undefined) data.building = body.building?.trim() || null;
+  if (body.area !== undefined) data.area = body.area?.trim() || null;
+  if (body.latitude !== undefined) data.latitude = body.latitude;
+  if (body.longitude !== undefined) data.longitude = body.longitude;
+  if (body.totalAmount !== undefined) data.totalAmount = body.totalAmount;
+
+  if (booking.servantId == null && body.requestedSkill !== undefined) {
+    data.requestedSkill = body.requestedSkill
+      ? String(body.requestedSkill).toUpperCase()
+      : null;
+  }
+
+  let scheduleChanged = false;
+
+  if (booking.bookingType === "SESSION") {
+    const hasSessionUpdate =
+      body.sessionDate !== undefined ||
+      body.sessionStartTime !== undefined ||
+      body.sessionEndTime !== undefined ||
+      body.sessionSlots !== undefined ||
+      body.sessionHours !== undefined;
+
+    if (hasSessionUpdate) {
+      scheduleChanged = true;
+      const sessionBody = {
+        sessionStartTime: body.sessionStartTime ?? booking.sessionStartTime,
+        sessionEndTime: body.sessionEndTime ?? booking.sessionEndTime,
+        sessionHours: body.sessionHours ?? booking.sessionHours,
+        sessionSlots: body.sessionSlots ?? parseJsonArray(booking.sessionSlots)
+      };
+      Object.assign(data, normalizeSessionBooking(sessionBody));
+      data.sessionDate = body.sessionDate
+        ? new Date(body.sessionDate)
+        : booking.sessionDate;
+
+      if (!data.sessionDate) {
+        throw new ApiError(400, "Session bookings require a visit date");
+      }
+      if (!data.sessionStartTime || !data.sessionEndTime) {
+        throw new ApiError(400, "Session bookings require at least one time slot");
+      }
+    }
+  } else if (booking.bookingType === "MONTHLY") {
+    if (body.monthlyStartDate !== undefined) {
+      scheduleChanged = true;
+      data.monthlyStartDate = new Date(body.monthlyStartDate);
+    }
+    if (body.monthlyEndDate !== undefined) {
+      scheduleChanged = true;
+      data.monthlyEndDate = new Date(body.monthlyEndDate);
+    }
+    if (body.hoursPerDay !== undefined) data.hoursPerDay = body.hoursPerDay;
+    if (body.workingDays !== undefined) {
+      data.workingDays = normalizeWorkingDays(body.workingDays);
+    }
+
+    const start = data.monthlyStartDate ?? booking.monthlyStartDate;
+    const end = data.monthlyEndDate ?? booking.monthlyEndDate;
+    if (!start || !end) {
+      throw new ApiError(400, "Monthly bookings require start and end dates");
+    }
+  }
+
+  const nextLat = data.latitude ?? booking.latitude;
+  const nextLng = data.longitude ?? booking.longitude;
+  const nextAddress = data.address ?? booking.address;
+
+  if (booking.servantId == null) {
+    if (nextLat == null || nextLng == null || Number.isNaN(Number(nextLat)) || Number.isNaN(Number(nextLng))) {
+      throw new ApiError(400, "Live location is required for area requests");
+    }
+    if (!String(nextAddress || "").trim()) {
+      throw new ApiError(400, "Address is required for area requests");
+    }
+  }
+
+  if (booking.servantId && scheduleChanged) {
+    const conflictData = toConflictData({ ...booking, ...data, bookingType: booking.bookingType });
+    await checkBookingConflict(
+      booking.servantId,
+      conflictData,
+      booking.id,
+      booking.houseOwnerId
+    );
+  }
+
+  const updated = await prisma.booking.update({
+    where: { id },
+    data,
+    include: bookingInclude
+  });
+
+  sendSuccess(res, {
+    booking: normalizeBookingRow(updated),
+    message: "Booking updated"
+  });
+};
+
 exports.cancelBooking = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const booking = await loadBooking(id);
