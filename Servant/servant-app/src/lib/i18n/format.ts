@@ -30,6 +30,17 @@ export function formatTime(value: Date | string): string {
   });
 }
 
+export function formatDateTime(value: Date | string): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  return date.toLocaleString(getIntlLocale(i18n.language), {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
   return value.toLocaleString(getIntlLocale(i18n.language), options);
 }

@@ -201,6 +201,7 @@
   },
   "bookings": {
     "myBookings": "My bookings",
+    "totalCount": "{{count}} booking(s)",
     "activeAndRecent": "Active requests and recent visits",
     "noBookingsTitle": "No bookings yet",
     "noBookingsSub": "Send a request from Home — nearby helpers will see it and the first to accept is assigned to you.",
@@ -212,6 +213,10 @@
     "newBooking": "New booking",
     "areaRequest": "Area request",
     "bookingDetails": "Booking details",
+    "workDetails": "Work details",
+    "workStartTime": "Start time",
+    "workEndTime": "End time",
+    "workInProgress": "In progress",
     "editBooking": "Edit booking",
     "saveChanges": "Save changes",
     "updateSuccess": "Booking updated successfully",

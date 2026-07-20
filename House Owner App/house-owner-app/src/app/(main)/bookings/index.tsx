@@ -1,6 +1,7 @@
-import { View, Text, StyleSheet, FlatList } from 'react-native';
-import { router } from 'expo-router';
+import { View, Text, StyleSheet, SectionList, RefreshControl } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
@@ -13,60 +14,66 @@ import {
   splitBookings,
   type BookingSummary,
 } from '@/components/bookings/BookingSummaryCard';
+import { bookingsListPollInterval } from '@/lib/bookingPoll';
 
 export default function BookingsListScreen() {
   const { t } = useTranslation();
   const { data: skills = [] } = useSkills();
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
       const res = await api.get('/bookings');
       return res.data.data.bookings as BookingSummary[];
     },
-    refetchInterval: 20000,
+    refetchInterval: (query) => bookingsListPollInterval(query.state.data as BookingSummary[] | undefined),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
 
   const bookings = data || [];
   const { active, recent } = splitBookings(bookings);
 
-  const renderSection = (title: string, items: BookingSummary[], emptyText: string) => (
-    <View style={styles.section}>
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <Text style={styles.sectionCount}>{items.length}</Text>
-      </View>
-      {items.length === 0 ? (
-        <GlassCard>
-          <Text style={styles.sectionEmpty}>{emptyText}</Text>
-        </GlassCard>
-      ) : (
-        items.map((item) => (
-          <BookingSummaryCard
-            key={item.id}
-            booking={item}
-            skills={skills}
-            onPress={() => router.push(`/(main)/bookings/${item.id}`)}
-          />
-        ))
-      )}
-    </View>
+  const sections = useMemo(
+    () =>
+      [
+        { key: 'active', title: t('common.active'), data: active },
+        { key: 'recent', title: t('common.recent'), data: recent },
+      ].filter((section) => section.data.length > 0),
+    [active, recent, t],
   );
 
   return (
     <View style={styles.root}>
       <View style={styles.header}>
         <Text style={styles.title}>{t('bookings.myBookings')}</Text>
-        <Text style={styles.sub}>{t('bookings.activeAndRecent')}</Text>
+        <Text style={styles.sub}>
+          {bookings.length > 0
+            ? t('bookings.totalCount', { count: bookings.length })
+            : t('bookings.activeAndRecent')}
+        </Text>
       </View>
 
-      <FlatList
-        data={[{ key: 'content' }]}
-        keyExtractor={(item) => item.key}
-        refreshing={isLoading}
-        onRefresh={refetch}
-        contentContainerStyle={styles.list}
-        ListHeaderComponent={
-          bookings.length === 0 && !isLoading ? (
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => String(item.id)}
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={[
+          styles.list,
+          bookings.length === 0 && !isLoading ? styles.listEmpty : null,
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching && !isLoading}
+            onRefresh={() => refetch()}
+            tintColor={Stitch.colors.primary}
+          />
+        }
+        ListEmptyComponent={
+          !isLoading ? (
             <GlassCard style={styles.emptyCard}>
               <MaterialIcons name="event-busy" size={40} color={Stitch.colors.onSurfaceVariant} />
               <Text style={styles.emptyTitle}>{t('bookings.noBookingsTitle')}</Text>
@@ -79,12 +86,20 @@ export default function BookingsListScreen() {
             </GlassCard>
           ) : null
         }
-        renderItem={() => (
-          <>
-            {renderSection(t('common.active'), active, t('bookings.noActive'))}
-            {renderSection(t('common.recent'), recent, t('bookings.noRecent'))}
-          </>
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.sectionCount}>{section.data.length}</Text>
+          </View>
         )}
+        renderItem={({ item }) => (
+          <BookingSummaryCard
+            booking={item}
+            skills={skills}
+            onPress={() => router.push(`/(main)/bookings/${item.id}`)}
+          />
+        )}
+        SectionSeparatorComponent={() => <View style={styles.sectionGap} />}
       />
     </View>
   );
@@ -100,12 +115,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '700', color: Stitch.colors.primary },
   sub: { fontSize: 14, color: Stitch.colors.onSurfaceVariant, marginTop: 4 },
   list: { paddingHorizontal: Stitch.spacing.padding, paddingBottom: 100 },
-  section: { marginBottom: 24 },
+  listEmpty: { flexGrow: 1 },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+    marginTop: 8,
   },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Stitch.colors.onBackground },
   sectionCount: {
@@ -117,8 +133,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: Stitch.radius.pill,
   },
-  sectionEmpty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant, lineHeight: 20 },
-  emptyCard: { alignItems: 'center', marginBottom: 24, paddingVertical: 28 },
+  sectionGap: { height: 16 },
+  emptyCard: { alignItems: 'center', marginTop: 24, paddingVertical: 28 },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',

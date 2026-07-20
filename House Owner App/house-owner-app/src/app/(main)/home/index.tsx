@@ -6,11 +6,11 @@ import {
   ScrollView,
   RefreshControl,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
@@ -28,6 +28,7 @@ import {
 } from '@/components/bookings/BookingSummaryCard';
 import { formatVisitAddressLines } from '@/lib/visitAddress';
 import { WorkStartOtpCard } from '@/components/bookings/WorkStartOtpCard';
+import { bookingsListPollInterval } from '@/lib/bookingPoll';
 
 type BookingWithOtp = BookingSummary & {
   pendingWorkOtp?: boolean;
@@ -98,8 +99,14 @@ export default function HomeScreen() {
       const res = await api.get('/bookings');
       return res.data.data.bookings as BookingSummary[];
     },
-    refetchInterval: 10000,
+    refetchInterval: (query) => bookingsListPollInterval(query.state.data as BookingSummary[] | undefined),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetchBookings();
+    }, [refetchBookings]),
+  );
 
   const bookingList = (bookings || []) as BookingWithOtp[];
   const otpBooking = bookingList.find((b) => b.workStartOtp?.code);

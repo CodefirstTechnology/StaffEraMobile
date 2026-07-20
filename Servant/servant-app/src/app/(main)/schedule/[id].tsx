@@ -23,6 +23,7 @@ import {
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
 import { WorkStartOtpPanel } from '@/components/bookings/WorkStartOtpPanel';
+import { BookingWorkTimesCard } from '@/components/bookings/BookingWorkTimesCard';
 import { DeclineReasonSheet } from '@/components/bookings/DeclineReasonSheet';
 import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
 import { useZoneGate } from '@/hooks/useZoneGate';
@@ -283,6 +284,8 @@ export default function ScheduleDetailScreen() {
           <Text style={styles.notes}>{t('servantHome.notesLabel', { notes: booking.notes })}</Text>
         ) : null}
       </GlassCard>
+
+      <BookingWorkTimesCard booking={booking} style={{ marginTop: 16, marginHorizontal: Stitch.spacing.padding }} />
 
       {home && bookingActionable && ['CONFIRMED', 'ACTIVE'].includes(booking.status) ? (
         <>

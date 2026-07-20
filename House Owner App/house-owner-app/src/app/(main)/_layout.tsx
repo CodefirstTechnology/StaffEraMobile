@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Stitch } from '@/theme/stitch';
@@ -50,6 +50,12 @@ export default function MainLayout() {
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="calendar-today" size={size} color={color} />
           ),
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.navigate('/(main)/bookings');
+          },
         }}
       />
       <Tabs.Screen

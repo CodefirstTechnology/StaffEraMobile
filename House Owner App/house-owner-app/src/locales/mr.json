@@ -200,6 +200,7 @@
   },
   "bookings": {
     "myBookings": "माझ्या बुकिंग",
+    "totalCount": "{{count}} बुकिंग",
     "activeAndRecent": "सक्रिय विनंत्या आणि अलीकडील भेटी",
     "noBookingsTitle": "अद्याप बुकिंग नाही",
     "noBookingsSub": "होमवरून विनंती पाठवा — जवळचे सहाय्यक पाहतील, पहिला स्वीकारेल.",
@@ -211,6 +212,10 @@
     "newBooking": "नवीन बुकिंग",
     "areaRequest": "परिसर विनंती",
     "bookingDetails": "बुकिंग तपशील",
+    "workDetails": "कामाचे तपशील",
+    "workStartTime": "सुरुवातीची वेळ",
+    "workEndTime": "समाप्तीची वेळ",
+    "workInProgress": "सुरू आहे",
     "editBooking": "बुकिंग संपादित करा",
     "saveChanges": "बदल जतन करा",
     "updateSuccess": "बुकिंग यशस्वीरित्या अपडेट झाली",
