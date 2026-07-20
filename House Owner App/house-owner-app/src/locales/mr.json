@@ -150,7 +150,10 @@
     "privacyHint": "नावे खाजगी — विनंती पाठवा, जवळचा पहिला उपलब्ध स्वीकारेल.",
     "whatNeed": "तुम्हाला काय हवे?",
     "yourBookings": "तुमच्या बुकिंग",
-    "noBookingsYet": "अद्याप बुकिंग नाही — वर विनंती पाठवा"
+    "noBookingsYet": "अद्याप बुकिंग नाही — वर विनंती पाठवा",
+    "activeInquiries": "सक्रिय चौकशी",
+    "inquiryWaiting_one": "{{count}} सहाय्यकाच्या प्रतिसादाची वाट",
+    "inquiryWaiting_other": "{{count}} सहाय्यकांच्या प्रतिसादाची वाट"
   },
   "browse": {
     "findHelp": "सत्यापित मदत शोधा",

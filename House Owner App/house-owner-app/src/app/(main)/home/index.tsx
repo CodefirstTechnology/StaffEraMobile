@@ -21,6 +21,7 @@ import { useSkills } from '@/hooks/useSkills';
 import { localizedSkillLabel } from '@/lib/skills';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useLiveLocation } from '@/hooks/useLiveLocation';
+import { useHomeSummary } from '@/hooks/useHomeSummary';
 import {
   BookingSummaryCard,
   splitBookings,
@@ -70,21 +71,16 @@ export default function HomeScreen() {
     return null;
   }, [liveLocation, user?.houseOwner]);
 
-  const { data: nearbyHelpers = [], isLoading: helpersLoading, refetch: refetchHelpers } = useQuery({
-    queryKey: ['servants', 'home', searchLocation?.latitude, searchLocation?.longitude],
-    enabled: !locLoading && !!searchLocation,
-    queryFn: async () => {
-      const res = await api.get('/servants', {
-        params: {
-          latitude: searchLocation!.latitude,
-          longitude: searchLocation!.longitude,
-        },
-      });
-      return res.data.data.servants as unknown[];
-    },
-  });
+  const {
+    data: homeSummary,
+    isLoading: summaryLoading,
+    isFetching: summaryFetching,
+    refetch: refetchSummary,
+  } = useHomeSummary(searchLocation, locLoading);
 
-  const nearbyCount = nearbyHelpers.length;
+  const eligibleHelperCount = homeSummary?.eligibleHelperCount ?? 0;
+  const openInquiries = homeSummary?.openInquiries ?? [];
+  const locationRequired = homeSummary?.locationRequired ?? !searchLocation;
 
   const openRequest = (skillCode?: string) => {
     router.push({
@@ -109,11 +105,22 @@ export default function HomeScreen() {
   );
 
   const bookingList = (bookings || []) as BookingWithOtp[];
+  const openInquiryIds = useMemo(
+    () => new Set(openInquiries.map((inquiry) => inquiry.id)),
+    [openInquiries],
+  );
+  const bookingsForHome = bookingList.filter((b) => !openInquiryIds.has(b.id));
   const otpBooking = bookingList.find((b) => b.workStartOtp?.code);
-  const { active, recent } = splitBookings(bookingList);
+  const { active, recent } = splitBookings(bookingsForHome);
   const homeActive = active.slice(0, 2);
   const homeRecent = recent.slice(0, 2);
   const hasBookings = homeActive.length > 0 || homeRecent.length > 0;
+  const isRefreshing = summaryLoading || summaryFetching || bookingsLoading;
+
+  const handleRefresh = useCallback(() => {
+    void refetchSummary();
+    void refetchBookings();
+  }, [refetchSummary, refetchBookings]);
 
   const headerLocation = (() => {
     const ho = user?.houseOwner;
@@ -147,11 +154,8 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={helpersLoading || bookingsLoading}
-            onRefresh={() => {
-              refetchHelpers();
-              refetchBookings();
-            }}
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
             tintColor={Stitch.colors.primary}
           />
         }
@@ -166,19 +170,43 @@ export default function HomeScreen() {
             <Text style={styles.heroBadgeText}>{t('home.fastBooking')}</Text>
           </View>
           <Text style={styles.heroTitle}>{t('home.requestInArea')}</Text>
-          {searchLocation && nearbyCount === 0 ? (
-            <Text style={styles.heroSub}>{t('home.noHelpersNearby')}</Text>
-          ) : !searchLocation ? (
+          {locationRequired ? (
             <Text style={styles.heroSub}>{t('home.enableLocation')}</Text>
-          ) : null}
+          ) : eligibleHelperCount === 0 ? (
+            <Text style={styles.heroSub}>{t('home.noHelpersNearby')}</Text>
+          ) : (
+            <Text style={styles.heroSub}>
+              {t('home.helpersNearby', { count: eligibleHelperCount })}
+            </Text>
+          )}
           <TouchableOpacity
-            style={[styles.heroBtn, !searchLocation && styles.heroBtnDisabled]}
-            disabled={!searchLocation}
+            style={[styles.heroBtn, locationRequired && styles.heroBtnDisabled]}
+            disabled={locationRequired}
             onPress={() => openRequest()}
           >
             <Text style={styles.heroBtnText}>{t('home.sendRequestNow')}</Text>
           </TouchableOpacity>
         </LinearGradient>
+
+        {openInquiries.length > 0 ? (
+          <>
+            <Text style={[styles.sectionTitle, styles.sectionTitleSpacing]}>
+              {t('home.activeInquiries')}
+            </Text>
+            {openInquiries.map((inquiry) => (
+              <View key={inquiry.id} style={styles.inquiryWrap}>
+                <BookingSummaryCard
+                  booking={inquiry}
+                  skills={skills}
+                  onPress={() => router.push(`/(main)/bookings/${inquiry.id}`)}
+                />
+                <Text style={styles.inquiryHint}>
+                  {t('home.inquiryWaiting', { count: inquiry.eligibleHelperCount })}
+                </Text>
+              </View>
+            ))}
+          </>
+        ) : null}
 
         <Text style={[styles.sectionTitle, styles.sectionTitleSpacing]}>{t('home.whatNeed')}</Text>
         <View style={styles.grid}>
@@ -289,25 +317,6 @@ const styles = StyleSheet.create({
   },
   heroBtnText: { color: Stitch.colors.secondary, fontWeight: '700' },
   heroBtnDisabled: { opacity: 0.6 },
-  countCard: { marginBottom: 24 },
-  countRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  countIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: Stitch.colors.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countBody: { flex: 1 },
-  countValue: { fontSize: 32, fontWeight: '700', color: Stitch.colors.primary },
-  countLabel: { fontSize: 14, color: Stitch.colors.onSurfaceVariant, marginTop: 2 },
-  countHint: {
-    marginTop: 12,
-    fontSize: 12,
-    lineHeight: 18,
-    color: Stitch.colors.onSurfaceVariant,
-  },
   sectionTitle: {
     ...Stitch.typography.headline,
     fontSize: 20,
@@ -353,4 +362,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   empty: { color: Stitch.colors.onSurfaceVariant, textAlign: 'center' },
+  inquiryWrap: { marginBottom: 12 },
+  inquiryHint: {
+    marginTop: -4,
+    marginBottom: 8,
+    marginHorizontal: 4,
+    fontSize: 12,
+    lineHeight: 18,
+    color: Stitch.colors.onSurfaceVariant,
+  },
 });

@@ -89,6 +89,7 @@ export default function BookingDetailScreen() {
     try {
       await api.patch(`/bookings/${id}/cancel`);
       qc.invalidateQueries({ queryKey: ['bookings'] });
+      qc.invalidateQueries({ queryKey: ['home-summary'] });
       qc.invalidateQueries({ queryKey: ['booking', id] });
       Alert.alert(t('bookings.cancelledTitle'), t('bookings.bookingCancelled'));
     } catch (e: unknown) {

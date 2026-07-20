@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
@@ -41,6 +41,7 @@ import { formatDate } from '@/lib/i18n/format';
 
 export default function AreaBookingRequestScreen() {
   const { t } = useTranslation();
+  const qc = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const { skill: skillParam } = useLocalSearchParams<{ skill?: string }>();
   const { data: skills = [] } = useSkills();
@@ -177,6 +178,8 @@ export default function AreaBookingRequestScreen() {
       }
 
       const res = await api.post('/bookings', payload);
+      await qc.invalidateQueries({ queryKey: ['bookings'] });
+      await qc.invalidateQueries({ queryKey: ['home-summary'] });
       const notified = res.data.data.broadcast?.notifiedServants ?? 0;
       const timePreview =
         bookingType === 'SESSION' && slotsSummary

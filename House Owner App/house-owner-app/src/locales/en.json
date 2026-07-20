@@ -151,7 +151,10 @@
     "privacyHint": "Helper names are private — send a request and the first available helper in your area will accept.",
     "whatNeed": "What do you need?",
     "yourBookings": "Your bookings",
-    "noBookingsYet": "No bookings yet — tap Send request now above"
+    "noBookingsYet": "No bookings yet — tap Send request now above",
+    "activeInquiries": "Active inquiries",
+    "inquiryWaiting_one": "Waiting for {{count}} helper to respond",
+    "inquiryWaiting_other": "Waiting for {{count}} helpers to respond"
   },
   "browse": {
     "findHelp": "Find verified help",

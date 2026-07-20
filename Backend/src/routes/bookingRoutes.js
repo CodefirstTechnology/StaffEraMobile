@@ -32,6 +32,12 @@ router.get(
   requireRole("SERVANT"),
   bookingController.listDeclinedOpenBookingIds
 );
+router.get(
+  "/home-summary",
+  authenticate,
+  requireRole("HOUSE_OWNER"),
+  bookingController.getHomeSummary
+);
 router.get("/:id", authenticate, bookingController.getBooking);
 router.patch(
   "/:id",

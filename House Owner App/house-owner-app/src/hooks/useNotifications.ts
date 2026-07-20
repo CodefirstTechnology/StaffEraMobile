@@ -59,6 +59,7 @@ export function useNotifications() {
 
       const bookingId = notification.data?.bookingId;
       void qc.invalidateQueries({ queryKey: ['bookings'] });
+      void qc.invalidateQueries({ queryKey: ['home-summary'] });
       if (bookingId != null) {
         void qc.invalidateQueries({ queryKey: ['booking', String(bookingId)] });
       }

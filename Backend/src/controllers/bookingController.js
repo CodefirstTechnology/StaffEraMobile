@@ -24,6 +24,7 @@ const {
   servantCoversLocation,
   bookingMatchesServantSkill
 } = require("../services/locationService");
+const { buildHomeSummary } = require("../services/homeService");
 
 const bookingInclude = {
   servant: {
@@ -357,6 +358,26 @@ exports.listDeclinedOpenBookingIds = async (req, res) => {
   });
 
   sendSuccess(res, { bookingIds: rows.map((row) => row.bookingId) });
+};
+
+exports.getHomeSummary = async (req, res) => {
+  const houseOwner = await prisma.houseOwner.findUnique({
+    where: { userId: req.user.id }
+  });
+  if (!houseOwner) throw new ApiError(403, "House owner profile required");
+
+  const latitude =
+    req.query.latitude != null ? Number(req.query.latitude) : houseOwner.latitude;
+  const longitude =
+    req.query.longitude != null ? Number(req.query.longitude) : houseOwner.longitude;
+
+  const summary = await buildHomeSummary({
+    houseOwnerId: houseOwner.id,
+    latitude,
+    longitude
+  });
+
+  sendSuccess(res, summary);
 };
 
 exports.getBooking = async (req, res) => {
