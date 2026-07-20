@@ -401,6 +401,50 @@ exports.updatePreferences = async (req, res) => {
   sendSuccess(res, { user: sanitizeUser(user) });
 };
 
+exports.updateProfile = async (req, res) => {
+  const { name, email, phone } = req.body;
+
+  const normalizedEmail =
+    email !== undefined ? normalizeEmail(String(email)) : undefined;
+  const normalizedPhone =
+    phone !== undefined ? String(phone ?? "").replace(/\D/g, "") || null : undefined;
+
+  if (normalizedEmail !== undefined) {
+    const existingEmail = await prisma.user.findFirst({
+      where: { email: normalizedEmail, NOT: { id: req.user.id } }
+    });
+    if (existingEmail) {
+      throw new ApiError(400, "Email is already in use");
+    }
+  }
+
+  if (normalizedPhone) {
+    const existingPhone = await prisma.user.findFirst({
+      where: { phone: normalizedPhone, NOT: { id: req.user.id } }
+    });
+    if (existingPhone) {
+      throw new ApiError(400, "Phone number is already in use");
+    }
+  }
+
+  const user = await prisma.user.update({
+    where: { id: req.user.id },
+    data: {
+      ...(name !== undefined && { name: String(name).trim() }),
+      ...(normalizedEmail !== undefined && { email: normalizedEmail }),
+      ...(normalizedPhone !== undefined && { phone: normalizedPhone })
+    },
+    include: {
+      houseOwner: true,
+      servant: { include: { skills: true, zones: true } },
+      agent: true,
+      ...userWithRoleInclude
+    }
+  });
+
+  sendSuccess(res, { user: sanitizeUser(user) });
+};
+
 const resetTokens = new Map();
 
 exports.forgotPassword = async (req, res) => {

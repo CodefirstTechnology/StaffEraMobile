@@ -16,6 +16,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { GhostInput } from '@/components/ui/GhostInput';
 import { LocationPicker } from '@/components/ui/LocationPicker';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import {
@@ -26,6 +27,7 @@ import { updateHomeLocation } from '@/lib/geo';
 import { mapsDeepLink, type LocationValue } from '@/lib/locationTypes';
 import { hasSavedHomeAddress, type HouseOwnerProfile } from '@/lib/homeLocation';
 import { formatVisitAddressLines } from '@/lib/visitAddress';
+import api from '@/lib/api';
 
 function profileFromHouseOwner(ho?: HouseOwnerProfile | null) {
   const location: LocationValue | null =
@@ -53,6 +55,11 @@ export default function ProfileScreen() {
   const { user, logout, setUser } = useAuthStore();
   const ho = user?.houseOwner;
   const hasSaved = hasSavedHomeAddress(ho);
+  const [editingAccount, setEditingAccount] = useState(false);
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [savingAccount, setSavingAccount] = useState(false);
   const [editing, setEditing] = useState(!hasSaved);
   const [location, setLocation] = useState<LocationValue | null>(
     () => profileFromHouseOwner(ho).location,
@@ -61,6 +68,12 @@ export default function ProfileScreen() {
     () => profileFromHouseOwner(ho).addressUnit,
   );
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setName(user?.name || '');
+    setEmail(user?.email || '');
+    setPhone(user?.phone || '');
+  }, [user?.name, user?.email, user?.phone]);
 
   useEffect(() => {
     const next = profileFromHouseOwner(user?.houseOwner);
@@ -87,6 +100,65 @@ export default function ProfileScreen() {
     setLocation(next.location);
     setAddressUnit(next.addressUnit);
     setEditing(false);
+  };
+
+  const startEditingAccount = () => {
+    setName(user?.name || '');
+    setEmail(user?.email || '');
+    setPhone(user?.phone || '');
+    setEditingAccount(true);
+  };
+
+  const cancelEditingAccount = () => {
+    setName(user?.name || '');
+    setEmail(user?.email || '');
+    setPhone(user?.phone || '');
+    setEditingAccount(false);
+  };
+
+  const saveAccount = async () => {
+    if (!name.trim()) {
+      Alert.alert(t('errors.generic'), t('validation.nameMin'));
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      Alert.alert(t('errors.generic'), t('validation.emailInvalid'));
+      return;
+    }
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phone.trim() && phoneDigits.length < 10) {
+      Alert.alert(t('errors.generic'), t('validation.phoneInvalid'));
+      return;
+    }
+    setSavingAccount(true);
+    try {
+      const payload: { name: string; email: string; phone?: string } = {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+      };
+      if (phoneDigits) {
+        payload.phone = phoneDigits;
+      } else if (user?.phone) {
+        payload.phone = '';
+      }
+      const res = await api.patch('/auth/me/profile', payload);
+      setUser(res.data.data.user as typeof user);
+      setEditingAccount(false);
+      Alert.alert(t('success.saved'), t('profile.profileUpdated'));
+    } catch (e: unknown) {
+      const err = e as {
+        message?: string;
+        response?: { status?: number; data?: { message?: string } };
+      };
+      const apiMessage = err.response?.data?.message;
+      const fallback =
+        err.response?.status === 404
+          ? t('errors.profileEndpointMissing')
+          : t('errors.couldNotSaveProfile');
+      Alert.alert(t('errors.generic'), apiMessage || fallback);
+    } finally {
+      setSavingAccount(false);
+    }
   };
 
   const saveLocation = async () => {
@@ -167,41 +239,95 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
-      <Text style={styles.screenTitle}>{t('profile.title')}</Text>
-
-      <LinearGradient
-        colors={[Stitch.colors.primary, Stitch.colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <View style={styles.avatarWrap}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
-          <View style={styles.verifiedBadge}>
-            <MaterialIcons name="verified" size={14} color={Stitch.colors.success} />
-          </View>
-        </View>
-        <Text style={styles.heroName} numberOfLines={2}>
-          {user?.name || t('profile.houseOwner')}
-        </Text>
-        <View style={styles.rolePill}>
-          <Text style={styles.roleText}>{t('profile.houseOwner')}</Text>
-        </View>
-        <View style={styles.metaRow}>
-          <MaterialIcons name="mail-outline" size={16} color="rgba(255,255,255,0.85)" />
-          <Text style={styles.metaText} numberOfLines={1}>
-            {user?.email}
-          </Text>
-        </View>
-        {displayCity ? (
-          <View style={styles.cityPill}>
-            <MaterialIcons name="location-on" size={14} color="#fff" />
-            <Text style={styles.cityPillText}>{displayCity}</Text>
-          </View>
+      <View style={styles.headerRow}>
+        <Text style={styles.screenTitle}>{t('profile.title')}</Text>
+        {!editingAccount ? (
+          <TouchableOpacity style={styles.editIconBtn} onPress={startEditingAccount} hitSlop={8}>
+            <MaterialIcons name="edit" size={24} color={Stitch.colors.primary} />
+          </TouchableOpacity>
         ) : null}
-      </LinearGradient>
+      </View>
+
+      {editingAccount ? (
+        <GlassCard style={styles.accountCard}>
+          <Text style={styles.editTitle}>{t('profile.editDetails')}</Text>
+          <GhostInput
+            label={t('auth.fullName')}
+            value={name}
+            onChangeText={setName}
+            placeholder={t('auth.fullName')}
+          />
+          <GhostInput
+            label={t('auth.email')}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            placeholder={t('auth.email')}
+          />
+          <GhostInput
+            label={t('auth.phone')}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            placeholder={t('auth.phone')}
+          />
+          <View style={styles.profileEditActions}>
+            <GradientButton
+              title={savingAccount ? t('common.saving') : t('common.save')}
+              onPress={saveAccount}
+              loading={savingAccount}
+              style={styles.profileSaveBtn}
+            />
+            <GradientButton
+              title={t('common.cancel')}
+              variant="outline"
+              onPress={cancelEditingAccount}
+              style={styles.profileCancelBtn}
+            />
+          </View>
+        </GlassCard>
+      ) : (
+        <LinearGradient
+          colors={[Stitch.colors.primary, Stitch.colors.secondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.hero}
+        >
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initial}</Text>
+            </View>
+            <View style={styles.verifiedBadge}>
+              <MaterialIcons name="verified" size={14} color={Stitch.colors.success} />
+            </View>
+          </View>
+          <Text style={styles.heroName} numberOfLines={2}>
+            {user?.name || t('profile.houseOwner')}
+          </Text>
+          <View style={styles.rolePill}>
+            <Text style={styles.roleText}>{t('profile.houseOwner')}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <MaterialIcons name="mail-outline" size={16} color="rgba(255,255,255,0.85)" />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {user?.email || '—'}
+            </Text>
+          </View>
+          <View style={styles.metaRow}>
+            <MaterialIcons name="phone" size={16} color="rgba(255,255,255,0.85)" />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {user?.phone || '—'}
+            </Text>
+          </View>
+          {displayCity ? (
+            <View style={styles.cityPill}>
+              <MaterialIcons name="location-on" size={14} color="#fff" />
+              <Text style={styles.cityPillText}>{displayCity}</Text>
+            </View>
+          ) : null}
+        </LinearGradient>
+      )}
 
       <GlassCard style={styles.languageCard}>
         <LanguageSelector showTitle />
@@ -316,12 +442,29 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Stitch.colors.background },
   scroll: { paddingHorizontal: Stitch.spacing.padding, paddingTop: 52, paddingBottom: 48 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   screenTitle: {
     fontSize: 28,
     fontWeight: '700',
     color: Stitch.colors.primary,
+    marginBottom: 0,
+    flex: 1,
+  },
+  editIconBtn: { padding: 4 },
+  editTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
     marginBottom: 16,
   },
+  profileEditActions: { gap: 12, marginTop: 4 },
+  profileSaveBtn: { marginBottom: 0 },
+  profileCancelBtn: { marginTop: 0 },
   hero: {
     borderRadius: Stitch.radius.xl,
     paddingVertical: 28,
@@ -393,6 +536,7 @@ const styles = StyleSheet.create({
     borderRadius: Stitch.radius.pill,
   },
   cityPillText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  accountCard: { marginBottom: 20 },
   languageCard: { marginBottom: 16 },
   locationCard: { marginBottom: 16 },
   sectionHead: {

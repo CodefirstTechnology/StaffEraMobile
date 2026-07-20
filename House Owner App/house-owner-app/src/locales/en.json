@@ -113,6 +113,8 @@
   "errors": {
     "generic": "Something went wrong",
     "couldNotSave": "Could not save location",
+    "couldNotSaveProfile": "Could not update profile. Check your connection and try again.",
+    "profileEndpointMissing": "Profile update is unavailable — restart the backend server and try again.",
     "loadFailed": "Failed to load data"
   },
   "success": {
@@ -394,6 +396,11 @@
     "noHomeYet": "No home address saved yet. Add one so you can use it for bookings.",
     "addHomeLocation": "Add home address",
     "saveHomeLocation": "Save home location",
+    "accountDetails": "Account details",
+    "accountDetailsSub": "Your name, email, and phone used for bookings",
+    "editAccount": "Edit account",
+    "editDetails": "Edit profile details",
+    "profileUpdated": "Profile updated successfully",
     "flatNo": "Flat / house no.",
     "building": "Building / society name",
     "area": "Area / locality"

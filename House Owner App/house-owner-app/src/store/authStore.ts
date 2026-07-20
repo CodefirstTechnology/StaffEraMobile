@@ -8,6 +8,7 @@ type User = {
   id: number;
   name: string;
   email: string;
+  phone?: string | null;
   role: string;
   preferredLanguage?: string;
   houseOwner?: {

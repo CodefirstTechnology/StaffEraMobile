@@ -1,5 +1,5 @@
  const { z } = require("zod");
-const { optionalPhone, requiredPhone, strictEmail } = require("./zodHelpers");
+const { optionalPhone, requiredPhone, strictEmail, phoneDigitsOnly } = require("./zodHelpers");
 
 const emptyToUndefined = (val) =>
   val === undefined || val === null || String(val).trim() === "" ? undefined : val;
@@ -107,6 +107,21 @@ const updatePreferencesSchema = z.object({
   })
 });
 
+const updateProfileSchema = z.object({
+  body: z.object({
+    name: z.string().min(2, "Name must be at least 2 characters").optional(),
+    email: strictEmail("Invalid email address").optional(),
+    phone: z.preprocess(
+      (val) => {
+        if (val === undefined) return undefined;
+        const digits = phoneDigitsOnly(val);
+        return digits || null;
+      },
+      z.union([z.null(), z.string().min(10, "Mobile number must be at least 10 digits").max(15)]).optional()
+    )
+  })
+});
+
 module.exports = {
   registerOwnerSchema,
   registerServantSchema,
@@ -116,5 +131,6 @@ module.exports = {
   resetPasswordSchema,
   updateLocationSchema,
   updatePreferencesSchema,
+  updateProfileSchema,
   SUPPORTED_LANGUAGES
 };
