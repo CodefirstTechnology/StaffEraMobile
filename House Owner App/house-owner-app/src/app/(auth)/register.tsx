@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
@@ -52,7 +53,7 @@ export default function RegisterScreen() {
 
   const submit = async () => {
     if (form.password !== form.confirmPassword) {
-      Alert.alert(te('errors.generic'), te('auth.passwordMismatch'));
+      showAlert(te('errors.generic'), te('auth.passwordMismatch'));
       return;
     }
     if (!validatePhoneField(form.phone)) return;
@@ -75,7 +76,7 @@ export default function RegisterScreen() {
       router.replace('/(main)/home');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(
+      showAlert(
         te('auth.registrationFailed'),
         normalizeApiErrorMessage(err.response?.data?.message),
       );

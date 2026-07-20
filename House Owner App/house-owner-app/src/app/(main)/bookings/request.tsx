@@ -5,8 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -127,7 +127,7 @@ export default function AreaBookingRequestScreen() {
 
   const submit = async () => {
     if (!selectedSkill) {
-      Alert.alert(te('bookings.categoryRequired'), te('bookings.whatHelpNeed'));
+      showAlert(te('bookings.categoryRequired'), te('bookings.whatHelpNeed'));
       return;
     }
 
@@ -136,7 +136,7 @@ export default function AreaBookingRequestScreen() {
       const available = getAvailableTimeSlots(sessionDate);
       sessionSlotsToSend = timeSlots.filter((s) => available.some((a) => a.id === s.id));
       if (sessionSlotsToSend.length === 0) {
-        Alert.alert(te('bookings.timeSlotRequired'), te('timeSlots.noneLeftToday'));
+        showAlert(te('bookings.timeSlotRequired'), te('timeSlots.noneLeftToday'));
         return;
       }
       if (sessionSlotsToSend.length !== timeSlots.length) {
@@ -145,7 +145,7 @@ export default function AreaBookingRequestScreen() {
     }
 
     if (!location?.address || location.latitude == null || location.longitude == null) {
-      Alert.alert(te('validation.locationRequired'), te('bookings.locationRequiredShort'));
+      showAlert(te('validation.locationRequired'), te('bookings.locationRequiredShort'));
       return;
     }
     setLoading(true);
@@ -186,7 +186,7 @@ export default function AreaBookingRequestScreen() {
         bookingType === 'SESSION' && slotsSummary
           ? `\n${t('bookings.timeSlotsPreview', { slots: slotsSummary })}`
           : '';
-      Alert.alert(
+      showAlert(
         t('bookings.requestSentTitle'),
         `${skillLabel} · ${requestTypeLabel}${timePreview}\n\n${
           notified > 0
@@ -197,7 +197,7 @@ export default function AreaBookingRequestScreen() {
       router.replace(`/(main)/bookings/${res.data.data.booking.id}`);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(
+      showAlert(
         t('bookings.requestFailed'),
         normalizeApiErrorMessage(err.response?.data?.message),
       );

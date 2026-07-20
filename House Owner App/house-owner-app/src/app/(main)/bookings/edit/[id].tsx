@@ -5,8 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -182,7 +182,7 @@ export default function EditBookingScreen() {
         router.back();
       } catch (e: unknown) {
         const err = e as { response?: { data?: { message?: string } } };
-        Alert.alert(
+        showAlert(
           t('bookings.updateFailed'),
           normalizeApiErrorMessage(err.response?.data?.message),
         );
@@ -193,7 +193,7 @@ export default function EditBookingScreen() {
     }
 
     if (isOpenBroadcast && !selectedSkill) {
-      Alert.alert(te('bookings.categoryRequired'), te('bookings.whatHelpNeed'));
+      showAlert(te('bookings.categoryRequired'), te('bookings.whatHelpNeed'));
       return;
     }
 
@@ -202,13 +202,13 @@ export default function EditBookingScreen() {
       const available = getAvailableTimeSlots(sessionDate);
       sessionSlotsToSend = timeSlots.filter((slot) => available.some((row) => row.id === slot.id));
       if (sessionSlotsToSend.length === 0) {
-        Alert.alert(te('bookings.timeSlotRequired'), te('timeSlots.noneLeftToday'));
+        showAlert(te('bookings.timeSlotRequired'), te('timeSlots.noneLeftToday'));
         return;
       }
     }
 
     if (!location?.address || location.latitude == null || location.longitude == null) {
-      Alert.alert(te('validation.locationRequired'), te('bookings.visitLocationRequired'));
+      showAlert(te('validation.locationRequired'), te('bookings.visitLocationRequired'));
       return;
     }
 
@@ -267,7 +267,7 @@ export default function EditBookingScreen() {
       const message = normalizeApiErrorMessage(err.response?.data?.message);
       const title =
         err.response?.status === 409 ? t('bookings.timeNotAvailable') : t('bookings.updateFailed');
-      Alert.alert(title, message);
+      showAlert(title, message);
     } finally {
       setLoading(false);
     }

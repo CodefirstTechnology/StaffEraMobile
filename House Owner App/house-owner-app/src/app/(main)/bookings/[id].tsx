@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -91,10 +92,10 @@ export default function BookingDetailScreen() {
       qc.invalidateQueries({ queryKey: ['bookings'] });
       qc.invalidateQueries({ queryKey: ['home-summary'] });
       qc.invalidateQueries({ queryKey: ['booking', id] });
-      Alert.alert(t('bookings.cancelledTitle'), t('bookings.bookingCancelled'));
+      showAlert(t('bookings.cancelledTitle'), t('bookings.bookingCancelled'));
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(t('bookings.requestFailed'), err.response?.data?.message || t('bookings.couldNotCancel'));
+      showAlert(t('bookings.requestFailed'), err.response?.data?.message || t('bookings.couldNotCancel'));
     }
   };
 

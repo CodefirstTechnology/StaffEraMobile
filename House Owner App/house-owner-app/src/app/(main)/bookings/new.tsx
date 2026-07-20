@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -86,11 +87,11 @@ export default function NewBookingScreen() {
 
   const submit = async () => {
     if (!servantId) {
-      Alert.alert(t('bookings.requestFailed'), t('bookings.selectHelperFirst'));
+      showAlert(t('bookings.requestFailed'), t('bookings.selectHelperFirst'));
       return;
     }
     if (!location?.address) {
-      Alert.alert(te('validation.locationRequired'), te('bookings.visitLocationRequired'));
+      showAlert(te('validation.locationRequired'), te('bookings.visitLocationRequired'));
       return;
     }
     setLoading(true);
@@ -127,7 +128,7 @@ export default function NewBookingScreen() {
       }
 
       const res = await api.post('/bookings', payload);
-      Alert.alert(t('bookings.requestSent'), t('bookings.requestSentSub'));
+      showAlert(t('bookings.requestSent'), t('bookings.requestSentSub'));
       router.replace(`/(main)/bookings/${res.data.data.booking.id}`);
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { message?: string } } };
@@ -145,8 +146,12 @@ export default function NewBookingScreen() {
                 onPress: () => router.push('/(main)/bookings'),
               },
             ]
-          : [{ text: t('common.confirm') }];
-      Alert.alert(title, message, buttons);
+          : undefined;
+      if (buttons) {
+        Alert.alert(title, message, buttons);
+      } else {
+        showAlert(title, message);
+      }
     } finally {
       setLoading(false);
     }

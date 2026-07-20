@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Linking,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -119,16 +120,16 @@ export default function ProfileScreen() {
 
   const saveAccount = async () => {
     if (!name.trim()) {
-      Alert.alert(te('errors.generic'), te('validation.nameMin'));
+      showAlert(te('errors.generic'), te('validation.nameMin'));
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      Alert.alert(te('errors.generic'), te('validation.emailInvalid'));
+      showAlert(te('errors.generic'), te('validation.emailInvalid'));
       return;
     }
     const phoneDigits = phone.replace(/\D/g, '');
     if (phone.trim() && phoneDigits.length < 10) {
-      Alert.alert(te('errors.generic'), te('validation.phoneInvalid'));
+      showAlert(te('errors.generic'), te('validation.phoneInvalid'));
       return;
     }
     setSavingAccount(true);
@@ -145,7 +146,7 @@ export default function ProfileScreen() {
       const res = await api.patch('/auth/me/profile', payload);
       setUser(res.data.data.user as typeof user);
       setEditingAccount(false);
-      Alert.alert(t('success.saved'), t('profile.profileUpdated'));
+      showAlert(t('success.saved'), t('profile.profileUpdated'));
     } catch (e: unknown) {
       const err = e as {
         message?: string;
@@ -157,7 +158,7 @@ export default function ProfileScreen() {
         : err.response?.status === 404
           ? te('errors.profileEndpointMissing')
           : te('errors.couldNotSaveProfile');
-      Alert.alert(te('errors.generic'), message);
+      showAlert(te('errors.generic'), message);
     } finally {
       setSavingAccount(false);
     }
@@ -165,7 +166,7 @@ export default function ProfileScreen() {
 
   const saveLocation = async () => {
     if (!location) {
-      Alert.alert(te('validation.locationRequired'), te('validation.pickHomeFirst'));
+      showAlert(te('validation.locationRequired'), te('validation.pickHomeFirst'));
       return;
     }
     setSaving(true);
@@ -181,10 +182,10 @@ export default function ProfileScreen() {
       });
       setUser(updatedUser as typeof user);
       setEditing(false);
-      Alert.alert(t('success.saved'), t('success.homeLocationUpdated'));
+      showAlert(t('success.saved'), t('success.homeLocationUpdated'));
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(te('errors.generic'), err.response?.data?.message || te('errors.couldNotSave'));
+      showAlert(te('errors.generic'), err.response?.data?.message || te('errors.couldNotSave'));
     } finally {
       setSaving(false);
     }
