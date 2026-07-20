@@ -28,6 +28,7 @@ import { mapsDeepLink, type LocationValue } from '@/lib/locationTypes';
 import { hasSavedHomeAddress, type HouseOwnerProfile } from '@/lib/homeLocation';
 import { formatVisitAddressLines } from '@/lib/visitAddress';
 import api from '@/lib/api';
+import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
 
 function profileFromHouseOwner(ho?: HouseOwnerProfile | null) {
   const location: LocationValue | null =
@@ -118,16 +119,16 @@ export default function ProfileScreen() {
 
   const saveAccount = async () => {
     if (!name.trim()) {
-      Alert.alert(t('errors.generic'), t('validation.nameMin'));
+      Alert.alert(te('errors.generic'), te('validation.nameMin'));
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      Alert.alert(t('errors.generic'), t('validation.emailInvalid'));
+      Alert.alert(te('errors.generic'), te('validation.emailInvalid'));
       return;
     }
     const phoneDigits = phone.replace(/\D/g, '');
     if (phone.trim() && phoneDigits.length < 10) {
-      Alert.alert(t('errors.generic'), t('validation.phoneInvalid'));
+      Alert.alert(te('errors.generic'), te('validation.phoneInvalid'));
       return;
     }
     setSavingAccount(true);
@@ -151,11 +152,12 @@ export default function ProfileScreen() {
         response?: { status?: number; data?: { message?: string } };
       };
       const apiMessage = err.response?.data?.message;
-      const fallback =
-        err.response?.status === 404
-          ? t('errors.profileEndpointMissing')
-          : t('errors.couldNotSaveProfile');
-      Alert.alert(t('errors.generic'), apiMessage || fallback);
+      const message = apiMessage
+        ? normalizeApiErrorMessage(apiMessage)
+        : err.response?.status === 404
+          ? te('errors.profileEndpointMissing')
+          : te('errors.couldNotSaveProfile');
+      Alert.alert(te('errors.generic'), message);
     } finally {
       setSavingAccount(false);
     }
@@ -163,7 +165,7 @@ export default function ProfileScreen() {
 
   const saveLocation = async () => {
     if (!location) {
-      Alert.alert(t('validation.locationRequired'), t('validation.pickHomeFirst'));
+      Alert.alert(te('validation.locationRequired'), te('validation.pickHomeFirst'));
       return;
     }
     setSaving(true);
@@ -182,7 +184,7 @@ export default function ProfileScreen() {
       Alert.alert(t('success.saved'), t('success.homeLocationUpdated'));
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(t('errors.generic'), err.response?.data?.message || t('errors.couldNotSave'));
+      Alert.alert(te('errors.generic'), err.response?.data?.message || te('errors.couldNotSave'));
     } finally {
       setSaving(false);
     }

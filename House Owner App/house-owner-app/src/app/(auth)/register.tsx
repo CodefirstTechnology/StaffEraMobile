@@ -16,12 +16,10 @@ import {
 import type { LocationValue } from '@/lib/locationTypes';
 import { digitsOnlyPhone, getPhoneValidationKind } from '@/lib/phone';
 import { setPendingToast } from '@/lib/pendingToast';
+import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
 
-function phoneErrorMessage(
-  kind: ReturnType<typeof getPhoneValidationKind>,
-  t: (key: string) => string,
-) {
-  if (kind === 'invalid') return t('validation.phoneInvalid');
+function phoneErrorMessage(kind: ReturnType<typeof getPhoneValidationKind>) {
+  if (kind === 'invalid') return te('validation.phoneInvalid');
   return '';
 }
 
@@ -47,14 +45,14 @@ export default function RegisterScreen() {
 
   const validatePhoneField = (value: string) => {
     const kind = getPhoneValidationKind(value, { required: false });
-    const msg = phoneErrorMessage(kind, t);
+    const msg = phoneErrorMessage(kind);
     setPhoneError(msg);
     return !kind;
   };
 
   const submit = async () => {
     if (form.password !== form.confirmPassword) {
-      Alert.alert(t('auth.passwordMismatch'));
+      Alert.alert(te('errors.generic'), te('auth.passwordMismatch'));
       return;
     }
     if (!validatePhoneField(form.phone)) return;
@@ -77,7 +75,10 @@ export default function RegisterScreen() {
       router.replace('/(main)/home');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(t('auth.registrationFailed'), err.response?.data?.message || t('auth.tryAgain'));
+      Alert.alert(
+        te('auth.registrationFailed'),
+        normalizeApiErrorMessage(err.response?.data?.message),
+      );
     } finally {
       setLoading(false);
     }

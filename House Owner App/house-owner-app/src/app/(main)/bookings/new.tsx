@@ -26,6 +26,7 @@ import {
   type BookingLocationMode,
 } from '@/lib/homeLocation';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
 
 export default function NewBookingScreen() {
   const { t } = useTranslation();
@@ -89,7 +90,7 @@ export default function NewBookingScreen() {
       return;
     }
     if (!location?.address) {
-      Alert.alert(t('validation.locationRequired'), t('bookings.visitLocationRequired'));
+      Alert.alert(te('validation.locationRequired'), te('bookings.visitLocationRequired'));
       return;
     }
     setLoading(true);
@@ -130,7 +131,7 @@ export default function NewBookingScreen() {
       router.replace(`/(main)/bookings/${res.data.data.booking.id}`);
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { message?: string } } };
-      const message = err.response?.data?.message || t('auth.tryAgain');
+      const message = normalizeApiErrorMessage(err.response?.data?.message);
       const title =
         err.response?.status === 409
           ? t('bookings.timeNotAvailable')

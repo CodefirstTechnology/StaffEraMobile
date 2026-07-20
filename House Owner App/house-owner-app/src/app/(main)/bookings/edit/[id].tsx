@@ -36,6 +36,7 @@ import {
 } from '@/lib/timeSlots';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
 import { getBookingEditMode, sessionSlotsToTimeSlots } from '@/lib/bookingEdit';
 import { setPendingToast } from '@/lib/pendingToast';
 
@@ -181,7 +182,10 @@ export default function EditBookingScreen() {
         router.back();
       } catch (e: unknown) {
         const err = e as { response?: { data?: { message?: string } } };
-        Alert.alert(t('bookings.updateFailed'), err.response?.data?.message || t('auth.tryAgain'));
+        Alert.alert(
+          t('bookings.updateFailed'),
+          normalizeApiErrorMessage(err.response?.data?.message),
+        );
       } finally {
         setLoading(false);
       }
@@ -189,7 +193,7 @@ export default function EditBookingScreen() {
     }
 
     if (isOpenBroadcast && !selectedSkill) {
-      Alert.alert(t('bookings.categoryRequired'), t('bookings.whatHelpNeed'));
+      Alert.alert(te('bookings.categoryRequired'), te('bookings.whatHelpNeed'));
       return;
     }
 
@@ -198,13 +202,13 @@ export default function EditBookingScreen() {
       const available = getAvailableTimeSlots(sessionDate);
       sessionSlotsToSend = timeSlots.filter((slot) => available.some((row) => row.id === slot.id));
       if (sessionSlotsToSend.length === 0) {
-        Alert.alert(t('bookings.timeSlotRequired'), t('timeSlots.noneLeftToday'));
+        Alert.alert(te('bookings.timeSlotRequired'), te('timeSlots.noneLeftToday'));
         return;
       }
     }
 
     if (!location?.address || location.latitude == null || location.longitude == null) {
-      Alert.alert(t('validation.locationRequired'), t('bookings.visitLocationRequired'));
+      Alert.alert(te('validation.locationRequired'), te('bookings.visitLocationRequired'));
       return;
     }
 
@@ -260,7 +264,7 @@ export default function EditBookingScreen() {
       router.back();
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { message?: string } } };
-      const message = err.response?.data?.message || t('auth.tryAgain');
+      const message = normalizeApiErrorMessage(err.response?.data?.message);
       const title =
         err.response?.status === 409 ? t('bookings.timeNotAvailable') : t('bookings.updateFailed');
       Alert.alert(title, message);

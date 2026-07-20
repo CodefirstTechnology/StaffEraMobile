@@ -13,6 +13,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
+import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
 import { useAuthStore } from '@/store/authStore';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
@@ -29,14 +30,14 @@ export default function LoginScreen() {
       z.object({
         email: z
           .string()
-          .min(1, t('validation.usernameRequired') || 'Username required')
+          .min(1, te('validation.usernameRequired'))
           .refine(
             (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
-            t('validation.emailInvalid') || 'Enter a valid username (email address)'
+            te('validation.emailInvalid'),
           ),
-        password: z.string().min(1, t('validation.passwordRequired')),
+        password: z.string().min(1, te('validation.passwordRequired')),
       }),
-    [t],
+    [],
   );
 
   const {
@@ -59,15 +60,7 @@ export default function LoginScreen() {
       router.replace('/(main)/home');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      const msg = err.response?.data?.message || '';
-      let displayMsg = msg;
-      if (msg.includes('email or password') || msg === 'Unauthorized' || msg === 'Login failed') {
-        displayMsg = t('auth.invalidCredentials') || 'Invalid username or password. Please try again.';
-      } else if (msg.includes('Email and password are required')) {
-        displayMsg = 'Username and password are required.';
-      } else if (!msg) {
-        displayMsg = t('auth.tryAgain') || 'Please try again';
-      }
+      const displayMsg = normalizeApiErrorMessage(err.response?.data?.message);
       setFormError(displayMsg);
       setError('email', { type: 'manual', message: ' ' });
       setError('password', { type: 'manual', message: ' ' });

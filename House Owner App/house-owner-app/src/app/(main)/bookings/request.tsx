@@ -38,6 +38,7 @@ import {
 } from '@/lib/timeSlots';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate } from '@/lib/i18n/format';
+import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
 
 export default function AreaBookingRequestScreen() {
   const { t } = useTranslation();
@@ -126,7 +127,7 @@ export default function AreaBookingRequestScreen() {
 
   const submit = async () => {
     if (!selectedSkill) {
-      Alert.alert(t('bookings.categoryRequired'), t('bookings.whatHelpNeed'));
+      Alert.alert(te('bookings.categoryRequired'), te('bookings.whatHelpNeed'));
       return;
     }
 
@@ -135,7 +136,7 @@ export default function AreaBookingRequestScreen() {
       const available = getAvailableTimeSlots(sessionDate);
       sessionSlotsToSend = timeSlots.filter((s) => available.some((a) => a.id === s.id));
       if (sessionSlotsToSend.length === 0) {
-        Alert.alert(t('bookings.timeSlotRequired'), t('timeSlots.noneLeftToday'));
+        Alert.alert(te('bookings.timeSlotRequired'), te('timeSlots.noneLeftToday'));
         return;
       }
       if (sessionSlotsToSend.length !== timeSlots.length) {
@@ -144,7 +145,7 @@ export default function AreaBookingRequestScreen() {
     }
 
     if (!location?.address || location.latitude == null || location.longitude == null) {
-      Alert.alert(t('validation.locationRequired'), t('bookings.locationRequiredShort'));
+      Alert.alert(te('validation.locationRequired'), te('bookings.locationRequiredShort'));
       return;
     }
     setLoading(true);
@@ -196,7 +197,10 @@ export default function AreaBookingRequestScreen() {
       router.replace(`/(main)/bookings/${res.data.data.booking.id}`);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(t('bookings.requestFailed'), err.response?.data?.message || t('auth.tryAgain'));
+      Alert.alert(
+        t('bookings.requestFailed'),
+        normalizeApiErrorMessage(err.response?.data?.message),
+      );
     } finally {
       setLoading(false);
     }
