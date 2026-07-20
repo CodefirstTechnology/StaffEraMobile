@@ -353,7 +353,11 @@
     "useCurrentLocation": "Use current location",
     "pickHint": "Pick a place from search, tap the map, or use GPS.",
     "webMapHint": "Search for an address above or use your current location. Interactive map is available in the Android/iOS app.",
-    "webGpsHint": "Search for a place or use GPS to set location."
+    "webGpsHint": "Search for a place or use GPS to set location.",
+    "servicesRequiredTitle": "Location Services required",
+    "servicesRequiredBody": "StaffEra needs Location Services enabled to find verified helpers near you. Turn on Location Services in your device settings, then return to the app.",
+    "enableLocationServices": "Enable Location",
+    "checkAgain": "I've enabled it — check again"
   },
   "skills": {
     "COOKING": "Cooking",
