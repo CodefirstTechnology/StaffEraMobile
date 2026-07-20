@@ -28,7 +28,6 @@ import {
 } from '@/lib/homeLocation';
 import { useSkills } from '@/hooks/useSkills';
 import {
-  getAvailableTimeSlots,
   getDefaultTimeSlotsForDate,
   pruneTimeSlotsForDate,
   slotsToPayload,
@@ -37,6 +36,10 @@ import {
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
 import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
+import {
+  validateBookingForm,
+  type BookingFieldErrors,
+} from '@/lib/bookingValidation';
 import { getBookingEditMode, sessionSlotsToTimeSlots } from '@/lib/bookingEdit';
 import { setPendingToast } from '@/lib/pendingToast';
 
@@ -107,6 +110,7 @@ export default function EditBookingScreen() {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<BookingFieldErrors>({});
 
   useEffect(() => {
     if (!booking || hydrated) return;
@@ -192,35 +196,46 @@ export default function EditBookingScreen() {
       return;
     }
 
-    if (isOpenBroadcast && !selectedSkill) {
-      showAlert(te('bookings.categoryRequired'), te('bookings.whatHelpNeed'));
-      return;
-    }
-
     let sessionSlotsToSend = timeSlots;
-    if (booking.bookingType === 'SESSION' && isOpenBroadcast) {
-      const available = getAvailableTimeSlots(sessionDate);
-      sessionSlotsToSend = timeSlots.filter((slot) => available.some((row) => row.id === slot.id));
-      if (sessionSlotsToSend.length === 0) {
-        showAlert(te('bookings.timeSlotRequired'), te('timeSlots.noneLeftToday'));
+    if (editMode === 'full') {
+      const { errors, sessionSlotsToSend: slots, valid } = validateBookingForm({
+        t,
+        bookingType: booking.bookingType,
+        requireCategory: isOpenBroadcast,
+        selectedSkill,
+        useTimeSlotPicker: booking.bookingType === 'SESSION' && isOpenBroadcast,
+        timeSlots,
+        sessionDate,
+        sessionStart,
+        sessionEnd,
+        location,
+        requireLocation: true,
+      });
+
+      setFieldErrors(errors);
+      if (!valid) {
+        showAlert(te('bookings.validationTitle'), te('bookings.fixRequiredFields'));
         return;
+      }
+
+      sessionSlotsToSend = slots;
+      if (sessionSlotsToSend.length !== timeSlots.length) {
+        setTimeSlots(sessionSlotsToSend);
       }
     }
 
-    if (!location?.address || location.latitude == null || location.longitude == null) {
-      showAlert(te('validation.locationRequired'), te('bookings.visitLocationRequired'));
-      return;
-    }
+    if (!location) return;
+    const visitLocation = location;
 
     setLoading(true);
     try {
       const payload: Record<string, unknown> = {
-        address: location.address,
+        address: visitLocation.address,
         flatNo: addressUnit.flatNo.trim() || undefined,
         building: addressUnit.building.trim() || undefined,
         area: addressUnit.area.trim() || undefined,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        latitude: visitLocation.latitude,
+        longitude: visitLocation.longitude,
         notes: notes.trim() || undefined,
       };
 
@@ -309,8 +324,11 @@ export default function EditBookingScreen() {
 
         {editMode === 'full' && isOpenBroadcast ? (
           <>
-            <Text style={styles.section}>{t('bookings.requestCategory')}</Text>
-            <View style={styles.skillRow}>
+            <Text style={styles.section}>
+              {t('bookings.requestCategory')}
+              <Text style={styles.required}> *</Text>
+            </Text>
+            <View style={[styles.skillRow, fieldErrors.category ? styles.fieldBoxError : null]}>
               {skills.map((skill) => {
                 const code = skill.code;
                 const active = selectedSkill === code;
@@ -318,7 +336,10 @@ export default function EditBookingScreen() {
                   <TouchableOpacity
                     key={code}
                     style={[styles.skillChip, active && styles.skillChipOn]}
-                    onPress={() => setSelectedSkill(code)}
+                    onPress={() => {
+                      setSelectedSkill(code);
+                      setFieldErrors((prev) => ({ ...prev, category: undefined }));
+                    }}
                   >
                     <Text style={[styles.skillText, active && styles.skillTextOn]}>
                       {localizedSkillLabel(code, skills)}
@@ -327,6 +348,9 @@ export default function EditBookingScreen() {
                 );
               })}
             </View>
+            {fieldErrors.category ? (
+              <Text style={styles.fieldError}>{fieldErrors.category}</Text>
+            ) : null}
           </>
         ) : null}
 
@@ -355,19 +379,34 @@ export default function EditBookingScreen() {
               <TimeSlotPicker
                 sessionDate={sessionDate}
                 value={timeSlots}
-                onChange={setTimeSlots}
+                onChange={(slots) => {
+                  setTimeSlots(slots);
+                  setFieldErrors((prev) => ({ ...prev, timeSlots: undefined }));
+                }}
+                error={fieldErrors.timeSlots}
+                required
               />
             ) : (
               <>
                 <GhostInput
                   label={t('bookings.startTime')}
                   value={sessionStart}
-                  onChangeText={setSessionStart}
+                  onChangeText={(text) => {
+                    setSessionStart(text);
+                    setFieldErrors((prev) => ({ ...prev, sessionStart: undefined }));
+                  }}
+                  error={fieldErrors.sessionStart}
+                  required
                 />
                 <GhostInput
                   label={t('bookings.endTime')}
                   value={sessionEnd}
-                  onChangeText={setSessionEnd}
+                  onChangeText={(text) => {
+                    setSessionEnd(text);
+                    setFieldErrors((prev) => ({ ...prev, sessionEnd: undefined }));
+                  }}
+                  error={fieldErrors.sessionEnd}
+                  required
                 />
               </>
             )}
@@ -389,9 +428,13 @@ export default function EditBookingScreen() {
             mode={locationMode}
             onModeChange={setLocationMode}
             location={location}
-            onLocationChange={setLocation}
+            onLocationChange={(next) => {
+              setLocation(next);
+              setFieldErrors((prev) => ({ ...prev, location: undefined }));
+            }}
             addressUnit={addressUnit}
             onAddressUnitChange={setAddressUnit}
+            locationError={fieldErrors.location}
           />
         ) : null}
 
@@ -436,6 +479,21 @@ const styles = StyleSheet.create({
   },
   hint: { marginBottom: 16, color: Stitch.colors.onSurfaceVariant, lineHeight: 20 },
   section: { fontSize: 13, fontWeight: '700', color: Stitch.colors.onSurfaceVariant, marginBottom: 8 },
+  required: { color: Stitch.colors.error },
+  fieldBoxError: {
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Stitch.colors.error,
+    backgroundColor: Stitch.colors.error + '08',
+    marginBottom: 8,
+  },
+  fieldError: {
+    fontSize: 12,
+    color: Stitch.colors.error,
+    marginBottom: 12,
+    lineHeight: 17,
+  },
   skillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   skillChip: {
     paddingHorizontal: 14,

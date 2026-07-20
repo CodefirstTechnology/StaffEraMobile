@@ -29,7 +29,6 @@ import {
 import { useSkills } from '@/hooks/useSkills';
 import {
   formatSessionSlotsLabel,
-  getAvailableTimeSlots,
   getDefaultTimeSlotsForDate,
   pruneTimeSlotsForDate,
   slotsToPayload,
@@ -39,6 +38,10 @@ import {
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate } from '@/lib/i18n/format';
 import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
+import {
+  validateBookingForm,
+  type BookingFieldErrors,
+} from '@/lib/bookingValidation';
 
 export default function AreaBookingRequestScreen() {
   const { t } = useTranslation();
@@ -66,6 +69,7 @@ export default function AreaBookingRequestScreen() {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<BookingFieldErrors>({});
 
   useEffect(() => {
     if (requestedSkillFromRoute) setSelectedSkill(requestedSkillFromRoute);
@@ -126,38 +130,41 @@ export default function AreaBookingRequestScreen() {
   );
 
   const submit = async () => {
-    if (!selectedSkill) {
-      showAlert(te('bookings.categoryRequired'), te('bookings.whatHelpNeed'));
+    const { errors, sessionSlotsToSend, valid } = validateBookingForm({
+      t,
+      bookingType,
+      requireCategory: true,
+      selectedSkill,
+      useTimeSlotPicker: bookingType === 'SESSION',
+      timeSlots,
+      sessionDate,
+      location,
+      requireLocation: true,
+    });
+
+    setFieldErrors(errors);
+    if (!valid) {
+      showAlert(te('bookings.validationTitle'), te('bookings.fixRequiredFields'));
       return;
     }
 
-    let sessionSlotsToSend = timeSlots;
-    if (bookingType === 'SESSION') {
-      const available = getAvailableTimeSlots(sessionDate);
-      sessionSlotsToSend = timeSlots.filter((s) => available.some((a) => a.id === s.id));
-      if (sessionSlotsToSend.length === 0) {
-        showAlert(te('bookings.timeSlotRequired'), te('timeSlots.noneLeftToday'));
-        return;
-      }
-      if (sessionSlotsToSend.length !== timeSlots.length) {
-        setTimeSlots(sessionSlotsToSend);
-      }
+    if (sessionSlotsToSend.length !== timeSlots.length) {
+      setTimeSlots(sessionSlotsToSend);
     }
 
-    if (!location?.address || location.latitude == null || location.longitude == null) {
-      showAlert(te('validation.locationRequired'), te('bookings.locationRequiredShort'));
-      return;
-    }
+    if (!location) return;
+    const visitLocation = location;
+
     setLoading(true);
     try {
       const payload: Record<string, unknown> = {
         bookingType,
-        address: location.address,
+        address: visitLocation.address,
         flatNo: addressUnit.flatNo.trim() || undefined,
         building: addressUnit.building.trim() || undefined,
         area: addressUnit.area.trim() || undefined,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        latitude: visitLocation.latitude,
+        longitude: visitLocation.longitude,
         notes: notes.trim() || undefined,
         requestedSkill: selectedSkill,
       };
@@ -212,8 +219,11 @@ export default function AreaBookingRequestScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
       <Text style={styles.sub}>{t('bookings.requestHelpSub')}</Text>
 
-      <View style={styles.categoryBox}>
-        <Text style={styles.categoryTitle}>{t('bookings.requestCategory')}</Text>
+      <View style={[styles.categoryBox, fieldErrors.category ? styles.fieldBoxError : null]}>
+        <Text style={styles.categoryTitle}>
+          {t('bookings.requestCategory')}
+          <Text style={styles.required}> *</Text>
+        </Text>
         <Text style={styles.categoryHint}>{t('bookings.whatHelpNeed')}</Text>
         <ScrollView
           horizontal
@@ -225,7 +235,10 @@ export default function AreaBookingRequestScreen() {
             <TouchableOpacity
               key={s.code}
               style={[styles.skillChip, selectedSkill === s.code && styles.skillChipOn]}
-              onPress={() => setSelectedSkill(s.code)}
+              onPress={() => {
+                setSelectedSkill(s.code);
+                setFieldErrors((prev) => ({ ...prev, category: undefined }));
+              }}
             >
               <Text style={[styles.skillChipText, selectedSkill === s.code && styles.skillChipTextOn]}>
                 {localizedSkillLabel(s.code, skills)}
@@ -242,6 +255,9 @@ export default function AreaBookingRequestScreen() {
                 bookingType === 'SESSION' && slotsSummary ? ` · ${slotsSummary}` : '',
             })}
           </Text>
+        ) : null}
+        {fieldErrors.category ? (
+          <Text style={styles.fieldError}>{fieldErrors.category}</Text>
         ) : null}
       </View>
 
@@ -294,8 +310,13 @@ export default function AreaBookingRequestScreen() {
           <TimeSlotPicker
             label={t('bookings.pickTimeSlots')}
             value={timeSlots}
-            onChange={setTimeSlots}
+            onChange={(slots) => {
+              setTimeSlots(slots);
+              setFieldErrors((prev) => ({ ...prev, timeSlots: undefined }));
+            }}
             sessionDate={sessionDate}
+            error={fieldErrors.timeSlots}
+            required
           />
         </>
       ) : (
@@ -312,9 +333,13 @@ export default function AreaBookingRequestScreen() {
         mode={locationMode}
         onModeChange={setLocationMode}
         location={location}
-        onLocationChange={setLocation}
+        onLocationChange={(next) => {
+          setLocation(next);
+          setFieldErrors((prev) => ({ ...prev, location: undefined }));
+        }}
         addressUnit={addressUnit}
         onAddressUnitChange={setAddressUnit}
+        locationError={fieldErrors.location}
       />
       <GhostInput label={t('bookings.notesOptional')} value={notes} onChangeText={setNotes} />
 
@@ -342,6 +367,19 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  fieldBoxError: {
+    borderColor: Stitch.colors.error,
+    backgroundColor: Stitch.colors.error + '08',
+  },
+  required: { color: Stitch.colors.error },
+  fieldError: {
+    marginTop: 10,
+    fontSize: 12,
+    color: Stitch.colors.error,
+    lineHeight: 17,
   },
   categoryTitle: { fontSize: 14, fontWeight: '700', color: Stitch.colors.primary },
   categoryHint: { fontSize: 12, color: Stitch.colors.onSurfaceVariant, marginTop: 4 },

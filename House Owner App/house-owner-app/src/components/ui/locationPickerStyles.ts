@@ -17,6 +17,11 @@ export const locationPickerStyles = StyleSheet.create({
     paddingHorizontal: 12,
     minHeight: 48,
     gap: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  searchRowError: {
+    borderColor: Stitch.colors.error,
   },
   input: { flex: 1, fontSize: 16, color: Stitch.colors.onBackground },
   suggestions: {

@@ -78,6 +78,39 @@ export function normalizeApiErrorMessage(raw?: string | null): string {
     return te('validation.nameMin');
   }
 
+  if (
+    matches(lower, [
+      'service category is required',
+      'service category cannot be empty',
+      'select what type of help',
+    ])
+  ) {
+    return te('bookings.categoryRequired');
+  }
+
+  if (
+    matches(lower, [
+      'session bookings require',
+      'at least one time slot',
+      'invalid session start time',
+      'invalid session end time',
+      'end time must be after start time',
+      'invalid time slot',
+    ])
+  ) {
+    return te('bookings.timeSlotRequired');
+  }
+
+  if (
+    matches(lower, [
+      'live location',
+      'latitude and longitude',
+      'address is required',
+    ])
+  ) {
+    return te('bookings.visitLocationRequired');
+  }
+
   if (matches(lower, ['password must be at least 6'])) {
     return te('validation.passwordMin');
   }

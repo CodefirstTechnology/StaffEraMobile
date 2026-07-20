@@ -26,6 +26,7 @@ type Props = {
   label?: string;
   placeholder?: string;
   height?: number;
+  error?: string;
 };
 
 export function LocationPicker({
@@ -34,6 +35,7 @@ export function LocationPicker({
   label,
   placeholder,
   height = 220,
+  error,
 }: Props) {
   const { t } = useTranslation();
   const pickerLabel = label ?? t('location.label');
@@ -150,7 +152,7 @@ export function LocationPicker({
   return (
     <View style={styles.wrap}>
       {pickerLabel ? <Text style={styles.label}>{pickerLabel}</Text> : null}
-      <View style={styles.searchRow}>
+      <View style={[styles.searchRow, error ? styles.searchRowError : null]}>
         <MaterialIcons name="search" size={20} color={Stitch.colors.onSurfaceVariant} />
         <TextInput
           value={query}
