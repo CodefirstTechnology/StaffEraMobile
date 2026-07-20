@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { verifyAccessToken } = require("../utils/jwt");
 const { userWithRoleInclude, getRoleCode } = require("../services/roleService");
+const { INACTIVE_ACCOUNT_MESSAGE } = require("../constants/authMessages");
 
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -23,8 +24,12 @@ const authenticate = async (req, res, next) => {
       }
     });
 
-    if (!user || !user.isActive) {
-      return next(new ApiError(401, "User not found or inactive"));
+    if (!user) {
+      return next(new ApiError(401, "Invalid or expired token"));
+    }
+
+    if (!user.isActive) {
+      return next(new ApiError(403, INACTIVE_ACCOUNT_MESSAGE));
     }
 
     req.user = {

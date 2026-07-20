@@ -112,6 +112,7 @@
     "registrationPending": "Your application is pending. An agent will contact you.",
     "noSelfSignup": "No self-signup. Your agent creates your account and verifies your ID.",
     "invalidCredentials": "Invalid username or password. Please try again.",
+    "accountInactive": "Your account is inactive. Please contact the administrator.",
     "networkLocalhost": "Cannot reach the server. On a real phone, set EXPO_PUBLIC_API_BASE_URL in .env to your PC IP (run ipconfig), then restart: npx expo start -c",
     "networkGeneric": "Cannot reach {{base}}\n\n• Backend running? (npm start in Backend)\n• Phone on same Wi‑Fi as PC (not mobile data)\n• Windows Firewall: allow Node/port 5000\n• Restart app after .env change: npx expo start -c"
   },
@@ -122,6 +123,7 @@
     "nameMin": "Name must be at least 2 characters",
     "mobileRequired": "Mobile number is required",
     "passwordMin": "Password must be at least 6 characters",
+    "credentialsRequired": "Username and password are required.",
     "locationRequired": "Location required",
     "pickHomeFirst": "Pick your home location first."
   },

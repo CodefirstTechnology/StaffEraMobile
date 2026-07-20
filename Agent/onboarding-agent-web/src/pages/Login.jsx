@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../context/AuthContext'
 import { checkPasswordStrength } from '../lib/generatePassword'
+import { normalizeLoginErrorMessage } from '../lib/normalizeLoginErrorMessage'
 
 function emailMessage(value) {
   const email = String(value ?? '').trim()
@@ -110,14 +111,7 @@ export default function Login() {
       if (user.role === 'ADMIN') navigate('/admin')
       else navigate('/')
     } catch (e) {
-      const msg = e.response?.data?.message || ''
-      if (msg.includes('email or password') || msg === 'Unauthorized' || msg === 'Login failed') {
-        setError('Invalid username or password. Please try again.')
-      } else if (msg.includes('Email and password are required')) {
-        setError('Username and password are required.')
-      } else {
-        setError(msg || 'Invalid username or password. Please try again.')
-      }
+      setError(normalizeLoginErrorMessage(e.response?.data?.message) || 'Invalid username or password. Please try again.')
     }
   }
 

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
-import { getLoginErrorMessage } from '@/lib/getLoginErrorMessage';
+import { getLoginErrorMessage, normalizeLoginErrorMessage } from '@/lib/getLoginErrorMessage';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 import { GhostInput } from '@/components/ui/GhostInput';
@@ -48,16 +48,7 @@ export default function LoginScreen() {
       router.replace('/(main)/home');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      const msg = err.response?.data?.message || '';
-      let displayMsg = msg;
-      if (msg.includes('email or password') || msg === 'Unauthorized' || msg === 'Login failed') {
-        displayMsg = t('auth.invalidCredentials') || 'Invalid username or password. Please try again.';
-      } else if (msg.includes('Email and password are required')) {
-        displayMsg = 'Username and password are required.';
-      } else if (!msg) {
-        displayMsg = getLoginErrorMessage(e) || t('auth.tryAgain');
-      }
-      setFormError(displayMsg);
+      setFormError(normalizeLoginErrorMessage(err.response?.data?.message) || getLoginErrorMessage(e));
       setErrors({ email: ' ', password: ' ' });
     } finally {
       setLoading(false);

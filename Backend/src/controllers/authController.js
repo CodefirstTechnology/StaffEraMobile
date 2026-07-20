@@ -19,6 +19,7 @@ const {
   serializeUser
 } = require("../services/roleService");
 const { notifyNearbyAgentsOfRegistration } = require("../services/agentRegistrationService");
+const { INACTIVE_ACCOUNT_MESSAGE } = require("../constants/authMessages");
 
 const sanitizeUser = (user) => serializeUser(user);
 
@@ -272,18 +273,14 @@ exports.login = async (req, res) => {
     throw new ApiError(401, "Invalid email or password");
   }
 
-  if (!user.isActive) {
-    if (getRoleCode(user) === "SERVANT") {
-      throw new ApiError(
-        403,
-        "Your application is under review. An agent will contact you with login details."
-      );
-    }
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) {
     throw new ApiError(401, "Invalid email or password");
   }
 
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) throw new ApiError(401, "Invalid email or password");
+  if (!user.isActive) {
+    throw new ApiError(403, INACTIVE_ACCOUNT_MESSAGE);
+  }
 
   if (getRoleCode(user) === "SERVANT" && !user.servant) {
     throw new ApiError(403, "Servant profile not found. Contact your agent.");

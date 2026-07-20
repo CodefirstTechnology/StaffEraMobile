@@ -17,6 +17,17 @@ export function normalizeApiErrorMessage(raw?: string | null): string {
 
   if (
     matches(lower, [
+      'account is inactive',
+      'please contact the administrator',
+      'application is under review',
+      'user not found or inactive',
+    ])
+  ) {
+    return te('auth.accountInactive');
+  }
+
+  if (
+    matches(lower, [
       'invalid email',
       'invalid email address',
       'valid email',
