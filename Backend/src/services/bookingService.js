@@ -204,6 +204,7 @@ const computeBookingEarnings = (booking, hourlyRate) => {
 const resolveExpiredSessionStatus = (booking) => {
   if (!["PENDING", "CONFIRMED", "ACTIVE"].includes(booking.status)) return null;
   if (booking.bookingType !== "SESSION" || !isSessionPast(booking)) return null;
+  if (booking.extensionStatus === "PENDING") return null;
 
   const hasWork = Array.isArray(booking.timeEntries) && booking.timeEntries.length > 0;
   if (booking.status === "PENDING") return "EXPIRED";

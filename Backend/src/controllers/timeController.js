@@ -125,7 +125,10 @@ exports.clockOut = async (req, res) => {
       { ...booking, timeEntries: booking.timeEntries },
       booking.servant?.hourlyRate
     );
-    const sessionEnded = booking.bookingType === "SESSION" && isSessionPast(booking, now);
+    const sessionEnded =
+      booking.bookingType === "SESSION" &&
+      isSessionPast(booking, now) &&
+      booking.extensionStatus !== "PENDING";
 
     await prisma.booking.update({
       where: { id: booking.id },

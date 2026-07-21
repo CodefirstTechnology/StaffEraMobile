@@ -9,7 +9,7 @@ export function useZoneGate() {
   const { data: zones = [], isLoading } = useMyZones();
   const hasZones = zones.length > 0;
 
-  const goAddZone = () => router.push('/(main)/zones?add=1');
+  const goAddZone = () => router.push('/(main)/zones?add=1&from=home');
 
   const requireZone = (): boolean => {
     if (hasZones) return true;

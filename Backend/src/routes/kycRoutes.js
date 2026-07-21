@@ -3,6 +3,7 @@ const router = express.Router();
 const kycController = require("../controllers/kycController");
 const { authenticate, requireRole } = require("../middleware/auth");
 const { uploadAadhaarZip } = require("../middleware/uploadKyc");
+const upload = require("../middleware/upload");
 
 router.post(
   "/aadhaar/xml/verify",
@@ -10,6 +11,14 @@ router.post(
   requireRole("SERVANT"),
   uploadAadhaarZip.single("aadhaarZip"),
   kycController.verifyAadhaarXmlForMe
+);
+
+router.post(
+  "/aadhaar/manual/verify",
+  authenticate,
+  requireRole("SERVANT"),
+  upload.single("idProof"),
+  kycController.uploadAadhaarManualForMe
 );
 
 router.get(

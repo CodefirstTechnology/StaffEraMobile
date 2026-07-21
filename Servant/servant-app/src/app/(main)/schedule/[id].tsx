@@ -240,6 +240,55 @@ export default function ScheduleDetailScreen() {
         </GlassCard>
       ) : null}
 
+      {booking.extensionStatus === 'PENDING' && (
+        <GlassCard style={styles.extensionBanner}>
+          <View style={styles.extensionBannerRow}>
+            <MaterialIcons name="alarm" size={24} color={Stitch.colors.primary} />
+            <View style={styles.extensionBannerBody}>
+              <Text style={styles.extensionBannerTitle}>
+                Your session is about to end. Do you want to extend the duration?
+              </Text>
+              <Text style={styles.extensionBannerSubtitle}>
+                Proposed extension: {booking.sessionEndTime} to {booking.extensionRequestedEndTime}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.extensionActions}>
+            <TouchableOpacity
+              style={[styles.extensionBtn, styles.extensionAcceptBtn]}
+              onPress={async () => {
+                try {
+                  await api.patch(`/bookings/${id}/respond-extension`, { accept: true });
+                  qc.invalidateQueries({ queryKey: ['booking', id] });
+                  qc.invalidateQueries({ queryKey: ['schedule'] });
+                  Alert.alert("Extended", `Your session has been extended to ${booking.extensionRequestedEndTime}.`);
+                } catch (e: unknown) {
+                  const err = e as { response?: { data?: { message?: string } } };
+                  Alert.alert("Error", err.response?.data?.message || "Could not accept extension.");
+                }
+              }}
+            >
+              <Text style={styles.extensionAcceptBtnText}>Accept</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.extensionBtn, styles.extensionRejectBtn]}
+              onPress={async () => {
+                try {
+                  await api.patch(`/bookings/${id}/respond-extension`, { accept: false });
+                  qc.invalidateQueries({ queryKey: ['booking', id] });
+                  qc.invalidateQueries({ queryKey: ['schedule'] });
+                } catch (e: unknown) {
+                  const err = e as { response?: { data?: { message?: string } } };
+                  Alert.alert("Error", err.response?.data?.message || "Could not decline extension.");
+                }
+              }}
+            >
+              <Text style={styles.extensionRejectBtnText}>Decline</Text>
+            </TouchableOpacity>
+          </View>
+        </GlassCard>
+      )}
+
       <GlassCard>
         <Text style={styles.title}>{booking.houseOwner.user.name}</Text>
         <StatusPill status={booking.status} />
@@ -443,5 +492,59 @@ const styles = StyleSheet.create({
     color: Stitch.colors.error,
     fontWeight: '600',
     lineHeight: 20,
+  },
+  extensionBanner: {
+    marginHorizontal: Stitch.spacing.padding,
+    marginBottom: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(98, 0, 238, 0.2)',
+  },
+  extensionBannerRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  extensionBannerBody: {
+    flex: 1,
+  },
+  extensionBannerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+    lineHeight: 20,
+  },
+  extensionBannerSubtitle: {
+    fontSize: 13,
+    color: Stitch.colors.onSurfaceVariant,
+    marginTop: 4,
+  },
+  extensionActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  extensionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: Stitch.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  extensionAcceptBtn: {
+    backgroundColor: Stitch.colors.primary,
+  },
+  extensionAcceptBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  extensionRejectBtn: {
+    backgroundColor: Stitch.colors.surfaceContainer,
+  },
+  extensionRejectBtnText: {
+    color: Stitch.colors.onSurfaceVariant,
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

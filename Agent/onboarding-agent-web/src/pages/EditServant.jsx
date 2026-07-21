@@ -226,7 +226,7 @@ export default function EditServant() {
     } else if (initialPhoneVal.startsWith('+91')) {
       initialPhoneVal = initialPhoneVal.substring(3)
     }
-    
+
     return (
       form.name !== initialName ||
       form.phone !== initialPhoneVal ||
@@ -575,11 +575,10 @@ export default function EditServant() {
                     key={d}
                     type="button"
                     onClick={() => toggleDay(d)}
-                    className={`rounded-full px-3 py-1 text-sm ${
-                      form.workingDays.includes(d)
+                    className={`rounded-full px-3 py-1 text-sm ${form.workingDays.includes(d)
                         ? 'bg-primary text-white'
                         : 'bg-gray-100'
-                    }`}
+                      }`}
                   >
                     {d}
                   </button>

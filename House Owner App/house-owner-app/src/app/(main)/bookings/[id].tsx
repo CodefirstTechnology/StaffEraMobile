@@ -202,6 +202,54 @@ export default function BookingDetailScreen() {
         </GlassCard>
       ) : null}
 
+      {booking.bookingType === 'SESSION' && ['CONFIRMED', 'ACTIVE'].includes(booking.status) && (
+        <View style={styles.extensionContainer}>
+          {!booking.extensionStatus && (
+            <GradientButton
+              title="Extend Booking by 15 mins"
+              onPress={async () => {
+                try {
+                  await api.patch(`/bookings/${id}/request-extension`);
+                  qc.invalidateQueries({ queryKey: ['booking', id] });
+                  Alert.alert("Success", "Extension requested. Waiting for helper's approval.");
+                } catch (e: unknown) {
+                  const err = e as { response?: { data?: { message?: string } } };
+                  Alert.alert("Failed to extend", err.response?.data?.message || "Could not request extension.");
+                }
+              }}
+              style={{ marginTop: 12 }}
+            />
+          )}
+
+          {booking.extensionStatus === 'PENDING' && (
+            <GlassCard style={styles.infoBanner}>
+              <MaterialIcons name="hourglass-empty" size={20} color={Stitch.colors.secondary} />
+              <Text style={styles.infoBannerText}>
+                Extension requested. Waiting for helper's approval. (New end time: {booking.extensionRequestedEndTime})
+              </Text>
+            </GlassCard>
+          )}
+
+          {booking.extensionStatus === 'ACCEPTED' && (
+            <GlassCard style={styles.successBanner}>
+              <MaterialIcons name="check-circle" size={20} color={Stitch.colors.success} />
+              <Text style={styles.successBannerText}>
+                Extension accepted! New end time: {booking.sessionEndTime}
+              </Text>
+            </GlassCard>
+          )}
+
+          {booking.extensionStatus === 'REJECTED' && (
+            <GlassCard style={styles.errorBanner}>
+              <MaterialIcons name="cancel" size={20} color={Stitch.colors.error} />
+              <Text style={styles.errorBannerText}>
+                Extension request was declined by the helper.
+              </Text>
+            </GlassCard>
+          )}
+        </View>
+      )}
+
       {['PENDING', 'CONFIRMED'].includes(booking.status) && (
         <GradientButton
           title={t('bookings.cancelBooking')}
@@ -249,4 +297,51 @@ const styles = StyleSheet.create({
   onWaySub: { fontSize: 12, color: Stitch.colors.onSurfaceVariant, marginTop: 2, lineHeight: 16 },
   noMap: { marginTop: 16 },
   noMapText: { color: Stitch.colors.onSurfaceVariant, lineHeight: 20 },
+  extensionContainer: {
+    marginTop: 16,
+    gap: 12,
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    backgroundColor: Stitch.colors.surfaceLow,
+  },
+  infoBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: Stitch.colors.onSurfaceVariant,
+    fontWeight: '600',
+  },
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    backgroundColor: Stitch.colors.successBg,
+    borderWidth: 1,
+    borderColor: 'rgba(13, 148, 136, 0.2)',
+  },
+  successBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: Stitch.colors.success,
+    fontWeight: '600',
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    backgroundColor: Stitch.colors.errorContainer,
+    borderWidth: 1,
+    borderColor: 'rgba(185, 28, 28, 0.2)',
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 14,
+    color: Stitch.colors.error,
+    fontWeight: '600',
+  },
 });

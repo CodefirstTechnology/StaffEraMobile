@@ -203,3 +203,40 @@ exports.getMyAadhaarStatus = async (req, res) => {
     verificationStatus: servant.verificationStatus
   });
 };
+
+exports.uploadAadhaarManualForMe = async (req, res) => {
+  if (!req.file) throw new ApiError(400, "Aadhaar document file is required");
+
+  const servant = await prisma.servant.findUnique({
+    where: { userId: req.user.id },
+    include: { user: true }
+  });
+  if (!servant) throw new ApiError(404, "Servant profile not found");
+
+  const idProofUrl = `/uploads/${req.file.filename}`;
+
+  const updated = await prisma.servant.update({
+    where: { id: servant.id },
+    data: {
+      aadhaarVerified: true,
+      aadhaarVerificationType: "MANUAL",
+      aadhaarVerifiedAt: new Date(),
+      idProofUrl,
+      idProofType: "AADHAR",
+      // Set the verified name from the user's profile name
+      aadhaarVerifiedName: servant.user.name
+    },
+    select: servantKycSelect
+  });
+
+  sendSuccess(res, {
+    message: "Aadhaar document uploaded and verified successfully",
+    verification: {
+      verified: true,
+      type: "MANUAL",
+      name: updated.aadhaarVerifiedName,
+      idProofUrl
+    },
+    servant: updated
+  });
+};

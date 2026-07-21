@@ -38,3 +38,43 @@ exports.createMyZone = async (req, res) => {
   sendSuccess(res, { zone }, 201);
 };
 
+exports.updateMyZone = async (req, res) => {
+  const servant = await getServantForUser(req.user.id);
+  const zoneId = parseInt(req.params.zoneId, 10);
+
+  const existingZone = await prisma.zone.findFirst({
+    where: { id: zoneId, servantId: servant.id }
+  });
+  if (!existingZone) throw new ApiError(404, "Zone not found");
+
+  const { name, description, city, latitude, longitude } = req.body;
+
+  const zone = await prisma.zone.update({
+    where: { id: zoneId },
+    data: {
+      ...(name !== undefined && { name: name.trim() }),
+      ...(description !== undefined && {
+        description: description?.trim() || null
+      }),
+      ...(city !== undefined && { city: city.trim() }),
+      ...(latitude !== undefined && { latitude }),
+      ...(longitude !== undefined && { longitude })
+    }
+  });
+
+  sendSuccess(res, { zone });
+};
+
+exports.deleteMyZone = async (req, res) => {
+  const servant = await getServantForUser(req.user.id);
+  const zoneId = parseInt(req.params.zoneId, 10);
+
+  const existingZone = await prisma.zone.findFirst({
+    where: { id: zoneId, servantId: servant.id }
+  });
+  if (!existingZone) throw new ApiError(404, "Zone not found");
+
+  await prisma.zone.delete({ where: { id: zoneId } });
+  sendSuccess(res, { message: "Zone deleted" });
+};
+

@@ -93,5 +93,17 @@ router.post(
   validate(reviewSchema),
   bookingController.createReview
 );
+router.patch(
+  "/:id/request-extension",
+  authenticate,
+  requireRole("HOUSE_OWNER"),
+  bookingController.requestExtension
+);
+router.patch(
+  "/:id/respond-extension",
+  authenticate,
+  requireRole("SERVANT"),
+  bookingController.respondExtension
+);
 
 module.exports = router;

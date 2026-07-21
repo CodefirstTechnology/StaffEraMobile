@@ -963,3 +963,235 @@ exports.verifyWorkOtp = async (req, res) => {
 
   sendSuccess(res, { booking: enriched, entry, message: "OTP verified. Work started." });
 };
+
+const addMinutesToTime = (timeStr, mins) => {
+  const [h, m] = timeStr.split(":").map(Number);
+  const totalMins = h * 60 + m + mins;
+  const newH = Math.floor(totalMins / 60) % 24;
+  const newM = totalMins % 60;
+  return `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
+};
+
+const checkServantNextHourBooking = async (servantId, sessionDate, sessionEndTime, bookingId) => {
+  const startTime = sessionEndTime;
+  const endTime = addMinutesToTime(sessionEndTime, 60);
+
+  const dayStart = new Date(sessionDate);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(sessionDate);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const BLOCKING_STATUSES = ["PENDING", "CONFIRMED", "ACTIVE"];
+
+  const bookings = await prisma.booking.findMany({
+    where: {
+      servantId,
+      status: { in: BLOCKING_STATUSES },
+      id: { not: bookingId },
+      sessionDate: { gte: dayStart, lte: dayEnd }
+    }
+  });
+
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const [h, m] = timeStr.split(":").map(Number);
+    return h * 60 + (m || 0);
+  };
+
+  const rangesOverlap = (startA, endA, startB, endB) =>
+    timeToMinutes(startA) < timeToMinutes(endB) &&
+    timeToMinutes(endA) > timeToMinutes(startB);
+
+  const getBookingSlots = (booking) => {
+    const parsed = Array.isArray(booking.sessionSlots)
+      ? booking.sessionSlots
+      : (() => {
+          try {
+            return JSON.parse(booking.sessionSlots || "[]");
+          } catch {
+            return [];
+          }
+        })();
+    if (parsed.length && parsed[0]?.start && parsed[0]?.end) {
+      return parsed;
+    }
+    if (booking.sessionStartTime && booking.sessionEndTime) {
+      return [{ start: booking.sessionStartTime, end: booking.sessionEndTime }];
+    }
+    return [];
+  };
+
+  for (const b of bookings) {
+    const slots = getBookingSlots(b);
+    if (slots.some(slot => rangesOverlap(slot.start, slot.end, startTime, endTime))) {
+      return b;
+    }
+  }
+
+  const monthlies = await prisma.booking.findMany({
+    where: {
+      servantId,
+      bookingType: "MONTHLY",
+      status: { in: BLOCKING_STATUSES }
+    }
+  });
+
+  const dayOfWeek = new Date(sessionDate)
+    .toLocaleString("en-US", { weekday: "long" })
+    .toUpperCase();
+
+  for (const b of monthlies) {
+    const start = new Date(b.monthlyStartDate);
+    const end = new Date(b.monthlyEndDate);
+    if (dayStart >= start && dayStart <= end) {
+      const days = (() => {
+        try {
+          return Array.isArray(b.workingDays) ? b.workingDays : JSON.parse(b.workingDays || "[]");
+        } catch {
+          return String(b.workingDays || "").split(",").map(s => s.trim().toUpperCase());
+        }
+      })();
+      if (days.map(d => d.toUpperCase()).includes(dayOfWeek)) {
+        return b;
+      }
+    }
+  }
+
+  return null;
+};
+
+exports.requestExtension = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const booking = await loadBooking(id);
+
+  if (!booking) throw new ApiError(404, "Booking not found");
+  if (booking.bookingType !== "SESSION") {
+    throw new ApiError(400, "Only session bookings can be extended");
+  }
+  if (!["CONFIRMED", "ACTIVE"].includes(booking.status)) {
+    throw new ApiError(400, "Booking is not active or confirmed");
+  }
+
+  const conflict = await checkServantNextHourBooking(
+    booking.servantId,
+    booking.sessionDate,
+    booking.sessionEndTime,
+    booking.id
+  );
+
+  if (conflict) {
+    throw new ApiError(400, "Helper is not available for extension (booked for next hour)");
+  }
+
+  const extensionRequestedEndTime = addMinutesToTime(booking.sessionEndTime, 15);
+
+  const updated = await prisma.booking.update({
+    where: { id },
+    data: {
+      extensionStatus: "PENDING",
+      extensionRequestedEndTime
+    },
+    include: bookingInclude
+  });
+
+  if (booking.servant?.user?.id) {
+    await createNotification({
+      userId: booking.servant.user.id,
+      title: "Session extension requested",
+      body: `Your session is about to end. Do you want to extend the duration from ${booking.sessionEndTime} to ${extensionRequestedEndTime}?`,
+      type: "EXTENSION_REQUESTED",
+      data: { bookingId: id }
+    });
+  }
+
+  sendSuccess(res, { booking: updated, message: "Extension requested successfully" });
+};
+
+exports.respondExtension = async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { accept } = req.body;
+
+  const booking = await loadBooking(id);
+  if (!booking) throw new ApiError(404, "Booking not found");
+
+  if (booking.extensionStatus !== "PENDING") {
+    throw new ApiError(400, "No pending extension request found");
+  }
+
+  const servant = await getServantForUser(req.user.id);
+  if (booking.servantId !== servant.id) {
+    throw new ApiError(403, "Access denied");
+  }
+
+  if (accept) {
+    const conflict = await checkServantNextHourBooking(
+      booking.servantId,
+      booking.sessionDate,
+      booking.sessionEndTime,
+      booking.id
+    );
+
+    if (conflict) {
+      throw new ApiError(400, "Helper is not available for extension anymore (booked for next hour)");
+    }
+
+    const newHours = (booking.sessionHours || 0) + 0.25;
+    const hourlyRate = booking.servant?.hourlyRate || 0;
+    const newAmount = hourlyRate ? Math.round(newHours * hourlyRate * 100) / 100 : booking.totalAmount;
+
+    let slots = [];
+    try {
+      slots = JSON.parse(booking.sessionSlots || "[]");
+    } catch (err) {
+      // ignore
+    }
+    if (slots.length > 0) {
+      slots[slots.length - 1].end = booking.extensionRequestedEndTime;
+    }
+    const newSessionSlots = JSON.stringify(slots);
+
+    const updated = await prisma.booking.update({
+      where: { id },
+      data: {
+        sessionEndTime: booking.extensionRequestedEndTime,
+        sessionHours: newHours,
+        sessionSlots: newSessionSlots,
+        totalAmount: newAmount,
+        extensionStatus: "ACCEPTED"
+      },
+      include: bookingInclude
+    });
+
+    if (booking.houseOwner?.user?.id) {
+      await createNotification({
+        userId: booking.houseOwner.user.id,
+        title: "Extension accepted",
+        body: `${servant.user.name || "Your helper"} accepted the session extension. New end time: ${booking.extensionRequestedEndTime}`,
+        type: "EXTENSION_ACCEPTED",
+        data: { bookingId: id }
+      });
+    }
+
+    sendSuccess(res, { booking: updated, message: "Extension accepted successfully" });
+  } else {
+    const updated = await prisma.booking.update({
+      where: { id },
+      data: {
+        extensionStatus: "REJECTED"
+      },
+      include: bookingInclude
+    });
+
+    if (booking.houseOwner?.user?.id) {
+      await createNotification({
+        userId: booking.houseOwner.user.id,
+        title: "Extension declined",
+        body: `${servant.user.name || "Your helper"} declined the session extension.`,
+        type: "EXTENSION_DECLINED",
+        data: { bookingId: id }
+      });
+    }
+
+    sendSuccess(res, { booking: updated, message: "Extension declined successfully" });
+  }
+};

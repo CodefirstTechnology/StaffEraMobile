@@ -367,7 +367,7 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={styles.zoneBtn}
               activeOpacity={0.85}
-              onPress={() => router.push('/(main)/zones?add=1')}
+              onPress={() => router.push('/(main)/zones?add=1&from=profile')}
             >
               <MaterialIcons name="add-location-alt" size={22} color={Stitch.colors.primary} />
               <View style={styles.zoneBtnTextWrap}>
@@ -395,7 +395,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={styles.zoneBtn}
             activeOpacity={0.85}
-            onPress={() => router.push('/(main)/zones')}
+            onPress={() => router.push('/(main)/zones?from=profile')}
           >
             <MaterialIcons name="map" size={22} color={Stitch.colors.primary} />
             <View style={styles.zoneBtnTextWrap}>

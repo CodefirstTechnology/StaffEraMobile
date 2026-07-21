@@ -243,6 +243,9 @@ model Booking {
   notes            String?
   rejectReason     String?
 
+  extensionStatus          String?
+  extensionRequestedEndTime String?
+
   timeEntries      TimeEntry[]
   review           Review?
   workStartedAt    DateTime?
