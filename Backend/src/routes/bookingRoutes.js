@@ -5,6 +5,7 @@ const { authenticate, requireRole } = require("../middleware/auth");
 const validate = require("../middleware/validate");
 const {
   createBookingSchema,
+  updateBookingSchema,
   reviewSchema,
   rejectBookingSchema,
   updateTrackingSchema,
@@ -31,7 +32,20 @@ router.get(
   requireRole("SERVANT"),
   bookingController.listDeclinedOpenBookingIds
 );
+router.get(
+  "/home-summary",
+  authenticate,
+  requireRole("HOUSE_OWNER"),
+  bookingController.getHomeSummary
+);
 router.get("/:id", authenticate, bookingController.getBooking);
+router.patch(
+  "/:id",
+  authenticate,
+  requireRole("HOUSE_OWNER"),
+  validate(updateBookingSchema),
+  bookingController.updateBooking
+);
 router.get("/:id/tracking", authenticate, bookingController.getBookingTracking);
 router.post(
   "/:id/tracking",

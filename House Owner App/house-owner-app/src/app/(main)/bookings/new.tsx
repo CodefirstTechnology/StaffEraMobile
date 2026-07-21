@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -26,6 +27,11 @@ import {
   type BookingLocationMode,
 } from '@/lib/homeLocation';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
+import {
+  validateBookingForm,
+  type BookingFieldErrors,
+} from '@/lib/bookingValidation';
 
 export default function NewBookingScreen() {
   const { t } = useTranslation();
@@ -50,6 +56,7 @@ export default function NewBookingScreen() {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDate, setShowDate] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<BookingFieldErrors>({});
 
   useEffect(() => {
     const profile = user?.houseOwner;
@@ -85,24 +92,43 @@ export default function NewBookingScreen() {
 
   const submit = async () => {
     if (!servantId) {
-      Alert.alert(t('bookings.requestFailed'), t('bookings.selectHelperFirst'));
+      showAlert(t('bookings.requestFailed'), t('bookings.selectHelperFirst'));
       return;
     }
-    if (!location?.address) {
-      Alert.alert(t('validation.locationRequired'), t('bookings.visitLocationRequired'));
+
+    const { errors, valid } = validateBookingForm({
+      t,
+      bookingType,
+      requireCategory: false,
+      useTimeSlotPicker: false,
+      timeSlots: [],
+      sessionDate,
+      sessionStart,
+      sessionEnd,
+      location,
+      requireLocation: true,
+    });
+
+    setFieldErrors(errors);
+    if (!valid) {
+      showAlert(te('bookings.validationTitle'), te('bookings.fixRequiredFields'));
       return;
     }
+
+    if (!location) return;
+    const visitLocation = location;
+
     setLoading(true);
     try {
       const payload: Record<string, unknown> = {
         servantId: Number(servantId),
         bookingType,
-        address: location.address,
+        address: visitLocation.address,
         flatNo: addressUnit.flatNo.trim() || undefined,
         building: addressUnit.building.trim() || undefined,
         area: addressUnit.area.trim() || undefined,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        latitude: visitLocation.latitude,
+        longitude: visitLocation.longitude,
         notes: notes.trim() || undefined,
         totalAmount: totalAmount || undefined,
       };
@@ -126,11 +152,11 @@ export default function NewBookingScreen() {
       }
 
       const res = await api.post('/bookings', payload);
-      Alert.alert(t('bookings.requestSent'), t('bookings.requestSentSub'));
+      showAlert(t('bookings.requestSent'), t('bookings.requestSentSub'));
       router.replace(`/(main)/bookings/${res.data.data.booking.id}`);
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { message?: string } } };
-      const message = err.response?.data?.message || t('auth.tryAgain');
+      const message = normalizeApiErrorMessage(err.response?.data?.message);
       const title =
         err.response?.status === 409
           ? t('bookings.timeNotAvailable')
@@ -144,8 +170,12 @@ export default function NewBookingScreen() {
                 onPress: () => router.push('/(main)/bookings'),
               },
             ]
-          : [{ text: t('common.confirm') }];
-      Alert.alert(title, message, buttons);
+          : undefined;
+      if (buttons) {
+        Alert.alert(title, message, buttons);
+      } else {
+        showAlert(title, message);
+      }
     } finally {
       setLoading(false);
     }
@@ -186,8 +216,26 @@ export default function NewBookingScreen() {
               }}
             />
           )}
-          <GhostInput label={t('bookings.startTime')} value={sessionStart} onChangeText={setSessionStart} />
-          <GhostInput label={t('bookings.endTime')} value={sessionEnd} onChangeText={setSessionEnd} />
+          <GhostInput
+            label={t('bookings.startTime')}
+            value={sessionStart}
+            onChangeText={(text) => {
+              setSessionStart(text);
+              setFieldErrors((prev) => ({ ...prev, sessionStart: undefined }));
+            }}
+            error={fieldErrors.sessionStart}
+            required
+          />
+          <GhostInput
+            label={t('bookings.endTime')}
+            value={sessionEnd}
+            onChangeText={(text) => {
+              setSessionEnd(text);
+              setFieldErrors((prev) => ({ ...prev, sessionEnd: undefined }));
+            }}
+            error={fieldErrors.sessionEnd}
+            required
+          />
         </>
       ) : (
         <>
@@ -205,9 +253,13 @@ export default function NewBookingScreen() {
         mode={locationMode}
         onModeChange={setLocationMode}
         location={location}
-        onLocationChange={setLocation}
+        onLocationChange={(next) => {
+          setLocation(next);
+          setFieldErrors((prev) => ({ ...prev, location: undefined }));
+        }}
         addressUnit={addressUnit}
         onAddressUnitChange={setAddressUnit}
+        locationError={fieldErrors.location}
       />
       <GhostInput label={t('bookings.notesOptional')} value={notes} onChangeText={setNotes} />
 

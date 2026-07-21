@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
 import { I18nGate } from '@/providers/I18nGate';
 import { ToastProvider } from '@/providers/ToastProvider';
+import { LocationServicesGate } from '@/components/LocationServicesGate';
 import '@/lib/i18n';
 
 const queryClient = new QueryClient();
@@ -18,15 +19,17 @@ export default function RootLayout() {
 
   return (
     <I18nGate>
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(main)" />
-          </Stack>
-        </ToastProvider>
-      </QueryClientProvider>
+      <LocationServicesGate>
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(main)" />
+            </Stack>
+          </ToastProvider>
+        </QueryClientProvider>
+      </LocationServicesGate>
     </I18nGate>
   );
 }

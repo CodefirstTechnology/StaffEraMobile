@@ -6,6 +6,7 @@
     "saving": "सेव हो रहा है…",
     "save": "सेव करें",
     "cancel": "रद्द करें",
+    "ok": "ठीक है",
     "confirm": "पुष्टि करें",
     "delete": "हटाएं",
     "edit": "संपादित करें",
@@ -112,6 +113,8 @@
   "errors": {
     "generic": "कुछ गलत हो गया",
     "couldNotSave": "स्थान सेव नहीं हो सका",
+    "couldNotSaveProfile": "प्रोफ़ाइल अपडेट नहीं हो सकी। कनेक्शन जाँचें और पुनः प्रयास करें।",
+    "profileEndpointMissing": "प्रोफ़ाइल अपडेट उपलब्ध नहीं — बैकएंड रीस्टार्ट करें और पुनः प्रयास करें।",
     "loadFailed": "डेटा लोड विफल"
   },
   "success": {
@@ -150,7 +153,10 @@
     "privacyHint": "नाम निजी हैं — अनुरोध भेजें, पास का पहला उपलब्ध सहायक स्वीकार करेगा।",
     "whatNeed": "आपको क्या चाहिए?",
     "yourBookings": "आपकी बुकिंग",
-    "noBookingsYet": "अभी कोई बुकिंग नहीं — ऊपर अनुरोध भेजें"
+    "noBookingsYet": "अभी कोई बुकिंग नहीं — ऊपर अनुरोध भेजें",
+    "activeInquiries": "सक्रिय अनुरोध",
+    "inquiryWaiting_one": "{{count}} सहायक के जवाब की प्रतीक्षा",
+    "inquiryWaiting_other": "{{count}} सहायकों के जवाब की प्रतीक्षा"
   },
   "browse": {
     "findHelp": "सत्यापित सहायता खोजें",
@@ -200,6 +206,7 @@
   },
   "bookings": {
     "myBookings": "मेरी बुकिंग",
+    "totalCount": "{{count}} बुकिंग",
     "activeAndRecent": "सक्रिय अनुरोध और हाल की विज़िट",
     "noBookingsTitle": "अभी कोई बुकिंग नहीं",
     "noBookingsSub": "होम से अनुरोध भेजें — पास के सहायक देखेंगे, पहला स्वीकार करेगा।",
@@ -211,6 +218,17 @@
     "newBooking": "नई बुकिंग",
     "areaRequest": "इलाका अनुरोध",
     "bookingDetails": "बुकिंग विवरण",
+    "workDetails": "कार्य विवरण",
+    "workStartTime": "शुरू समय",
+    "workEndTime": "समाप्ति समय",
+    "workInProgress": "जारी है",
+    "editBooking": "बुकिंग संपादित करें",
+    "saveChanges": "बदलाव सहेजें",
+    "updateSuccess": "बुकिंग सफलतापूर्वक अपडेट हुई",
+    "updateFailed": "बुकिंग अपडेट नहीं हो सकी",
+    "cannotEdit": "पूर्ण या रद्द बुकिंग संपादित नहीं की जा सकती।",
+    "editNotesOnlyHint": "काम चल रहा है — केवल नोट्स बदले जा सकते हैं।",
+    "notesRow": "नोट्स: {{notes}}",
     "cancelBooking": "बुकिंग रद्द",
     "writeReview": "समीक्षा लिखें",
     "liveTracking": "लाइव ट्रैकिंग",
@@ -228,6 +246,12 @@
     "reviewSubmitted": "आपकी समीक्षा भेज दी गई।",
     "selectHelperFirst": "पहले ब्राउज़ से सहायक चुनें",
     "visitLocationRequired": "कृपया मैप पर विज़िट स्थान सेट करें।",
+    "validationTitle": "आवश्यक फ़ील्ड अधूरे हैं",
+    "fixRequiredFields": "सबमिट करने से पहले सभी हाइलाइट किए गए फ़ील्ड पूरे करें।",
+    "startTimeRequired": "शुरू समय दर्ज करें।",
+    "endTimeRequired": "समाप्ति समय दर्ज करें।",
+    "invalidTimeFormat": "समय HH:MM (24-घंटे) प्रारूप में दर्ज करें।",
+    "invalidTimeRange": "समाप्ति समय, शुरू समय के बाद होना चाहिए।",
     "categoryRequired": "किस प्रकार की मदद चाहिए चुनें।",
     "timeSlotRequired": "कम से कम एक समय स्लॉट चुनें।",
     "locationRequiredShort": "लाइव लोकेशन दें या मैप पर पता चुनें।",
@@ -326,7 +350,11 @@
     "useCurrentLocation": "वर्तमान स्थान उपयोग करें",
     "pickHint": "खोज से चुनें, मैप टैप करें या GPS उपयोग करें।",
     "webMapHint": "ऊपर पता खोजें या वर्तमान स्थान उपयोग करें। इंटरैक्टिव मैप Android/iOS ऐप में उपलब्ध।",
-    "webGpsHint": "स्थान खोजें या GPS से सेट करें।"
+    "webGpsHint": "स्थान खोजें या GPS से सेट करें।",
+    "servicesRequiredTitle": "लोकेशन सेवाएँ आवश्यक हैं",
+    "servicesRequiredBody": "StaffEra को आपके पास सत्यापित सहायक खोजने के लिए लोकेशन सेवाएँ चालू होनी चाहिए। डिवाइस सेटिंग्स में लोकेशन सेवाएँ चालू करें, फिर ऐप पर वापस आएँ।",
+    "enableLocationServices": "लोकेशन चालू करें",
+    "checkAgain": "चालू कर दिया — फिर जाँचें"
   },
   "skills": {
     "COOKING": "खाना बनाना",
@@ -356,6 +384,11 @@
     "noHomeYet": "अभी घर का पता सहेजा नहीं है। बुकिंग के लिए जोड़ें।",
     "addHomeLocation": "घर का पता जोड़ें",
     "saveHomeLocation": "घर का स्थान सेव",
+    "accountDetails": "खाता विवरण",
+    "accountDetailsSub": "बुकिंग के लिए आपका नाम, ईमेल और फ़ोन",
+    "editAccount": "खाता संपादित करें",
+    "editDetails": "प्रोफ़ाइल विवरण संपादित करें",
+    "profileUpdated": "प्रोफ़ाइल सफलतापूर्वक अपडेट",
     "flatNo": "फ़्लैट / मकान नं.",
     "building": "बिल्डिंग / सोसाइटी",
     "area": "इलाका / इलाका"
@@ -437,6 +470,10 @@
     "BOOKING_COMPLETED": {
       "title": "बुकिंग पूर्ण",
       "body": "आपकी बुकिंग पूर्ण चिह्नित"
+    },
+    "WORK_COMPLETED": {
+      "title": "काम पूरा",
+      "body": "आपके सहायक ने निर्धारित काम पूरा कर लिया है।"
     },
     "CLOCK_IN": {
       "title": "सहायक पहुँचा",

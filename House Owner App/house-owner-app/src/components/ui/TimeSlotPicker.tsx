@@ -15,9 +15,11 @@ type Props = {
   value: TimeSlot[];
   onChange: (slots: TimeSlot[]) => void;
   sessionDate: Date;
+  error?: string;
+  required?: boolean;
 };
 
-export function TimeSlotPicker({ label, value, onChange, sessionDate }: Props) {
+export function TimeSlotPicker({ label, value, onChange, sessionDate, error, required }: Props) {
   const { t } = useTranslation();
   const pickerLabel = label ?? t('bookings.timeSlotLabel');
   const [now, setNow] = useState(() => new Date());
@@ -46,8 +48,11 @@ export function TimeSlotPicker({ label, value, onChange, sessionDate }: Props) {
   };
 
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.label}>{pickerLabel}</Text>
+    <View style={[styles.wrap, error ? styles.wrapError : null]}>
+      <Text style={styles.label}>
+        {pickerLabel}
+        {required ? <Text style={styles.required}> *</Text> : null}
+      </Text>
       <Text style={styles.hint}>{t('timeSlots.hint')}</Text>
       {availableSlots.length === 0 ? (
         <Text style={styles.empty}>{t('timeSlots.noneLeftToday')}</Text>
@@ -81,16 +86,30 @@ export function TimeSlotPicker({ label, value, onChange, sessionDate }: Props) {
             labels: localizedSlotLabels(value),
           })}
         </Text>
-      ) : availableSlots.length > 0 ? (
-        <Text style={styles.empty}>{t('timeSlots.pickAtLeastOne')}</Text>
+      ) : availableSlots.length > 0 && !error ? (
+        <Text style={styles.hintEmpty}>{t('timeSlots.pickAtLeastOne')}</Text>
       ) : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: 16 },
+  wrap: {
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    padding: 2,
+  },
+  wrapError: {
+    borderColor: Stitch.colors.error,
+    backgroundColor: Stitch.colors.error + '08',
+    padding: 10,
+    marginBottom: 16,
+  },
   label: { fontSize: 13, fontWeight: '600', color: Stitch.colors.onSurfaceVariant, marginBottom: 4 },
+  required: { color: Stitch.colors.error },
   hint: { fontSize: 12, color: Stitch.colors.onSurfaceVariant, marginBottom: 10 },
   row: { flexGrow: 0, marginBottom: 4 },
   rowContent: { alignItems: 'center', paddingVertical: 2 },
@@ -105,5 +124,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, fontWeight: '600', color: Stitch.colors.onSurfaceVariant },
   chipTextOn: { color: '#fff' },
   selected: { marginTop: 10, fontSize: 13, color: Stitch.colors.primary, fontWeight: '600', lineHeight: 18 },
+  hintEmpty: { marginTop: 10, fontSize: 13, color: Stitch.colors.onSurfaceVariant },
   empty: { marginTop: 10, fontSize: 13, color: Stitch.colors.error },
+  error: { marginTop: 8, fontSize: 12, color: Stitch.colors.error, lineHeight: 17 },
 });

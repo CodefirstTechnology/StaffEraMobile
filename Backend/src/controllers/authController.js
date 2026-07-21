@@ -19,6 +19,7 @@ const {
   serializeUser
 } = require("../services/roleService");
 const { notifyNearbyAgentsOfRegistration } = require("../services/agentRegistrationService");
+const { INACTIVE_ACCOUNT_MESSAGE } = require("../constants/authMessages");
 
 const sanitizeUser = (user) => serializeUser(user);
 
@@ -272,18 +273,14 @@ exports.login = async (req, res) => {
     throw new ApiError(401, "Invalid email or password");
   }
 
-  if (!user.isActive) {
-    if (getRoleCode(user) === "SERVANT") {
-      throw new ApiError(
-        403,
-        "Your application is under review. An agent will contact you with login details."
-      );
-    }
+  const valid = await bcrypt.compare(password, user.password);
+  if (!valid) {
     throw new ApiError(401, "Invalid email or password");
   }
 
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) throw new ApiError(401, "Invalid email or password");
+  if (!user.isActive) {
+    throw new ApiError(403, INACTIVE_ACCOUNT_MESSAGE);
+  }
 
   if (getRoleCode(user) === "SERVANT" && !user.servant) {
     throw new ApiError(403, "Servant profile not found. Contact your agent.");
@@ -390,6 +387,50 @@ exports.updatePreferences = async (req, res) => {
   const user = await prisma.user.update({
     where: { id: req.user.id },
     data: { preferredLanguage },
+    include: {
+      houseOwner: true,
+      servant: { include: { skills: true, zones: true } },
+      agent: true,
+      ...userWithRoleInclude
+    }
+  });
+
+  sendSuccess(res, { user: sanitizeUser(user) });
+};
+
+exports.updateProfile = async (req, res) => {
+  const { name, email, phone } = req.body;
+
+  const normalizedEmail =
+    email !== undefined ? normalizeEmail(String(email)) : undefined;
+  const normalizedPhone =
+    phone !== undefined ? String(phone ?? "").replace(/\D/g, "") || null : undefined;
+
+  if (normalizedEmail !== undefined) {
+    const existingEmail = await prisma.user.findFirst({
+      where: { email: normalizedEmail, NOT: { id: req.user.id } }
+    });
+    if (existingEmail) {
+      throw new ApiError(400, "Email is already in use");
+    }
+  }
+
+  if (normalizedPhone) {
+    const existingPhone = await prisma.user.findFirst({
+      where: { phone: normalizedPhone, NOT: { id: req.user.id } }
+    });
+    if (existingPhone) {
+      throw new ApiError(400, "Phone number is already in use");
+    }
+  }
+
+  const user = await prisma.user.update({
+    where: { id: req.user.id },
+    data: {
+      ...(name !== undefined && { name: String(name).trim() }),
+      ...(normalizedEmail !== undefined && { email: normalizedEmail }),
+      ...(normalizedPhone !== undefined && { phone: normalizedPhone })
+    },
     include: {
       houseOwner: true,
       servant: { include: { skills: true, zones: true } },

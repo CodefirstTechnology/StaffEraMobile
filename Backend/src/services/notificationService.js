@@ -27,4 +27,62 @@ const findUsersNotifiedForOpenBooking = async (bookingId) => {
   return [...new Set(rows.map((row) => row.userId))];
 };
 
-module.exports = { createNotification, findUsersNotifiedForOpenBooking };
+const WORK_COMPLETED_TYPE = "WORK_COMPLETED";
+
+const hasWorkCompletedNotification = async (timeEntryId) => {
+  const existing = await prisma.notification.findFirst({
+    where: {
+      type: WORK_COMPLETED_TYPE,
+      data: {
+        path: ["timeEntryId"],
+        equals: timeEntryId
+      }
+    },
+    select: { id: true }
+  });
+  return Boolean(existing);
+};
+
+const buildWorkCompletedData = ({ booking, servant, timeEntry, completedAt }) => {
+  const helperName = servant?.user?.name || "Your helper";
+  const toIso = (value) => (value ? new Date(value).toISOString() : null);
+
+  return {
+    bookingId: booking.id,
+    helperName,
+    completedAt: completedAt.toISOString(),
+    timeEntryId: timeEntry.id,
+    workDetails: {
+      clockIn: toIso(timeEntry.clockIn),
+      clockOut: toIso(timeEntry.clockOut),
+      hoursWorked: timeEntry.hoursWorked ?? null,
+      bookingType: booking.bookingType,
+      requestedSkill: booking.requestedSkill ?? null,
+      sessionDate: toIso(booking.sessionDate),
+      sessionStartTime: booking.sessionStartTime ?? null,
+      sessionEndTime: booking.sessionEndTime ?? null
+    }
+  };
+};
+
+/** Notify house owner once per successful helper checkout (clock-out). */
+const notifyWorkCompletedOnce = async ({ userId, booking, servant, timeEntry, completedAt }) => {
+  if (!userId || !timeEntry?.id) return null;
+  if (await hasWorkCompletedNotification(timeEntry.id)) return null;
+
+  return createNotification({
+    userId,
+    title: "Work Completed",
+    body: "Your assigned helper has completed the scheduled work.",
+    type: WORK_COMPLETED_TYPE,
+    data: buildWorkCompletedData({ booking, servant, timeEntry, completedAt })
+  });
+};
+
+module.exports = {
+  createNotification,
+  findUsersNotifiedForOpenBooking,
+  notifyWorkCompletedOnce,
+  hasWorkCompletedNotification,
+  WORK_COMPLETED_TYPE
+};

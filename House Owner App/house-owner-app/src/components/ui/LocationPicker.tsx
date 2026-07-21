@@ -6,10 +6,10 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   ScrollView,
   Platform,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +26,7 @@ type Props = {
   label?: string;
   placeholder?: string;
   height?: number;
+  error?: string;
 };
 
 export function LocationPicker({
@@ -34,6 +35,7 @@ export function LocationPicker({
   label,
   placeholder,
   height = 220,
+  error,
 }: Props) {
   const { t } = useTranslation();
   const pickerLabel = label ?? t('location.label');
@@ -99,7 +101,7 @@ export function LocationPicker({
       await applyLocation(location);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(
+      showAlert(
         t('location.errorTitle'),
         err.response?.data?.message || t('location.couldNotResolve'),
       );
@@ -115,7 +117,7 @@ export function LocationPicker({
       await applyLocation(location);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(
+      showAlert(
         t('location.errorTitle'),
         err.response?.data?.message || t('location.couldNotLoadPlace'),
       );
@@ -129,7 +131,7 @@ export function LocationPicker({
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t('location.permissionTitle'), t('location.permissionBody'));
+        showAlert(t('location.permissionTitle'), t('location.permissionBody'));
         return;
       }
       const pos = await Location.getCurrentPositionAsync({
@@ -137,7 +139,7 @@ export function LocationPicker({
       });
       await resolveCoords(pos.coords.latitude, pos.coords.longitude);
     } catch {
-      Alert.alert(t('location.errorTitle'), t('location.couldNotReadGps'));
+      showAlert(t('location.errorTitle'), t('location.couldNotReadGps'));
     } finally {
       setResolving(false);
     }
@@ -150,7 +152,7 @@ export function LocationPicker({
   return (
     <View style={styles.wrap}>
       {pickerLabel ? <Text style={styles.label}>{pickerLabel}</Text> : null}
-      <View style={styles.searchRow}>
+      <View style={[styles.searchRow, error ? styles.searchRowError : null]}>
         <MaterialIcons name="search" size={20} color={Stitch.colors.onSurfaceVariant} />
         <TextInput
           value={query}

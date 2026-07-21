@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { useTranslation } from 'react-i18next';
+import { te } from '@/lib/i18n/alertMessages';
 import { Stitch } from '@/theme/stitch';
 import { getPasswordStrength } from '@/lib/passwordStrength';
 
@@ -15,7 +15,6 @@ const LEVEL_COLORS = {
 } as const;
 
 export function PasswordStrengthIndicator({ password }: Props) {
-  const { t } = useTranslation();
   const strength = getPasswordStrength(password);
 
   if (strength.level === 'empty') return null;
@@ -52,13 +51,13 @@ export function PasswordStrengthIndicator({ password }: Props) {
           />
         ))}
       </View>
-      <Text style={[styles.label, { color: activeColor }]}>{t(labelKey)}</Text>
+      <Text style={[styles.label, { color: activeColor }]}>{te(labelKey)}</Text>
       <View style={styles.hints}>
-        <Hint ok={strength.hasMinLength} label={t('auth.passwordStrength.minLength')} />
-        <Hint ok={strength.hasUpper} label={t('auth.passwordStrength.upper')} />
-        <Hint ok={strength.hasLower} label={t('auth.passwordStrength.lower')} />
-        <Hint ok={strength.hasDigit} label={t('auth.passwordStrength.digit')} />
-        <Hint ok={strength.hasSpecial} label={t('auth.passwordStrength.special')} />
+        <Hint ok={strength.hasMinLength} label={te('auth.passwordStrength.minLength')} />
+        <Hint ok={strength.hasUpper} label={te('auth.passwordStrength.upper')} />
+        <Hint ok={strength.hasLower} label={te('auth.passwordStrength.lower')} />
+        <Hint ok={strength.hasDigit} label={te('auth.passwordStrength.digit')} />
+        <Hint ok={strength.hasSpecial} label={te('auth.passwordStrength.special')} />
       </View>
     </View>
   );

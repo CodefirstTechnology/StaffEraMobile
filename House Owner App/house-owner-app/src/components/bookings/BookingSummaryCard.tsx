@@ -47,10 +47,12 @@ export function BookingSummaryCard({
   booking,
   skills = [],
   onPress,
+  style,
 }: {
   booking: BookingSummary;
   skills?: Skill[];
   onPress: () => void;
+  style?: object;
 }) {
   const { t } = useTranslation();
   const helperName = booking.servant?.user?.name;
@@ -60,11 +62,11 @@ export function BookingSummaryCard({
   const when = formatBookingWhen(booking);
   const visitType =
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
-  const canTrack = booking.status === 'CONFIRMED';
+  const canTrack = booking.status === 'CONFIRMED' || booking.status === 'ACTIVE';
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-      <GlassCard style={styles.card}>
+      <GlassCard style={[styles.card, style]}>
         <View style={styles.topRow}>
           <View style={styles.avatar}>
             <MaterialIcons
@@ -126,12 +128,54 @@ export function BookingSummaryCard({
   );
 }
 
-const ACTIVE_STATUSES = ['PENDING', 'CONFIRMED', 'ACTIVE'];
+const ACTIVE_STATUSES = ['PENDING', 'CONFIRMED', 'ACTIVE', 'OTP_PENDING', 'ARRIVED'];
 const RECENT_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED', 'EXPIRED'];
 
+const ACTIVE_RANK: Record<string, number> = {
+  ACTIVE: 0,
+  CONFIRMED: 1,
+  OTP_PENDING: 1,
+  ARRIVED: 1,
+  PENDING: 2,
+};
+
+function normalizeStatus(status: string): string {
+  const upper = String(status || '').toUpperCase().trim();
+  if (upper === 'OTP_PENDING' || upper === 'ARRIVED') return 'CONFIRMED';
+  return upper;
+}
+
+function bookingSortKey(booking: BookingSummary): number {
+  const when = booking.sessionDate || booking.createdAt;
+  return when ? new Date(when).getTime() : 0;
+}
+
 export function splitBookings(bookings: BookingSummary[]) {
-  const active = bookings.filter((b) => ACTIVE_STATUSES.includes(b.status));
-  const recent = bookings.filter((b) => RECENT_STATUSES.includes(b.status));
+  const active: BookingSummary[] = [];
+  const recent: BookingSummary[] = [];
+
+  for (const booking of bookings) {
+    const status = normalizeStatus(booking.status);
+    const row = status === booking.status ? booking : { ...booking, status };
+    if (ACTIVE_STATUSES.includes(status)) {
+      active.push(row);
+    } else if (RECENT_STATUSES.includes(status)) {
+      recent.push(row);
+    } else {
+      active.push(row);
+    }
+  }
+
+  active.sort((a, b) => {
+    const rankDiff =
+      (ACTIVE_RANK[normalizeStatus(a.status)] ?? 99) -
+      (ACTIVE_RANK[normalizeStatus(b.status)] ?? 99);
+    if (rankDiff !== 0) return rankDiff;
+    return bookingSortKey(b) - bookingSortKey(a);
+  });
+
+  recent.sort((a, b) => bookingSortKey(b) - bookingSortKey(a));
+
   return { active, recent };
 }
 

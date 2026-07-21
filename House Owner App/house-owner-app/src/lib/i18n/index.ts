@@ -54,3 +54,5 @@ export function translateVerification(status: string): string {
 }
 
 export default i18n;
+
+export { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';

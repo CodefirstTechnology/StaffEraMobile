@@ -1,7 +1,9 @@
-import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { showAlert } from '@/lib/alert';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
@@ -18,6 +20,9 @@ import { localizedSkillLabel } from '@/lib/skills';
 import { useSkills } from '@/hooks/useSkills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { BookingWorkTimesCard } from '@/components/bookings/BookingWorkTimesCard';
+import { getBookingEditMode } from '@/lib/bookingEdit';
+import { bookingDetailPollInterval } from '@/lib/bookingPoll';
 
 export default function BookingDetailScreen() {
   const { t } = useTranslation();
@@ -26,18 +31,21 @@ export default function BookingDetailScreen() {
   const bookingId = id ? parseInt(id, 10) : null;
   const qc = useQueryClient();
 
-  const { data: booking, isLoading } = useQuery({
+  const { data: booking, isLoading, refetch } = useQuery({
     queryKey: ['booking', id],
     enabled: !!id,
     queryFn: async () => {
       const res = await api.get(`/bookings/${id}`);
       return res.data.data.booking;
     },
-    refetchInterval: (query) => {
-      const b = query.state.data;
-      return b?.status === 'PENDING' && !b?.servant ? 5000 : false;
-    },
+    refetchInterval: (query) => bookingDetailPollInterval(query.state.data),
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (id) void refetch();
+    }, [id, refetch]),
+  );
 
   const isOpenBroadcast = booking?.status === 'PENDING' && !booking?.servant;
 
@@ -82,11 +90,12 @@ export default function BookingDetailScreen() {
     try {
       await api.patch(`/bookings/${id}/cancel`);
       qc.invalidateQueries({ queryKey: ['bookings'] });
+      qc.invalidateQueries({ queryKey: ['home-summary'] });
       qc.invalidateQueries({ queryKey: ['booking', id] });
-      Alert.alert(t('bookings.cancelledTitle'), t('bookings.bookingCancelled'));
+      showAlert(t('bookings.cancelledTitle'), t('bookings.bookingCancelled'));
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(t('bookings.requestFailed'), err.response?.data?.message || t('bookings.couldNotCancel'));
+      showAlert(t('bookings.requestFailed'), err.response?.data?.message || t('bookings.couldNotCancel'));
     }
   };
 
@@ -127,6 +136,7 @@ export default function BookingDetailScreen() {
   const visitDate = booking.sessionDate ? formatDate(booking.sessionDate) : null;
   const visitType =
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
+  const editMode = getBookingEditMode(booking.status);
 
   return (
     <View style={styles.root}>
@@ -172,7 +182,12 @@ export default function BookingDetailScreen() {
             {formatCurrency(booking.totalAmount)}
           </Text>
         )}
+        {booking.notes ? (
+          <Text style={styles.row}>{t('bookings.notesRow', { notes: booking.notes })}</Text>
+        ) : null}
       </GlassCard>
+
+      <BookingWorkTimesCard booking={booking} style={{ marginTop: 16 }} />
 
       {helperSharing && canTrack && booking.status === 'CONFIRMED' ? (
         <View style={styles.onWayBanner}>
@@ -211,10 +226,10 @@ export default function BookingDetailScreen() {
                 try {
                   await api.patch(`/bookings/${id}/request-extension`);
                   qc.invalidateQueries({ queryKey: ['booking', id] });
-                  Alert.alert("Success", "Extension requested. Waiting for helper's approval.");
+                  showAlert("Success", "Extension requested. Waiting for helper's approval.");
                 } catch (e: unknown) {
                   const err = e as { response?: { data?: { message?: string } } };
-                  Alert.alert("Failed to extend", err.response?.data?.message || "Could not request extension.");
+                  showAlert("Failed to extend", err.response?.data?.message || "Could not request extension.");
                 }
               }}
               style={{ marginTop: 12 }}
@@ -249,6 +264,13 @@ export default function BookingDetailScreen() {
           )}
         </View>
       )}
+      {editMode !== 'none' ? (
+        <GradientButton
+          title={t('bookings.editBooking')}
+          onPress={() => router.push(`/(main)/bookings/edit/${id}`)}
+          style={{ marginTop: 20 }}
+        />
+      ) : null}
 
       {['PENDING', 'CONFIRMED'].includes(booking.status) && (
         <GradientButton

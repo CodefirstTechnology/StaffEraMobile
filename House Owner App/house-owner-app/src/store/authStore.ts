@@ -3,11 +3,13 @@ import api from '@/lib/api';
 import { clearAuthTokens, getToken, setToken } from '@/lib/tokenStorage';
 import { useLanguageStore } from '@/store/languageStore';
 import i18n, { isSupportedLanguage } from '@/lib/i18n';
+import { te } from '@/lib/i18n/alertMessages';
 
 type User = {
   id: number;
   name: string;
   email: string;
+  phone?: string | null;
   role: string;
   preferredLanguage?: string;
   houseOwner?: {
@@ -66,7 +68,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       throw {
         response: {
           data: {
-            message: i18n.t('auth.wrongRole'),
+            message: te('auth.wrongRole'),
           },
         },
       };

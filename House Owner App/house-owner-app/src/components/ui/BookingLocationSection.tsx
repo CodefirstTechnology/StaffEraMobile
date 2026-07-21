@@ -28,6 +28,7 @@ type Props = {
   onLocationChange: (location: LocationValue | null) => void;
   addressUnit: AddressUnitValue;
   onAddressUnitChange: (value: AddressUnitValue) => void;
+  locationError?: string;
 };
 
 export function BookingLocationSection({
@@ -38,6 +39,7 @@ export function BookingLocationSection({
   onLocationChange,
   addressUnit,
   onAddressUnitChange,
+  locationError,
 }: Props) {
   const { t } = useTranslation();
   const { location: liveLocation, loading: locLoading, error: locError } = useLiveLocation();
@@ -71,8 +73,11 @@ export function BookingLocationSection({
     : [];
 
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.sectionLabel}>{t('bookings.bookingLocation')}</Text>
+    <View style={[styles.wrap, locationError ? styles.wrapError : null]}>
+      <Text style={styles.sectionLabel}>
+        {t('bookings.bookingLocation')}
+        <Text style={styles.required}> *</Text>
+      </Text>
 
       <View style={styles.toggle}>
         <TouchableOpacity
@@ -119,7 +124,7 @@ export function BookingLocationSection({
       ) : null}
 
       {mode === 'home' && savedHome ? (
-        <View style={styles.homeCard}>
+        <View style={[styles.homeCard, locationError ? styles.homeCardError : null]}>
           <View style={styles.homeCardHead}>
             <MaterialIcons name="home" size={20} color={Stitch.colors.secondary} />
             <Text style={styles.homeCardTitle}>{t('bookings.savedHomeHint')}</Text>
@@ -148,24 +153,39 @@ export function BookingLocationSection({
             }
             value={location}
             onChange={onLocationChange}
+            error={locationError}
           />
           <Text style={styles.hint}>{t('bookings.currentLocationHint')}</Text>
         </>
       )}
 
       <AddressUnitFields value={addressUnit} onChange={onAddressUnitChange} />
+      {locationError ? <Text style={styles.fieldError}>{locationError}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: 8 },
+  wrap: {
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    padding: 2,
+  },
+  wrapError: {
+    borderColor: Stitch.colors.error,
+    backgroundColor: Stitch.colors.error + '08',
+    padding: 10,
+    marginBottom: 8,
+  },
   sectionLabel: {
     fontSize: 15,
     fontWeight: '700',
     color: Stitch.colors.onBackground,
     marginBottom: 12,
   },
+  required: { color: Stitch.colors.error },
   toggle: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   toggleBtn: {
     flex: 1,
@@ -211,6 +231,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Stitch.colors.outlineVariant + '55',
   },
+  homeCardError: {
+    borderColor: Stitch.colors.error,
+  },
   homeCardHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -249,5 +272,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Stitch.colors.error,
     marginBottom: 8,
+  },
+  fieldError: {
+    fontSize: 12,
+    color: Stitch.colors.error,
+    marginTop: 4,
+    lineHeight: 17,
   },
 });

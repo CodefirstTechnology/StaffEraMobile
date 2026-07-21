@@ -6,6 +6,7 @@
     "saving": "Saving…",
     "save": "Save",
     "cancel": "Cancel",
+    "ok": "OK",
     "confirm": "Confirm",
     "delete": "Delete",
     "edit": "Edit",
@@ -66,8 +67,8 @@
     "logoutConfirmTitle": "Sign out?",
     "logoutConfirmMessage": "Are you sure you want to log out?",
     "newAccount": "New here? Create your account",
-    "loginFailed": "Login failed",
-    "tryAgain": "Please try again",
+    "loginFailed": "Sign in failed",
+    "tryAgain": "Please try again.",
     "wrongRole": "This account is not a house owner. Use the Servant or Agent app.",
     "wrongRoleServant": "This account is not a servant. Use the House Owner or Agent app.",
     "joinTitle": "Join StaffEra",
@@ -76,7 +77,7 @@
     "phone": "Phone (+91)",
     "confirmPassword": "Confirm password",
     "createAccount": "Create account",
-    "passwordMismatch": "Passwords do not match",
+    "passwordMismatch": "Passwords do not match.",
     "registrationFailed": "Registration failed",
     "registrationSuccess": "User created successfully",
     "passwordStrength": {
@@ -97,22 +98,26 @@
     "servantSubtitle": "Sign in with the email your agent registered. Earn with dignity — on your schedule.",
     "noSelfSignup": "No self-signup. Your agent creates your account and verifies your ID.",
     "invalidCredentials": "Invalid username or password. Please try again.",
+    "accountInactive": "Your account is inactive. Please contact the administrator.",
     "networkLocalhost": "Cannot reach the server. On a real phone, set EXPO_PUBLIC_API_BASE_URL in .env to your PC IP (run ipconfig), then restart: npx expo start -c",
     "networkGeneric": "Cannot reach {{base}}\n\n• Backend running? (npm start in Backend)\n• Phone on same Wi‑Fi as PC (not mobile data)\n• Windows Firewall: allow Node/port 5000\n• Restart app after .env change: npx expo start -c"
   },
   "validation": {
-    "emailInvalid": "Enter a valid username (email address)",
-    "usernameRequired": "Username required",
-    "passwordRequired": "Password required",
-    "nameMin": "Name must be at least 2 characters",
-    "passwordMin": "Password must be at least 6 characters",
-    "phoneInvalid": "Enter a valid 10-digit phone number",
-    "locationRequired": "Location required",
+    "emailInvalid": "Enter a valid username (email address).",
+    "usernameRequired": "Username is required.",
+    "passwordRequired": "Password is required.",
+    "credentialsRequired": "Username and password are required.",
+    "nameMin": "Name must be at least 2 characters.",
+    "passwordMin": "Password must be at least 6 characters.",
+    "phoneInvalid": "Enter a valid 10-digit phone number.",
+    "locationRequired": "Location is required.",
     "pickHomeFirst": "Pick your home location first."
   },
   "errors": {
-    "generic": "Something went wrong",
+    "generic": "Something went wrong.",
     "couldNotSave": "Could not save location",
+    "couldNotSaveProfile": "Could not update profile. Check your connection and try again.",
+    "profileEndpointMissing": "Profile update is unavailable — restart the backend server and try again.",
     "loadFailed": "Failed to load data"
   },
   "success": {
@@ -151,7 +156,10 @@
     "privacyHint": "Helper names are private — send a request and the first available helper in your area will accept.",
     "whatNeed": "What do you need?",
     "yourBookings": "Your bookings",
-    "noBookingsYet": "No bookings yet — tap Send request now above"
+    "noBookingsYet": "No bookings yet — tap Send request now above",
+    "activeInquiries": "Active inquiries",
+    "inquiryWaiting_one": "Waiting for {{count}} helper to respond",
+    "inquiryWaiting_other": "Waiting for {{count}} helpers to respond"
   },
   "browse": {
     "findHelp": "Find verified help",
@@ -201,6 +209,7 @@
   },
   "bookings": {
     "myBookings": "My bookings",
+    "totalCount": "{{count}} booking(s)",
     "activeAndRecent": "Active requests and recent visits",
     "noBookingsTitle": "No bookings yet",
     "noBookingsSub": "Send a request from Home — nearby helpers will see it and the first to accept is assigned to you.",
@@ -212,6 +221,17 @@
     "newBooking": "New booking",
     "areaRequest": "Area request",
     "bookingDetails": "Booking details",
+    "workDetails": "Work details",
+    "workStartTime": "Start time",
+    "workEndTime": "End time",
+    "workInProgress": "In progress",
+    "editBooking": "Edit booking",
+    "saveChanges": "Save changes",
+    "updateSuccess": "Booking updated successfully",
+    "updateFailed": "Could not update booking",
+    "cannotEdit": "Completed or cancelled bookings cannot be edited.",
+    "editNotesOnlyHint": "Work is in progress — only notes can be changed.",
+    "notesRow": "Notes: {{notes}}",
     "cancelBooking": "Cancel booking",
     "writeReview": "Write a review",
     "liveTracking": "Live tracking",
@@ -229,6 +249,12 @@
     "reviewSubmitted": "Your review was submitted.",
     "selectHelperFirst": "Select a helper from Browse first",
     "visitLocationRequired": "Please set the visit location on the map.",
+    "validationTitle": "Required fields missing",
+    "fixRequiredFields": "Please complete all highlighted fields before submitting.",
+    "startTimeRequired": "Enter a start time.",
+    "endTimeRequired": "Enter an end time.",
+    "invalidTimeFormat": "Enter time as HH:MM (24-hour format).",
+    "invalidTimeRange": "End time must be after start time.",
     "categoryRequired": "Select what type of help you need.",
     "timeSlotRequired": "Select at least one time slot.",
     "locationRequiredShort": "Allow live location or pick your address on the map.",
@@ -327,7 +353,11 @@
     "useCurrentLocation": "Use current location",
     "pickHint": "Pick a place from search, tap the map, or use GPS.",
     "webMapHint": "Search for an address above or use your current location. Interactive map is available in the Android/iOS app.",
-    "webGpsHint": "Search for a place or use GPS to set location."
+    "webGpsHint": "Search for a place or use GPS to set location.",
+    "servicesRequiredTitle": "Location Services required",
+    "servicesRequiredBody": "StaffEra needs Location Services enabled to find verified helpers near you. Turn on Location Services in your device settings, then return to the app.",
+    "enableLocationServices": "Enable Location",
+    "checkAgain": "I've enabled it — check again"
   },
   "skills": {
     "COOKING": "Cooking",
@@ -379,6 +409,11 @@
     "noHomeYet": "No home address saved yet. Add one so you can use it for bookings.",
     "addHomeLocation": "Add home address",
     "saveHomeLocation": "Save home location",
+    "accountDetails": "Account details",
+    "accountDetailsSub": "Your name, email, and phone used for bookings",
+    "editAccount": "Edit account",
+    "editDetails": "Edit profile details",
+    "profileUpdated": "Profile updated successfully",
     "flatNo": "Flat / house no.",
     "building": "Building / society name",
     "area": "Area / locality"
@@ -474,6 +509,10 @@
     "BOOKING_COMPLETED": {
       "title": "Booking completed",
       "body": "Your booking has been marked completed"
+    },
+    "WORK_COMPLETED": {
+      "title": "Work Completed",
+      "body": "Your assigned helper has completed the scheduled work."
     },
     "CLOCK_IN": {
       "title": "Helper has arrived",

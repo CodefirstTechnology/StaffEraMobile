@@ -6,9 +6,9 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
+import { showAlert } from '@/lib/alert';
 import * as Location from 'expo-location';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -23,6 +23,7 @@ type Props = {
   label?: string;
   placeholder?: string;
   height?: number;
+  error?: string;
 };
 
 export function LocationPicker({
@@ -31,6 +32,7 @@ export function LocationPicker({
   label,
   placeholder,
   height = 220,
+  error,
 }: Props) {
   const { t } = useTranslation();
   const pickerLabel = label ?? t('location.label');
@@ -79,7 +81,7 @@ export function LocationPicker({
       applyLocation(location);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(
+      showAlert(
         t('location.errorTitle'),
         err.response?.data?.message || t('location.couldNotLoadPlace'),
       );
@@ -93,7 +95,7 @@ export function LocationPicker({
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t('location.permissionTitle'), t('location.permissionBody'));
+        showAlert(t('location.permissionTitle'), t('location.permissionBody'));
         return;
       }
       const pos = await Location.getCurrentPositionAsync({
@@ -103,7 +105,7 @@ export function LocationPicker({
       applyLocation(location);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert(
+      showAlert(
         t('location.errorTitle'),
         err.response?.data?.message || t('location.couldNotReadGps'),
       );
@@ -115,7 +117,7 @@ export function LocationPicker({
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>{pickerLabel}</Text>
-      <View style={styles.searchRow}>
+      <View style={[styles.searchRow, error ? styles.searchRowError : null]}>
         <MaterialIcons name="search" size={20} color={Stitch.colors.onSurfaceVariant} />
         <TextInput
           value={query}
