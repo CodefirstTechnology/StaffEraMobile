@@ -24,7 +24,7 @@ const {
   servantCoversLocation,
   bookingMatchesServantSkill
 } = require("../services/locationService");
-const { buildHomeSummary } = require("../services/homeService");
+const { buildHomeSummary, getAvailableHelpersForOpenBooking } = require("../services/homeService");
 
 const bookingInclude = {
   servant: {
@@ -589,7 +589,18 @@ exports.declineOpenRequest = async (req, res) => {
   }
 
   await recordOpenRequestDecline(servant, id, reason);
-  sendSuccess(res, { booking: normalizeBookingRow(booking), declined: true });
+
+  let updatedBooking = booking;
+  const availableHelpers = await getAvailableHelpersForOpenBooking(booking);
+  if (availableHelpers.length === 0) {
+    updatedBooking = await prisma.booking.update({
+      where: { id },
+      data: { status: "EXPIRED" },
+      include: bookingInclude
+    });
+  }
+
+  sendSuccess(res, { booking: normalizeBookingRow(updatedBooking), declined: true });
 };
 
 exports.rejectBooking = async (req, res) => {
