@@ -33,9 +33,12 @@ import api from '@/lib/api';
 import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
 import { useToast } from '@/providers/ToastProvider';
 
-function phoneErrorMessage(kind: ReturnType<typeof getPhoneValidationKind>) {
-  if (kind === 'required') return te('validation.phoneRequired');
-  if (kind === 'invalid') return te('validation.phoneInvalid');
+function phoneErrorMessage(
+  kind: ReturnType<typeof getPhoneValidationKind>,
+  t: (key: string) => string,
+) {
+  if (kind === 'required') return t('profile.mobileRequired');
+  if (kind === 'invalid') return t('profile.mobileInvalid');
   return '';
 }
 
@@ -132,7 +135,7 @@ export default function ProfileScreen() {
 
   const validatePhoneField = (value: string) => {
     const kind = getPhoneValidationKind(value, { required: true, exactLength: 10 });
-    const msg = phoneErrorMessage(kind);
+    const msg = phoneErrorMessage(kind, t);
     setPhoneError(msg);
     return !kind;
   };
@@ -261,7 +264,9 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <View style={styles.headerRow}>
-        <Text style={styles.screenTitle}>{t('profile.title')}</Text>
+        <Text style={styles.screenTitle}>
+          {editingAccount ? t('profile.editProfile') : t('profile.title')}
+        </Text>
         {!editingAccount ? (
           <TouchableOpacity style={styles.editIconBtn} onPress={startEditingAccount} hitSlop={8}>
             <MaterialIcons name="edit" size={24} color={Stitch.colors.primary} />
@@ -271,7 +276,6 @@ export default function ProfileScreen() {
 
       {editingAccount ? (
         <GlassCard style={styles.accountCard}>
-          <Text style={styles.editTitle}>{t('profile.editDetails')}</Text>
           <GhostInput
             label={t('auth.fullName')}
             value={name}
@@ -287,7 +291,7 @@ export default function ProfileScreen() {
             placeholder={t('auth.email')}
           />
           <GhostInput
-            label={t('auth.phone')}
+            label={t('profile.mobileNumber')}
             value={phone}
             onChangeText={(value) => {
               setPhone(digitsOnlyPhone(value).slice(0, 10));
@@ -295,7 +299,7 @@ export default function ProfileScreen() {
             }}
             onBlur={() => validatePhoneField(phone)}
             keyboardType="phone-pad"
-            placeholder={t('auth.phone')}
+            placeholder={t('profile.mobileNumber')}
             required
             error={phoneError}
             maxLength={10}

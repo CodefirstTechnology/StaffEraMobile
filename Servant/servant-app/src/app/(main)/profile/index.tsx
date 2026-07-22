@@ -25,8 +25,8 @@ function phoneErrorMessage(
   kind: ReturnType<typeof getPhoneValidationKind>,
   t: (key: string) => string,
 ) {
-  if (kind === 'required') return t('validation.mobileRequired');
-  if (kind === 'invalid') return t('auth.mobileInvalid');
+  if (kind === 'required') return t('profile.mobileRequired');
+  if (kind === 'invalid') return t('profile.mobileInvalid');
   return '';
 }
 
@@ -223,7 +223,9 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <View style={styles.headerRow}>
-        <Text style={styles.screenTitle}>{t('profile.title')}</Text>
+        <Text style={styles.screenTitle}>
+          {editing ? t('profile.editProfile') : t('profile.title')}
+        </Text>
         {!editing ? (
           <TouchableOpacity style={styles.editIconBtn} onPress={startEditing} hitSlop={8}>
             <MaterialIcons name="edit" size={24} color={Stitch.colors.primary} />
@@ -233,7 +235,6 @@ export default function ProfileScreen() {
 
       {editing ? (
         <GlassCard style={styles.sectionCard}>
-          <Text style={styles.editTitle}>{t('profile.editDetails')}</Text>
           <GhostInput
             label={t('auth.fullName')}
             value={name}
@@ -249,7 +250,7 @@ export default function ProfileScreen() {
             placeholder={t('auth.email')}
           />
           <GhostInput
-            label={t('auth.mobile')}
+            label={t('profile.mobileNumber')}
             value={phone}
             onChangeText={(value) => {
               setPhone(digitsOnlyPhone(value).slice(0, 10));
@@ -257,7 +258,7 @@ export default function ProfileScreen() {
             }}
             onBlur={() => validatePhoneField(phone)}
             keyboardType="phone-pad"
-            placeholder={t('auth.mobile')}
+            placeholder={t('profile.mobileNumber')}
             required
             error={phoneError}
             maxLength={10}

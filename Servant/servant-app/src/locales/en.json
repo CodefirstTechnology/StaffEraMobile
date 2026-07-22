@@ -355,7 +355,11 @@
   },
   "profile": {
     "title": "Profile",
+    "editProfile": "Edit Profile",
     "editDetails": "Edit profile details",
+    "mobileNumber": "Mobile number",
+    "mobileRequired": "Please enter your mobile number.",
+    "mobileInvalid": "Please enter a valid 10-digit mobile number.",
     "profileUpdated": "Profile updated successfully",
     "houseOwner": "House owner",
     "homeLocation": "Home location",
