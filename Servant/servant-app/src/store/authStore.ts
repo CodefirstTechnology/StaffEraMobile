@@ -5,10 +5,11 @@ import { clearAuthTokens, getToken, setToken } from '@/lib/tokenStorage';
 import { useLanguageStore } from '@/store/languageStore';
 import i18n, { isSupportedLanguage } from '@/lib/i18n';
 
-type User = {
+export type User = {
   id: number;
   name: string;
   email: string;
+  phone?: string | null;
   role: string;
   preferredLanguage?: string;
   servant?: { id: number; verificationStatus: string; profilePhoto?: string | null };
@@ -22,6 +23,7 @@ type AuthState = {
   submitApplication: (data: Record<string, unknown>) => Promise<string>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
+  setUser: (user: User | null) => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -95,6 +97,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     await clearAuthTokens();
     set({ user: null, isAuthenticated: false });
   },
+
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
 }));
 
 setSessionExpiredHandler(() => {

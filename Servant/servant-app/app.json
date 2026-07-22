@@ -44,7 +44,14 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow StaffEra to access your photos so you can choose a profile picture.",
+          "cameraPermission": "Allow StaffEra to use your camera so you can take a profile picture."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -367,7 +367,20 @@
     "saveHomeLocation": "Save home location",
     "flatNo": "Flat / house no.",
     "building": "Building / society name",
-    "area": "Area / locality"
+    "area": "Area / locality",
+    "choosePhotoSource": "Update profile photo",
+    "choosePhotoSourceSub": "Choose how you want to add your photo.",
+    "chooseFromGallery": "Choose from gallery",
+    "takePhoto": "Take a photo",
+    "photoPreviewTitle": "Preview profile photo",
+    "photoPreviewSub": "Crop your photo in the previous step, then tap Save to upload it.",
+    "photoPermissionTitle": "Photo access needed",
+    "photoPermissionBody": "Please allow access to your photos so you can choose a profile picture. You can enable this in Settings.",
+    "cameraPermissionTitle": "Camera access needed",
+    "cameraPermissionBody": "Please allow camera access so you can take a profile picture. You can enable this in Settings.",
+    "photoTooLarge": "Please choose an image that is 3 MB or less.",
+    "photoUpdated": "Profile photo updated successfully",
+    "photoUploadFailed": "Could not upload your profile photo. Please try again."
   },
   "notifications": {
     "title": "Notifications",

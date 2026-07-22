@@ -267,7 +267,20 @@
     "saveHomeLocation": "घराचे स्थान सेव्ह",
     "flatNo": "फ्लॅट / घर क्र.",
     "building": "इमारत / सोसायटी",
-    "area": "परिसर / locality"
+    "area": "परिसर / locality",
+    "choosePhotoSource": "प्रोफाइल फोटो अपडेट करा",
+    "choosePhotoSourceSub": "फोटो कसा जोडायचा ते निवडा.",
+    "chooseFromGallery": "गॅलरीमधून निवडा",
+    "takePhoto": "फोटो काढा",
+    "photoPreviewTitle": "प्रोफाइल फोटो पूर्वावलोकन",
+    "photoPreviewSub": "मागील पायरीत फोटो क्रॉप करा, नंतर अपलोडसाठी सेव्ह टॅप करा.",
+    "photoPermissionTitle": "फोटो परवानगी आवश्यक",
+    "photoPermissionBody": "प्रोफाइल फोटो निवडण्यासाठी कृपया फोटो परवानगी द्या. तुम्ही हे सेटिंग्जमध्ये सक्षम करू शकता.",
+    "cameraPermissionTitle": "कॅमेरा परवानगी आवश्यक",
+    "cameraPermissionBody": "प्रोफाइल फोटो काढण्यासाठी कृपया कॅमेरा परवानगी द्या. तुम्ही हे सेटिंग्जमध्ये सक्षम करू शकता.",
+    "photoTooLarge": "कृपया 3 MB किंवा त्यापेक्षा लहान प्रतिमा निवडा.",
+    "photoUpdated": "प्रोफाइल फोटो यशस्वीरित्या अपडेट झाला",
+    "photoUploadFailed": "प्रोफाइल फोटो अपलोड होऊ शकला नाही. कृपया पुन्हा प्रयत्न करा."
   },
   "notifications": {
     "title": "सूचना",

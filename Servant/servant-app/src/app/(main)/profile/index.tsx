@@ -19,6 +19,8 @@ import { formatCurrency } from '@/lib/i18n/format';
 import { formatSkillLabel } from '@/lib/skills';
 import { GhostInput } from '@/components/ui/GhostInput';
 import { digitsOnlyPhone, getPhoneValidationKind } from '@/lib/phone';
+import { ensureCameraPermission, ensureMediaLibraryPermission } from '@/lib/mediaPermissions';
+import { ProfilePhotoPreviewModal } from '@/components/profile/ProfilePhotoPreviewModal';
 import { useToast } from '@/providers/ToastProvider';
 
 function phoneErrorMessage(
@@ -45,6 +47,9 @@ export default function ProfileScreen() {
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [pendingPhotoUri, setPendingPhotoUri] = useState<string | null>(null);
+  const [photoPreviewVisible, setPhotoPreviewVisible] = useState(false);
 
   const { data: profile, refetch } = useQuery({
     queryKey: ['servant-profile'],
@@ -77,7 +82,7 @@ export default function ProfileScreen() {
   const startEditing = () => {
     setName(profile?.user?.name || user?.name || '');
     setEmail(profile?.user?.email || user?.email || '');
-    setPhone(profile?.user?.phone || user?.phone || '');
+    setPhone(profile?.user?.phone ?? user?.phone ?? '');
     setPhoneError('');
     setEditing(true);
   };
@@ -85,7 +90,7 @@ export default function ProfileScreen() {
   const cancelEditing = () => {
     setName(profile?.user?.name || user?.name || '');
     setEmail(profile?.user?.email || user?.email || '');
-    setPhone(profile?.user?.phone || user?.phone || '');
+    setPhone(profile?.user?.phone ?? user?.phone ?? '');
     setPhoneError('');
     setEditing(false);
   };
@@ -138,32 +143,76 @@ export default function ProfileScreen() {
     }
   };
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'We need access to your photos to upload a profile picture.');
+  const permissionMessages = (kind: 'library' | 'camera') => ({
+    title: t(kind === 'library' ? 'profile.photoPermissionTitle' : 'profile.cameraPermissionTitle'),
+    body: t(kind === 'library' ? 'profile.photoPermissionBody' : 'profile.cameraPermissionBody'),
+    openSettings: t('locationGate.openSettings'),
+    cancel: t('common.cancel'),
+  });
+
+  const pickerOptions: ImagePicker.ImagePickerOptions = {
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.8,
+  };
+
+  const handlePickerResult = (result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    if (asset.fileSize && asset.fileSize > 3 * 1024 * 1024) {
+      Alert.alert(t('errors.generic'), t('profile.photoTooLarge'));
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+    setPendingPhotoUri(asset.uri);
+    setPhotoPreviewVisible(true);
+  };
 
-    if (!result.canceled && result.assets?.[0]) {
-      const asset = result.assets[0];
-      if (asset.fileSize && asset.fileSize > 3 * 1024 * 1024) {
-        Alert.alert('File Too Large', 'Please select an image that is 3MB or less.');
-        return;
-      }
-      await uploadImage(asset.uri);
+  const openGallery = async () => {
+    const allowed = await ensureMediaLibraryPermission(permissionMessages('library'));
+    if (!allowed) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+    handlePickerResult(result);
+  };
+
+  const openCamera = async () => {
+    const allowed = await ensureCameraPermission(permissionMessages('camera'));
+    if (!allowed) return;
+
+    const result = await ImagePicker.launchCameraAsync(pickerOptions);
+    handlePickerResult(result);
+  };
+
+  const pickImage = () => {
+    Alert.alert(t('profile.choosePhotoSource'), t('profile.choosePhotoSourceSub'), [
+      { text: t('profile.chooseFromGallery'), onPress: () => void openGallery() },
+      { text: t('profile.takePhoto'), onPress: () => void openCamera() },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const cancelPhotoPreview = () => {
+    if (uploadingPhoto) return;
+    setPhotoPreviewVisible(false);
+    setPendingPhotoUri(null);
+  };
+
+  const confirmPhotoUpload = async () => {
+    if (!pendingPhotoUri || uploadingPhoto) return;
+    setUploadingPhoto(true);
+    try {
+      await uploadImage(pendingPhotoUri);
+      setPhotoPreviewVisible(false);
+      setPendingPhotoUri(null);
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
   const uploadImage = async (uri: string) => {
-    setSaving(true);
     try {
       const filename = uri.split('/').pop() || 'photo.jpg';
       const match = /\.(\w+)$/.exec(filename);
@@ -184,12 +233,10 @@ export default function ProfileScreen() {
 
       await refetch();
       await hydrate();
-      Alert.alert(t('success.saved') || 'Success', 'Profile photo updated successfully');
+      toast.show(t('profile.photoUpdated'), 'success');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
-      Alert.alert('Error', err.response?.data?.message || 'Could not upload image');
-    } finally {
-      setSaving(false);
+      Alert.alert(t('errors.generic'), err.response?.data?.message || t('profile.photoUploadFailed'));
     }
   };
 
@@ -221,6 +268,7 @@ export default function ProfileScreen() {
   };
 
   return (
+    <>
     <ScrollView style={styles.root} contentContainerStyle={styles.scroll}>
       <View style={styles.headerRow}>
         <Text style={styles.screenTitle}>
@@ -489,6 +537,15 @@ export default function ProfileScreen() {
         </>
       )}
     </ScrollView>
+
+    <ProfilePhotoPreviewModal
+      visible={photoPreviewVisible}
+      uri={pendingPhotoUri}
+      saving={uploadingPhoto}
+      onSave={() => void confirmPhotoUpload()}
+      onCancel={cancelPhotoPreview}
+    />
+    </>
   );
 }
 
