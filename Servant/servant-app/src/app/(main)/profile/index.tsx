@@ -18,12 +18,24 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { formatCurrency } from '@/lib/i18n/format';
 import { formatSkillLabel } from '@/lib/skills';
 import { GhostInput } from '@/components/ui/GhostInput';
+import { digitsOnlyPhone, getPhoneValidationKind } from '@/lib/phone';
+import { useToast } from '@/providers/ToastProvider';
+
+function phoneErrorMessage(
+  kind: ReturnType<typeof getPhoneValidationKind>,
+  t: (key: string) => string,
+) {
+  if (kind === 'required') return t('validation.mobileRequired');
+  if (kind === 'invalid') return t('auth.mobileInvalid');
+  return '';
+}
 
 type Zone = { id: number; name: string; city?: string | null };
 type Skill = { skillName: string };
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
+  const toast = useToast();
   const { user, logout } = useAuthStore();
   const hydrate = useAuthStore((s) => s.hydrate);
 
@@ -31,6 +43,7 @@ export default function ProfileScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const { data: profile, refetch } = useQuery({
@@ -61,26 +74,62 @@ export default function ProfileScreen() {
     }
   }, [profile]);
 
+  const startEditing = () => {
+    setName(profile?.user?.name || user?.name || '');
+    setEmail(profile?.user?.email || user?.email || '');
+    setPhone(profile?.user?.phone || user?.phone || '');
+    setPhoneError('');
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setName(profile?.user?.name || user?.name || '');
+    setEmail(profile?.user?.email || user?.email || '');
+    setPhone(profile?.user?.phone || user?.phone || '');
+    setPhoneError('');
+    setEditing(false);
+  };
+
+  const validatePhoneField = (value: string) => {
+    const kind = getPhoneValidationKind(value, { required: true, exactLength: 10 });
+    const msg = phoneErrorMessage(kind, t);
+    setPhoneError(msg);
+    return !kind;
+  };
+
   const saveProfile = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Name is required');
+      Alert.alert(t('errors.generic') || 'Error', t('validation.nameMin') || 'Name is required');
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      Alert.alert('Error', 'Valid email is required');
+      Alert.alert(
+        t('errors.generic') || 'Error',
+        t('validation.emailInvalid') || 'Valid email is required',
+      );
       return;
     }
+    if (!validatePhoneField(phone)) return;
+
+    const phoneDigits = digitsOnlyPhone(phone);
     setSaving(true);
     try {
       await api.patch('/servants/me', {
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        phone: phone.trim(),
+        phone: phoneDigits,
       });
-      await refetch();
+      const { data: refreshedProfile } = await refetch();
       await hydrate();
+      const updatedUser = refreshedProfile?.user;
+      if (updatedUser) {
+        setName(updatedUser.name || '');
+        setEmail(updatedUser.email || '');
+        setPhone(updatedUser.phone || '');
+      }
+      setPhoneError('');
       setEditing(false);
-      Alert.alert(t('success.saved') || 'Success', 'Profile updated successfully');
+      toast.show(t('profile.profileUpdated'), 'success');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       Alert.alert('Error', err.response?.data?.message || 'Could not update profile');
@@ -176,7 +225,7 @@ export default function ProfileScreen() {
       <View style={styles.headerRow}>
         <Text style={styles.screenTitle}>{t('profile.title')}</Text>
         {!editing ? (
-          <TouchableOpacity style={styles.editIconBtn} onPress={() => setEditing(true)} hitSlop={8}>
+          <TouchableOpacity style={styles.editIconBtn} onPress={startEditing} hitSlop={8}>
             <MaterialIcons name="edit" size={24} color={Stitch.colors.primary} />
           </TouchableOpacity>
         ) : null}
@@ -184,7 +233,7 @@ export default function ProfileScreen() {
 
       {editing ? (
         <GlassCard style={styles.sectionCard}>
-          <Text style={styles.editTitle}>{t('profile.editDetails') || 'Edit Profile Details'}</Text>
+          <Text style={styles.editTitle}>{t('profile.editDetails')}</Text>
           <GhostInput
             label={t('auth.fullName')}
             value={name}
@@ -200,11 +249,18 @@ export default function ProfileScreen() {
             placeholder={t('auth.email')}
           />
           <GhostInput
-            label={t('auth.mobile') || 'Mobile Number'}
+            label={t('auth.mobile')}
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(value) => {
+              setPhone(digitsOnlyPhone(value).slice(0, 10));
+              setPhoneError('');
+            }}
+            onBlur={() => validatePhoneField(phone)}
             keyboardType="phone-pad"
-            placeholder={t('auth.mobile') || 'Mobile Number'}
+            placeholder={t('auth.mobile')}
+            required
+            error={phoneError}
+            maxLength={10}
           />
           <View style={styles.editActions}>
             <GradientButton
@@ -216,12 +272,7 @@ export default function ProfileScreen() {
             <GradientButton
               title={t('common.cancel')}
               variant="outline"
-              onPress={() => {
-                setEditing(false);
-                setName(profile?.user?.name || '');
-                setEmail(profile?.user?.email || '');
-                setPhone(profile?.user?.phone || '');
-              }}
+              onPress={cancelEditing}
               style={styles.cancelBtn}
             />
           </View>

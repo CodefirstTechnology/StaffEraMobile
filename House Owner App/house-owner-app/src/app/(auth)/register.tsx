@@ -20,6 +20,7 @@ import { setPendingToast } from '@/lib/pendingToast';
 import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
 
 function phoneErrorMessage(kind: ReturnType<typeof getPhoneValidationKind>) {
+  if (kind === 'required') return te('validation.phoneRequired');
   if (kind === 'invalid') return te('validation.phoneInvalid');
   return '';
 }

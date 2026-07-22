@@ -28,8 +28,16 @@ import { updateHomeLocation } from '@/lib/geo';
 import { mapsDeepLink, type LocationValue } from '@/lib/locationTypes';
 import { hasSavedHomeAddress, type HouseOwnerProfile } from '@/lib/homeLocation';
 import { formatVisitAddressLines } from '@/lib/visitAddress';
+import { digitsOnlyPhone, getPhoneValidationKind } from '@/lib/phone';
 import api from '@/lib/api';
 import { te, normalizeApiErrorMessage } from '@/lib/i18n/alertMessages';
+import { useToast } from '@/providers/ToastProvider';
+
+function phoneErrorMessage(kind: ReturnType<typeof getPhoneValidationKind>) {
+  if (kind === 'required') return te('validation.phoneRequired');
+  if (kind === 'invalid') return te('validation.phoneInvalid');
+  return '';
+}
 
 function profileFromHouseOwner(ho?: HouseOwnerProfile | null) {
   const location: LocationValue | null =
@@ -54,6 +62,7 @@ function profileFromHouseOwner(ho?: HouseOwnerProfile | null) {
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
+  const toast = useToast();
   const { user, logout, setUser } = useAuthStore();
   const ho = user?.houseOwner;
   const hasSaved = hasSavedHomeAddress(ho);
@@ -61,6 +70,7 @@ export default function ProfileScreen() {
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [phoneError, setPhoneError] = useState('');
   const [savingAccount, setSavingAccount] = useState(false);
   const [editing, setEditing] = useState(!hasSaved);
   const [location, setLocation] = useState<LocationValue | null>(
@@ -108,6 +118,7 @@ export default function ProfileScreen() {
     setName(user?.name || '');
     setEmail(user?.email || '');
     setPhone(user?.phone || '');
+    setPhoneError('');
     setEditingAccount(true);
   };
 
@@ -115,7 +126,15 @@ export default function ProfileScreen() {
     setName(user?.name || '');
     setEmail(user?.email || '');
     setPhone(user?.phone || '');
+    setPhoneError('');
     setEditingAccount(false);
+  };
+
+  const validatePhoneField = (value: string) => {
+    const kind = getPhoneValidationKind(value, { required: true, exactLength: 10 });
+    const msg = phoneErrorMessage(kind);
+    setPhoneError(msg);
+    return !kind;
   };
 
   const saveAccount = async () => {
@@ -127,26 +146,25 @@ export default function ProfileScreen() {
       showAlert(te('errors.generic'), te('validation.emailInvalid'));
       return;
     }
-    const phoneDigits = phone.replace(/\D/g, '');
-    if (phone.trim() && phoneDigits.length < 10) {
-      showAlert(te('errors.generic'), te('validation.phoneInvalid'));
-      return;
-    }
+    if (!validatePhoneField(phone)) return;
+
+    const phoneDigits = digitsOnlyPhone(phone);
     setSavingAccount(true);
     try {
-      const payload: { name: string; email: string; phone?: string } = {
+      const payload = {
         name: name.trim(),
         email: email.trim().toLowerCase(),
+        phone: phoneDigits,
       };
-      if (phoneDigits) {
-        payload.phone = phoneDigits;
-      } else if (user?.phone) {
-        payload.phone = '';
-      }
       const res = await api.patch('/auth/me/profile', payload);
-      setUser(res.data.data.user as typeof user);
+      const updatedUser = res.data.data.user as typeof user;
+      setUser(updatedUser);
+      setName(updatedUser?.name || '');
+      setEmail(updatedUser?.email || '');
+      setPhone(updatedUser?.phone || '');
+      setPhoneError('');
       setEditingAccount(false);
-      showAlert(t('success.saved'), t('profile.profileUpdated'));
+      toast.show(t('profile.profileUpdated'), 'success');
     } catch (e: unknown) {
       const err = e as {
         message?: string;
@@ -271,9 +289,16 @@ export default function ProfileScreen() {
           <GhostInput
             label={t('auth.phone')}
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(value) => {
+              setPhone(digitsOnlyPhone(value).slice(0, 10));
+              setPhoneError('');
+            }}
+            onBlur={() => validatePhoneField(phone)}
             keyboardType="phone-pad"
             placeholder={t('auth.phone')}
+            required
+            error={phoneError}
+            maxLength={10}
           />
           <View style={styles.profileEditActions}>
             <GradientButton

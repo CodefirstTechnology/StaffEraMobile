@@ -107,6 +107,7 @@
     "nameMin": "नाव किमान 2 अक्षरे",
     "passwordMin": "पासवर्ड किमान 6 अक्षरे",
     "phoneInvalid": "वैध 10 अंकी फोन नंबर टाका",
+    "phoneRequired": "मोबाइल नंबर आवश्यक आहे.",
     "locationRequired": "स्थान आवश्यक",
     "pickHomeFirst": "प्रथम घराचे स्थान निवडा."
   },

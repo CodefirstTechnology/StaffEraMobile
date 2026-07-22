@@ -110,6 +110,7 @@
     "nameMin": "Name must be at least 2 characters.",
     "passwordMin": "Password must be at least 6 characters.",
     "phoneInvalid": "Enter a valid 10-digit phone number.",
+    "phoneRequired": "Mobile number is required.",
     "locationRequired": "Location is required.",
     "pickHomeFirst": "Pick your home location first."
   },

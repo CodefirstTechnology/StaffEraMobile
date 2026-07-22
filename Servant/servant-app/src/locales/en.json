@@ -355,6 +355,8 @@
   },
   "profile": {
     "title": "Profile",
+    "editDetails": "Edit profile details",
+    "profileUpdated": "Profile updated successfully",
     "houseOwner": "House owner",
     "homeLocation": "Home location",
     "homeLocationSub": "Search, tap the map, or use GPS — helpers see jobs near this address",
