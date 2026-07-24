@@ -3,13 +3,27 @@ const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
 
 exports.listNotifications = async (req, res) => {
-  const notifications = await prisma.notification.findMany({
-    where: { userId: req.user.id },
-    orderBy: { createdAt: "desc" },
-    take: 50
-  });
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const isAll = req.query.limit === "all";
+  const limit = isAll ? undefined : Math.min(100, parseInt(req.query.limit, 10) || 20);
+  const where = { userId: req.user.id };
 
-  sendSuccess(res, { notifications });
+  const [notifications, total] = await Promise.all([
+    prisma.notification.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      ...(limit ? { skip: (page - 1) * limit, take: limit } : {})
+    }),
+    prisma.notification.count({ where })
+  ]);
+
+  const activeLimit = limit || total || 1;
+  const totalPages = Math.ceil(total / activeLimit) || 1;
+
+  sendSuccess(res, {
+    notifications,
+    pagination: { page, limit: activeLimit, total, totalPages }
+  });
 };
 
 exports.markRead = async (req, res) => {

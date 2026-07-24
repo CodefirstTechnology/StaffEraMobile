@@ -18,6 +18,7 @@ import AdminBookings from './pages/admin/AdminBookings'
 import AdminServants from './pages/admin/AdminServants'
 import AdminSkills from './pages/admin/AdminSkills'
 import AdminAgents from './pages/admin/AdminAgents'
+import AdminPricing from './pages/admin/AdminPricing'
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -67,6 +68,7 @@ const router = createBrowserRouter([
       { path: "bookings", element: <AdminBookings /> },
       { path: "servants", element: <AdminServants /> },
       { path: "skills", element: <AdminSkills /> },
+      { path: "pricing", element: <AdminPricing /> },
     ]
   },
   {

@@ -1,0 +1,13 @@
+-- CreateTable
+CREATE TABLE "pricing_configs" (
+    "id" INTEGER NOT NULL DEFAULT 1,
+    "minHourlyRate" DOUBLE PRECISION NOT NULL DEFAULT 50,
+    "maxHourlyRate" DOUBLE PRECISION NOT NULL DEFAULT 1000,
+    "minMonthlyRate" DOUBLE PRECISION NOT NULL DEFAULT 3000,
+    "maxMonthlyRate" DOUBLE PRECISION NOT NULL DEFAULT 50000,
+    "platformFeePercentage" DOUBLE PRECISION NOT NULL DEFAULT 10,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "pricing_configs_pkey" PRIMARY KEY ("id")
+);

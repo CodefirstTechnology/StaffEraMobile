@@ -166,16 +166,27 @@ export default function NewBookingScreen() {
           ? [
               { text: t('bookings.changeTime'), style: 'cancel' as const },
               {
-                text: t('bookings.myBookings'),
-                onPress: () => router.push('/(main)/bookings'),
-              },
-            ]
-          : undefined;
-      if (buttons) {
-        Alert.alert(title, message, buttons);
-      } else {
-        showAlert(title, message);
-      }
+        sessionDate: bookingType === 'SESSION' ? sessionDate.toISOString() : undefined,
+        sessionStartTime: bookingType === 'SESSION' ? sessionStart : undefined,
+        sessionEndTime: bookingType === 'SESSION' ? sessionEnd : undefined,
+        sessionHours: bookingType === 'SESSION' ? hours : undefined,
+        monthlyStartDate: bookingType === 'MONTHLY' ? monthlyStart.toISOString() : undefined,
+        monthlyEndDate: bookingType === 'MONTHLY' ? monthlyEnd.toISOString() : undefined,
+        address: location.address,
+        flatNo: addressUnit.flatNo || undefined,
+        building: addressUnit.building || undefined,
+        area: location.area || undefined,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        totalAmount,
+        notes: notes || undefined,
+      });
+
+      showAlert(t('bookings.bookingCreated'), t('bookings.bookingCreatedBody'), [
+        { text: t('common.ok'), onPress: () => router.replace('/(main)/bookings') },
+      ]);
+    } catch (err: unknown) {
+      showAlert(t('bookings.requestFailed'), te(t, err, 'bookings.requestFailed'));
     } finally {
       setLoading(false);
     }
@@ -263,11 +274,23 @@ export default function NewBookingScreen() {
       />
       <GhostInput label={t('bookings.notesOptional')} value={notes} onChangeText={setNotes} />
 
-      <Text style={styles.estimate}>
-        {t('bookings.estimated', {
-          amount: `${Stitch.copy.rupee}${formatCurrency(totalAmount)}`,
-        })}
-      </Text>
+      <View style={styles.priceCard}>
+        <Text style={styles.priceCardTitle}>Calculated Price Breakdown</Text>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>
+            Helper Rate ({bookingType === 'SESSION' ? `${hours} hrs × ${Stitch.copy.rupee}${servant?.hourlyRate || 0}` : `${Stitch.copy.rupee}${servant?.monthlyRate || 0}/mo`})
+          </Text>
+          <Text style={styles.priceValue}>{Stitch.copy.rupee}{formatCurrency(baseSubtotal)}</Text>
+        </View>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Service Fee ({feePct}%)</Text>
+          <Text style={styles.priceFee}>+{Stitch.copy.rupee}{formatCurrency(platformFee)}</Text>
+        </View>
+        <View style={[styles.priceRow, styles.priceTotalRow]}>
+          <Text style={styles.priceTotalLabel}>Total Price</Text>
+          <Text style={styles.priceTotalValue}>{Stitch.copy.rupee}{formatCurrency(totalAmount)}</Text>
+        </View>
+      </View>
 
       <GradientButton title={t('bookings.sendBookingRequest')} onPress={submit} loading={loading} />
       </ScrollView>
@@ -299,11 +322,57 @@ const styles = StyleSheet.create({
   dateLabel: { fontSize: 12, color: Stitch.colors.onSurfaceVariant },
   dateValue: { fontSize: 16, fontWeight: '600', marginTop: 4 },
   hint: { marginBottom: 16, color: Stitch.colors.onSurfaceVariant },
-  estimate: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Stitch.colors.secondary,
+  priceCard: {
+    backgroundColor: Stitch.colors.surfaceLow,
+    borderRadius: 16,
+    padding: 16,
     marginVertical: 16,
-    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  priceCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  priceLabel: {
+    fontSize: 13,
+    color: Stitch.colors.onSurfaceVariant,
+  },
+  priceValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Stitch.colors.onBackground,
+  },
+  priceFee: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Stitch.colors.secondary,
+  },
+  priceTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.08)',
+    paddingTop: 10,
+    marginTop: 6,
+    marginBottom: 0,
+  },
+  priceTotalLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+  },
+  priceTotalValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Stitch.colors.secondary,
   },
 });

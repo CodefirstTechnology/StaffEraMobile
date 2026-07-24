@@ -82,28 +82,49 @@ export function getPhoneDisplayParts(user) {
   return { countryCode: ccVal, mobileNumber: phoneVal }
 }
 
+import { Pagination } from '../components/ui/Pagination'
+
 export default function ServantList() {
   const [searchParams] = useSearchParams()
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState(searchParams.get('category') || '')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
 
   useEffect(() => {
     setCategory(searchParams.get('category') || '')
+    setPage(1)
   }, [searchParams])
 
+  const handleStatusChange = (newStatus) => {
+    setStatus(newStatus)
+    setPage(1)
+  }
+
+  const handleSearchChange = (newSearch) => {
+    setSearch(newSearch)
+    setPage(1)
+  }
+
+  const handleCategoryChange = (newCat) => {
+    setCategory(newCat)
+    setPage(1)
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ['agent-servants', status, search, category],
+    queryKey: ['agent-servants', status, search, category, page, limit],
     queryFn: async () => {
       const res = await api.get('/agent/servants', {
         params: {
           status: status || undefined,
           search: search || undefined,
           category: category || undefined,
-          limit: 100,
+          page,
+          limit,
         },
       })
-      return res.data.data.servants
+      return res.data.data
     },
   })
 
@@ -117,7 +138,8 @@ export default function ServantList() {
     },
   })
 
-  const servants = data || []
+  const servants = data?.servants || []
+  const total = data?.pagination?.total ?? servants.length
   const allServants = allServantsData || []
 
   const stats = useMemo(() => {
@@ -158,12 +180,12 @@ export default function ServantList() {
       )}
 
       <FilterBar
-        count={servants.length}
-        countLabel={servants.length === 1 ? 'servant' : 'servants'}
+        count={total}
+        countLabel="total servants"
       >
-        <SelectFilter value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
-        <SelectFilter value={status} onChange={setStatus} options={STATUS_OPTIONS} />
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by name, mobile no…" />
+        <SelectFilter value={category} onChange={handleCategoryChange} options={CATEGORY_OPTIONS} />
+        <SelectFilter value={status} onChange={handleStatusChange} options={STATUS_OPTIONS} />
+        <SearchInput value={search} onChange={handleSearchChange} placeholder="Search by name, mobile no…" />
       </FilterBar>
 
       {isLoading ? (
@@ -177,101 +199,107 @@ export default function ServantList() {
       ) : (
         <>
           <div className="grid gap-4 lg:hidden">
-            {servants.map((s) => {
-              const { countryCode, mobileNumber } = getPhoneDisplayParts(s.user)
-              const phoneText = s.user.phone
-                ? countryCode !== '—'
-                  ? `${countryCode} ${mobileNumber}`
-                  : mobileNumber
-                : 'No phone'
-              return (
-                <MobileCard key={s.id}>
-                  <div className="flex items-start gap-3">
-                    <ServantPhoto name={s.user.name} profilePhoto={s.profilePhoto} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
+            {servants.map((s) => (
+              <MobileCard key={s.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <ServantPhoto name={s.user?.name} profilePhoto={s.profilePhoto} />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
                         <Link
                           to={`/servants/${s.id}`}
-                          className="font-semibold text-primary hover:text-secondary"
+                          className="font-semibold text-primary hover:text-secondary truncate"
                         >
-                          {s.user.name}
+                          {s.user?.name}
                         </Link>
                         {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
                       </div>
-                      <p className="text-sm text-on-surface-variant">{phoneText}</p>
+                      <p className="text-xs text-on-surface-variant truncate">{s.user?.email}</p>
                     </div>
-                    <Badge status={s.verificationStatus} />
                   </div>
-                  <div className="mt-3">
-                    <SkillChips skills={s.skills} />
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <Link to={`/servants/${s.id}`} className="flex-1">
-                      <Button variant="gradient" className="w-full text-sm">
-                        View
-                      </Button>
+                  <Badge status={s.verificationStatus} />
+                </div>
+                <div className="mt-3 flex items-center justify-between border-t border-outline-variant/20 pt-3 text-xs">
+                  <span className="text-on-surface-variant">{s.user?.phone || '—'}</span>
+                  <div className="flex gap-2">
+                    <Link
+                      to={`/servants/${s.id}`}
+                      className="font-semibold text-primary hover:underline"
+                    >
+                      View
                     </Link>
-                    <Link to={`/servants/${s.id}/edit`} className="flex-1">
-                      <Button variant="secondary" className="w-full text-sm">
-                        Edit
-                      </Button>
+                    <Link
+                      to={`/servants/${s.id}/edit`}
+                      className="font-semibold text-secondary hover:underline"
+                    >
+                      Edit
                     </Link>
                   </div>
-                </MobileCard>
-              )
-            })}
+                </div>
+              </MobileCard>
+            ))}
           </div>
 
-          <DataTable columns={['Servant', 'Country Code', 'Mobile Number', 'Skills', 'Status', 'Actions']}>
+          <DataTable
+            columns={['Servant', 'Country', 'Mobile', 'Skills', 'Status', 'Actions']}
+          >
             {servants.map((s) => {
               const { countryCode, mobileNumber } = getPhoneDisplayParts(s.user)
               return (
                 <TableRow key={s.id}>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <ServantPhoto name={s.user.name} profilePhoto={s.profilePhoto} />
+                      <ServantPhoto name={s.user?.name} profilePhoto={s.profilePhoto} />
                       <div>
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <Link
                             to={`/servants/${s.id}`}
                             className="font-semibold text-primary hover:text-secondary"
                           >
-                            {s.user.name}
+                            {s.user?.name}
                           </Link>
                           {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
                         </div>
-                        <p className="text-xs text-on-surface-variant">{s.user.email}</p>
+                        <p className="text-xs text-on-surface-variant">{s.user?.email}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-4 text-on-surface-variant">{countryCode}</td>
                   <td className="px-4 py-4 text-on-surface-variant">{mobileNumber}</td>
-                <td className="px-4 py-4 max-w-[200px]">
-                  <SkillChips skills={s.skills} max={2} />
-                </td>
-                <td className="px-4 py-4">
-                  <Badge status={s.verificationStatus} />
-                </td>
-                <td className="px-4 py-4">
-                  <div className="flex gap-2">
-                    <Link
-                      to={`/servants/${s.id}`}
-                      className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
-                    >
-                      View
-                    </Link>
-                    <Link
-                      to={`/servants/${s.id}/edit`}
-                      className="rounded-lg border border-outline-variant/40 px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-low"
-                    >
-                      Edit
-                    </Link>
-                  </div>
-                </td>
-              </TableRow>
-            )
-          })}
+                  <td className="px-4 py-4 max-w-[200px]">
+                    <SkillChips skills={s.skills} max={2} />
+                  </td>
+                  <td className="px-4 py-4">
+                    <Badge status={s.verificationStatus} />
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex gap-2">
+                      <Link
+                        to={`/servants/${s.id}`}
+                        className="rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
+                      >
+                        View
+                      </Link>
+                      <Link
+                        to={`/servants/${s.id}/edit`}
+                        className="rounded-lg border border-outline-variant/40 px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-low"
+                      >
+                        Edit
+                      </Link>
+                    </div>
+                  </td>
+                </TableRow>
+              )
+            })}
           </DataTable>
+
+          <Pagination
+            page={page}
+            limit={limit}
+            total={total}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
         </>
       )}
     </div>

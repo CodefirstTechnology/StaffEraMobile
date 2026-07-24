@@ -253,6 +253,14 @@ export default function OnboardServant() {
     enabled: user?.role === 'ADMIN',
   })
 
+  const { data: pricingConfig } = useQuery({
+    queryKey: ['public-pricing-config'],
+    queryFn: async () => {
+      const res = await api.get('/pricing/config')
+      return res.data.data.pricing
+    },
+  })
+
   const [step, setStep] = useState(1)
   const [submitError, setSubmitError] = useState('')
   const [personalErrors, setPersonalErrors] = useState(emptyPersonalErrors)
@@ -442,7 +450,7 @@ export default function OnboardServant() {
   }
 
   const validateSkillsRates = () => {
-    const errors = validateSkillsRateFields(form, { required: true })
+    const errors = validateSkillsRateFields(form, { required: true, config: pricingConfig })
     setSkillsRateErrors(errors)
     return !Object.values(errors).some(Boolean)
   }
@@ -849,33 +857,42 @@ export default function OnboardServant() {
       {step === 2 && (
         <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
           <h3 className="font-semibold">Skills & Rates</h3>
-          {SKILLS_RATE_FIELDS.map(({ key, label }) => (
-            <Field
-              key={key}
-              required
-              label={key === 'hourlyRate' || key === 'monthlyRate' ? `${label} (₹)` : label}
-            >
-              <input
-                placeholder={key === 'experience' ? 'e.g. 3' : key === 'hourlyRate' ? 'e.g. 150' : 'e.g. 15000'}
-                type="text"
-                inputMode={key === 'experience' ? 'numeric' : 'decimal'}
-                value={form[key]}
-                onChange={(e) => {
-                  update(key, sanitizeNonNegativeInput(e.target.value))
-                  setSkillsRateErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
-                }}
-                onBlur={() =>
-                  setSkillsRateErrors((prev) => ({
-                    ...prev,
-                    [key]: validateSkillsRateFields(form, { required: true })[key],
-                  }))
-                }
-                aria-invalid={skillsRateErrors[key] ? 'true' : undefined}
-                className={inputClassName(!!skillsRateErrors[key])}
-              />
-              <FieldError message={skillsRateErrors[key]} />
-            </Field>
-          ))}
+          {SKILLS_RATE_FIELDS.map(({ key, label }) => {
+            const hint =
+              key === 'hourlyRate'
+                ? `Allowed limit: ₹${pricingConfig?.minHourlyRate ?? 50} – ₹${pricingConfig?.maxHourlyRate ?? 1000} / hr`
+                : key === 'monthlyRate'
+                  ? `Allowed limit: ₹${(pricingConfig?.minMonthlyRate ?? 3000).toLocaleString('en-IN')} – ₹${(pricingConfig?.maxMonthlyRate ?? 50000).toLocaleString('en-IN')} / month`
+                  : undefined
+            return (
+              <Field
+                key={key}
+                required
+                label={key === 'hourlyRate' || key === 'monthlyRate' ? `${label} (₹)` : label}
+              >
+                <input
+                  placeholder={key === 'experience' ? 'e.g. 3' : key === 'hourlyRate' ? 'e.g. 150' : 'e.g. 15000'}
+                  type="text"
+                  inputMode={key === 'experience' ? 'numeric' : 'decimal'}
+                  value={form[key]}
+                  onChange={(e) => {
+                    update(key, sanitizeNonNegativeInput(e.target.value))
+                    setSkillsRateErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
+                  }}
+                  onBlur={() =>
+                    setSkillsRateErrors((prev) => ({
+                      ...prev,
+                      [key]: validateSkillsRateFields(form, { required: true, config: pricingConfig })[key],
+                    }))
+                  }
+                  aria-invalid={skillsRateErrors[key] ? 'true' : undefined}
+                  className={inputClassName(!!skillsRateErrors[key])}
+                />
+                {hint && <p className="mt-1 text-xs text-on-surface-variant">{hint}</p>}
+                <FieldError message={skillsRateErrors[key]} />
+              </Field>
+            )
+          })}
           <Field label="Bio">
             <textarea
               placeholder="Short description about the servant"

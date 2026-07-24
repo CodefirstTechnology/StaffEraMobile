@@ -1,5 +1,5 @@
+import React, { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { useMemo } from 'react'
 import { useAdminQuery } from '../../hooks/useAuthenticatedQuery'
 import {
   LineChart,
@@ -71,6 +71,10 @@ function SectionCard({ title, description, action, children, className = '' }) {
 function AgentRowCard({ agent }) {
   return (
     <MobileCard>
+      <div className="mb-2.5 flex items-center gap-1.5 text-xs font-bold text-secondary">
+        <LocationIcon size={14} className="shrink-0 text-secondary" />
+        <span className="truncate">{agent.city || agent.address || 'Unassigned Area'}</span>
+      </div>
       <div className="flex items-start gap-3">
         <Avatar name={agent.user.name} />
         <div className="min-w-0 flex-1">
@@ -79,17 +83,10 @@ function AgentRowCard({ agent }) {
         </div>
         <ActivePill active={agent.user.isActive} />
       </div>
-      <div className="mt-4 grid gap-2 text-sm">
+      <div className="mt-3 grid gap-2 border-t border-outline-variant/15 pt-3 text-sm">
         <div className="flex justify-between gap-2">
           <span className="text-on-surface-variant">Agency</span>
           <span className="font-medium">{agent.agencyName || '—'}</span>
-        </div>
-        <div className="flex items-start justify-between gap-2">
-          <span className="shrink-0 text-on-surface-variant">Area</span>
-          <span className="flex items-center gap-1.5 text-right font-medium">
-            <LocationIcon size={14} className="shrink-0 text-secondary" />
-            {agent.city || agent.address || '—'}
-          </span>
         </div>
         <div className="flex justify-between gap-2">
           <span className="text-on-surface-variant">Servants</span>
@@ -131,6 +128,15 @@ function BookingRowCard({ booking }) {
 }
 
 export default function AdminDashboard() {
+  const [collapsedAreas, setCollapsedAreas] = useState({})
+
+  const toggleArea = (areaName) => {
+    setCollapsedAreas((prev) => ({
+      ...prev,
+      [areaName]: !prev[areaName],
+    }))
+  }
+
   const { data: stats, isLoading: statsLoading } = useAdminQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
@@ -142,7 +148,7 @@ export default function AdminDashboard() {
   const { data: agents, isLoading: agentsLoading } = useAdminQuery({
     queryKey: ['admin-agents-dashboard'],
     queryFn: async () => {
-      const res = await api.get('/admin/agents', { params: { limit: 10 } })
+      const res = await api.get('/admin/agents', { params: { limit: 100 } })
       return res.data.data.agents
     },
   })
@@ -158,6 +164,25 @@ export default function AdminDashboard() {
   const isLoading = statsLoading || agentsLoading || bookingsLoading
   const agentRows = agents || []
   const bookingRows = bookings || []
+
+  const groupedAgentsByArea = useMemo(() => {
+    const map = {}
+    for (const agent of agentRows) {
+      const areaName = (agent.city || agent.address || 'Other / Unassigned Area').trim()
+      if (!map[areaName]) {
+        map[areaName] = {
+          areaName,
+          agents: [],
+          totalServants: 0,
+          totalRevenue: 0,
+        }
+      }
+      map[areaName].agents.push(agent)
+      map[areaName].totalServants += agent._count?.servants ?? 0
+      map[areaName].totalRevenue += Number(agent.annualRevenue || 0)
+    }
+    return Object.values(map).sort((a, b) => b.agents.length - a.agents.length)
+  }, [agentRows])
 
   const chartHasData = useMemo(() => {
     return (stats?.bookingsByMonth || []).some(
@@ -318,7 +343,7 @@ export default function AdminDashboard() {
 
           <SectionCard
             title="Field agents by area"
-            description="Top agents by coverage and onboarded servants."
+            description="Field agents grouped by coverage area — click area headers to expand or collapse agents."
             action={
               <Link to="/admin/agents">
                 <Button variant="secondary" className="text-sm">
@@ -327,7 +352,7 @@ export default function AdminDashboard() {
               </Link>
             }
           >
-            {agentRows.length === 0 ? (
+            {groupedAgentsByArea.length === 0 ? (
               <EmptyState
                 icon="🗺"
                 title="No field agents yet"
@@ -335,47 +360,122 @@ export default function AdminDashboard() {
               />
             ) : (
               <>
-                <div className="grid gap-4 lg:hidden">
-                  {agentRows.map((a) => (
-                    <AgentRowCard key={a.id} agent={a} />
-                  ))}
-                </div>
-                <DataTable
-                  columns={['Agent', 'Agency', 'Area', 'Servants', 'Annual revenue', 'Status']}
-                >
-                  {agentRows.map((a) => (
-                    <TableRow key={a.id}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <Avatar name={a.user.name} />
-                          <div>
-                            <p className="font-medium text-primary">{a.user.name}</p>
-                            <p className="text-xs text-on-surface-variant">{a.user.email}</p>
+                {/* Mobile View with Collapsible Area Groups */}
+                <div className="space-y-4 lg:hidden">
+                  {groupedAgentsByArea.map((group) => {
+                    const isCollapsed = !!collapsedAreas[group.areaName]
+                    return (
+                      <div key={group.areaName} className="rounded-2xl border border-outline-variant/30 overflow-hidden bg-white/70">
+                        <button
+                          type="button"
+                          onClick={() => toggleArea(group.areaName)}
+                          className="flex w-full items-center justify-between bg-surface-low/90 px-4 py-3 text-left transition-colors hover:bg-surface-low"
+                        >
+                          <div className="flex items-center gap-2 font-bold text-primary">
+                            <span className="text-xs font-mono text-secondary">
+                              {isCollapsed ? '▶' : '▼'}
+                            </span>
+                            <LocationIcon size={16} className="text-secondary shrink-0" />
+                            <span className="truncate">{group.areaName}</span>
+                            <span className="rounded-full bg-secondary/10 px-2 py-0.5 text-xs font-semibold text-secondary">
+                              {group.agents.length} agent{group.agents.length === 1 ? '' : 's'}
+                            </span>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-on-surface-variant">
-                        {a.agencyName || '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex max-w-[200px] items-center gap-1.5">
-                          <LocationIcon size={14} className="shrink-0 text-secondary" />
-                          <span className="truncate">{a.city || a.address || '—'}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-semibold text-secondary">
-                          {a._count?.servants ?? 0}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-amber-700">
-                        {formatAmount(a.annualRevenue)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <ActivePill active={a.user.isActive} />
-                      </td>
-                    </TableRow>
-                  ))}
+                          <span className="text-xs font-semibold text-secondary">
+                            {isCollapsed ? 'Expand' : 'Collapse'}
+                          </span>
+                        </button>
+
+                        {!isCollapsed && (
+                          <div className="p-3 space-y-3 bg-white/40">
+                            {group.agents.map((a) => (
+                              <AgentRowCard key={a.id} agent={a} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Desktop View with Area as 1st Column and Collapsible Rows */}
+                <DataTable
+                  columns={['Area', 'Agent', 'Agency', 'Servants', 'Annual revenue', 'Status']}
+                >
+                  {groupedAgentsByArea.map((group) => {
+                    const isCollapsed = !!collapsedAreas[group.areaName]
+                    return (
+                      <React.Fragment key={group.areaName}>
+                        {/* Area Group Header Row */}
+                        <tr
+                          onClick={() => toggleArea(group.areaName)}
+                          className="bg-surface-low/90 hover:bg-surface-low border-b border-outline-variant/30 cursor-pointer transition-colors"
+                        >
+                          <td colSpan={6} className="px-4 py-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 font-bold text-primary">
+                                <span className="text-xs font-mono text-secondary">
+                                  {isCollapsed ? '▶' : '▼'}
+                                </span>
+                                <LocationIcon size={16} className="text-secondary shrink-0" />
+                                <span>{group.areaName}</span>
+                                <span className="rounded-full bg-secondary/15 px-2.5 py-0.5 text-xs font-semibold text-secondary">
+                                  {group.agents.length} agent{group.agents.length === 1 ? '' : 's'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-5 text-xs">
+                                <span className="text-on-surface-variant">
+                                  Total Servants: <strong className="text-secondary">{group.totalServants}</strong>
+                                </span>
+                                <span className="text-on-surface-variant">
+                                  Revenue: <strong className="text-amber-700">{formatAmount(group.totalRevenue)}</strong>
+                                </span>
+                                <span className="font-semibold text-secondary hover:underline">
+                                  {isCollapsed ? 'Expand area' : 'Collapse area'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Agent Rows for this Area */}
+                        {!isCollapsed &&
+                          group.agents.map((a) => (
+                            <TableRow key={a.id}>
+                              <td className="px-4 py-3 font-semibold text-primary">
+                                <div className="flex max-w-[200px] items-center gap-1.5 pl-4">
+                                  <LocationIcon size={14} className="shrink-0 text-secondary" />
+                                  <span className="truncate">{a.city || a.address || '—'}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  <Avatar name={a.user.name} />
+                                  <div>
+                                    <p className="font-medium text-primary">{a.user.name}</p>
+                                    <p className="text-xs text-on-surface-variant">{a.user.email}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-on-surface-variant">
+                                {a.agencyName || '—'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="font-semibold text-secondary">
+                                  {a._count?.servants ?? 0}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-amber-700">
+                                {formatAmount(a.annualRevenue)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <ActivePill active={a.user.isActive} />
+                              </td>
+                            </TableRow>
+                          ))}
+                      </React.Fragment>
+                    )
+                  })}
                 </DataTable>
               </>
             )}

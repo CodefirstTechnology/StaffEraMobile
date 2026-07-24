@@ -269,3 +269,6 @@ export function PasswordPill({ set: isSet }) {
     </span>
   )
 }
+
+export { Pagination } from '../ui/Pagination'
+

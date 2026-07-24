@@ -83,6 +83,7 @@ app.use("/api/v1/admin", require("./routes/adminRoutes"));
 app.use("/api/v1/notifications", require("./routes/notificationRoutes"));
 app.use("/api/v1/zones", require("./routes/zoneRoutes"));
 app.use("/api/v1/geo", require("./routes/geoRoutes"));
+app.use("/api/v1/pricing", require("./routes/pricingRoutes"));
 app.use("/api/v1/kyc", require("./routes/kycRoutes"));
 
 app.get("/", (req, res) => {

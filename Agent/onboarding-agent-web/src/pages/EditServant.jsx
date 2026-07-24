@@ -172,6 +172,13 @@ export default function EditServant() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data: skills = [], isLoading: skillsLoading } = useSkills()
+  const { data: pricingConfig } = useQuery({
+    queryKey: ['public-pricing-config'],
+    queryFn: async () => {
+      const res = await api.get('/pricing/config')
+      return res.data.data.pricing
+    },
+  })
   const [error, setError] = useState('')
   const [savedCredentials, setSavedCredentials] = useState(null)
   const [loginPassword, setLoginPassword] = useState('')
@@ -317,7 +324,7 @@ export default function EditServant() {
       setError('Availability notes cannot exceed 500 characters')
       return
     }
-    const rateErrors = validateSkillsRateFields(form, { required: false })
+    const rateErrors = validateSkillsRateFields(form, { required: false, config: pricingConfig })
     setSkillsRateErrors(rateErrors)
     if (Object.values(rateErrors).some(Boolean)) return
     if (!form.offersSession && !form.offersMonthly) {
@@ -479,31 +486,40 @@ export default function EditServant() {
 
       <div className="space-y-4 rounded-xl bg-surface p-6 shadow-sm">
         <h3 className="font-semibold">Rates & experience</h3>
-        {SKILLS_RATE_FIELDS.map(({ key, label }) => (
-          <Field key={key} label={key === 'hourlyRate' || key === 'monthlyRate' ? `${label} (₹)` : label}>
-            <input
-              placeholder={key === 'experience' ? 'e.g. 3' : key === 'hourlyRate' ? 'e.g. 150' : 'e.g. 15000'}
-              type="text"
-              inputMode={key === 'experience' ? 'numeric' : 'decimal'}
-              value={form[key]}
-              onChange={(e) => {
-                update(key, sanitizeNonNegativeInput(e.target.value))
-                setSkillsRateErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
-              }}
-              onBlur={() =>
-                setSkillsRateErrors((prev) => ({
-                  ...prev,
-                  [key]: validateSkillsRateFields(form, { required: false })[key],
-                }))
-              }
-              aria-invalid={skillsRateErrors[key] ? 'true' : undefined}
-              className={`${inputClassName()}${skillsRateErrors[key] ? ' border-error' : ''}`}
-            />
-            {skillsRateErrors[key] ? (
-              <p className="text-sm text-error">{skillsRateErrors[key]}</p>
-            ) : null}
-          </Field>
-        ))}
+        {SKILLS_RATE_FIELDS.map(({ key, label }) => {
+          const hint =
+            key === 'hourlyRate'
+              ? `Allowed limit: ₹${pricingConfig?.minHourlyRate ?? 50} – ₹${pricingConfig?.maxHourlyRate ?? 1000} / hr`
+              : key === 'monthlyRate'
+                ? `Allowed limit: ₹${(pricingConfig?.minMonthlyRate ?? 3000).toLocaleString('en-IN')} – ₹${(pricingConfig?.maxMonthlyRate ?? 50000).toLocaleString('en-IN')} / month`
+                : undefined
+          return (
+            <Field key={key} label={key === 'hourlyRate' || key === 'monthlyRate' ? `${label} (₹)` : label}>
+              <input
+                placeholder={key === 'experience' ? 'e.g. 3' : key === 'hourlyRate' ? 'e.g. 150' : 'e.g. 15000'}
+                type="text"
+                inputMode={key === 'experience' ? 'numeric' : 'decimal'}
+                value={form[key]}
+                onChange={(e) => {
+                  update(key, sanitizeNonNegativeInput(e.target.value))
+                  setSkillsRateErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev))
+                }}
+                onBlur={() =>
+                  setSkillsRateErrors((prev) => ({
+                    ...prev,
+                    [key]: validateSkillsRateFields(form, { required: false, config: pricingConfig })[key],
+                  }))
+                }
+                aria-invalid={skillsRateErrors[key] ? 'true' : undefined}
+                className={`${inputClassName()}${skillsRateErrors[key] ? ' border-error' : ''}`}
+              />
+              {hint && <p className="mt-1 text-xs text-subtext">{hint}</p>}
+              {skillsRateErrors[key] ? (
+                <p className="text-sm text-error">{skillsRateErrors[key]}</p>
+              ) : null}
+            </Field>
+          )
+        })}
         <Field label="Bio">
           <textarea
             placeholder="Short description about the servant"

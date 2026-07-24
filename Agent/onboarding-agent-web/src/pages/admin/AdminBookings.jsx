@@ -36,20 +36,36 @@ function formatAmount(amount) {
   return `₹${Number(amount || 0).toLocaleString('en-IN')}`
 }
 
+import { Pagination } from '../../components/ui/Pagination'
+
 export default function AdminBookings() {
   const [status, setStatus] = useState('')
   const [type, setType] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+
+  const handleStatusChange = (newStatus) => {
+    setStatus(newStatus)
+    setPage(1)
+  }
+
+  const handleTypeChange = (newType) => {
+    setType(newType)
+    setPage(1)
+  }
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-bookings', status, type],
+    queryKey: ['admin-bookings', status, type, page, limit],
     queryFn: async () => {
       const res = await api.get('/admin/bookings', {
         params: {
           status: status || undefined,
           type: type || undefined,
+          page,
+          limit,
         },
       })
-      return res.data.data.bookings
+      return res.data.data
     },
   })
 
@@ -63,7 +79,8 @@ export default function AdminBookings() {
     },
   })
 
-  const bookings = data || []
+  const bookings = data?.bookings || []
+  const total = data?.pagination?.total ?? bookings.length
   const allBookings = allBookingsData || []
 
   const stats = useMemo(() => {
@@ -96,11 +113,11 @@ export default function AdminBookings() {
       )}
 
       <FilterBar
-        count={bookings.length}
-        countLabel={bookings.length === 1 ? 'booking' : 'bookings'}
+        count={total}
+        countLabel="total bookings"
       >
-        <SelectFilter value={status} onChange={setStatus} options={STATUS_OPTIONS} />
-        <SelectFilter value={type} onChange={setType} options={TYPE_OPTIONS} />
+        <SelectFilter value={status} onChange={handleStatusChange} options={STATUS_OPTIONS} />
+        <SelectFilter value={type} onChange={handleTypeChange} options={TYPE_OPTIONS} />
       </FilterBar>
 
       {isLoading ? (
@@ -181,6 +198,14 @@ export default function AdminBookings() {
               </TableRow>
             ))}
           </DataTable>
+
+          <Pagination
+            page={page}
+            limit={limit}
+            total={total}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
         </>
       )}
     </div>

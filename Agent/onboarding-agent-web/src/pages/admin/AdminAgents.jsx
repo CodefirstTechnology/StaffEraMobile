@@ -3,6 +3,7 @@ import { useBlocker, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
 import { Button } from '../../components/ui/Button'
+import { Pagination } from '../../components/ui/Pagination'
 import { PasswordInput } from '../../components/ui/PasswordInput'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { AgentLocationPicker } from '../../components/AgentLocationPicker'
@@ -601,13 +602,21 @@ export default function AdminAgents() {
     }
   }, [blocker.state])
 
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+
+  const handleSearchChange = (newSearch) => {
+    setSearch(newSearch)
+    setPage(1)
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-agents', search],
+    queryKey: ['admin-agents', search, page, limit],
     queryFn: async () => {
       const res = await api.get('/admin/agents', {
-        params: { search: search || undefined, limit: 100 },
+        params: { search: search || undefined, page, limit },
       })
-      return res.data.data.agents
+      return res.data.data
     },
   })
 
@@ -621,7 +630,8 @@ export default function AdminAgents() {
     },
   })
 
-  const rows = data || []
+  const rows = data?.agents || []
+  const total = data?.pagination?.total ?? rows.length
   const allRows = allAgentsData || []
 
   const stats = useMemo(() => {
@@ -1216,12 +1226,12 @@ export default function AdminAgents() {
         <input
           placeholder="Search by name, email, agency, or area…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
           className={`${inputClass()} max-w-md flex-1`}
         />
         {!isLoading && (
-          <span className="text-sm text-on-surface-variant">
-            {rows.length} agent{rows.length === 1 ? '' : 's'}
+          <span className="text-sm text-on-surface-variant ml-auto">
+            {total} total agent{total === 1 ? '' : 's'}
           </span>
         )}
       </div>
@@ -1229,18 +1239,11 @@ export default function AdminAgents() {
       {isLoading ? (
         <LoadingSkeleton />
       ) : rows.length === 0 ? (
-        <div className="glass-card flex flex-col items-center justify-center px-6 py-16 text-center">
-          <span className="text-5xl opacity-40" aria-hidden>
-            🗺
-          </span>
-          <p className="mt-4 text-lg font-semibold text-primary">No field agents yet</p>
-          <p className="mt-2 max-w-sm text-sm text-on-surface-variant">
-            Add your first agent to cover an area and onboard servants nearby.
-          </p>
-          <Button variant="gradient" className="mt-6" onClick={openCreateForm}>
-            + Add agent
-          </Button>
-        </div>
+        <EmptyState
+          icon="🏢"
+          title="No agents found"
+          description="Try a different search term or onboard a new field agent."
+        />
       ) : (
         <>
           <div className="grid gap-4 lg:hidden">
@@ -1248,7 +1251,6 @@ export default function AdminAgents() {
               <AgentRowCard
                 key={a.id}
                 agent={a}
-                isSelected={editingAgent?.id === a.id}
                 onEdit={openEdit}
                 onToggle={requestToggle}
               />
@@ -1259,44 +1261,52 @@ export default function AdminAgents() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-outline-variant/30 bg-surface-low/80">
-                  {['Agent', 'Agency', 'Area', 'Radius', 'Servants', 'Revenue', 'Status', ''].map(
-                    (h) => (
-                      <th
-                        key={h || 'actions'}
-                        className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant"
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    Agent & Agency
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    Location
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    Radius
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    Servants
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    Est. Revenue
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((a) => (
                   <tr
                     key={a.id}
-                    className={`border-b border-outline-variant/15 transition-colors hover:bg-primary/3 ${
-                      editingAgent?.id === a.id ? 'bg-secondary/5' : ''
-                    }`}
+                    className="border-b border-outline-variant/15 transition-colors hover:bg-primary/3"
                   >
                     <td className="px-4 py-4">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(a)}
-                        className="flex items-center gap-3 text-left"
-                      >
+                      <div className="flex items-center gap-3">
                         <AgentAvatar name={a.user.name} />
                         <div>
-                          <p className="font-semibold text-primary hover:text-secondary">
-                            {a.user.name}
-                          </p>
+                          <p className="font-semibold text-primary">{a.user.name}</p>
+                          {a.agencyName && (
+                            <p className="text-xs font-medium text-secondary">{a.agencyName}</p>
+                          )}
                           <p className="text-xs text-on-surface-variant">{a.user.email}</p>
+                          {a.user.phone && (
+                            <p className="text-xs text-on-surface-variant">{a.user.phone}</p>
+                          )}
                         </div>
-                      </button>
+                      </div>
                     </td>
-                    <td className="px-4 py-4 font-medium">{a.agencyName || '—'}</td>
-                    <td className="px-4 py-4 max-w-[200px]">
-                      <div className="flex items-start gap-1.5">
+                    <td className="px-4 py-4 text-xs text-on-surface-variant">
+                      <div className="flex items-start gap-1.5 max-w-[200px]">
                         <LocationIcon size={14} className="mt-0.5 shrink-0 text-secondary" />
                         <div className="min-w-0">
                           <p className="truncate">{a.address || '—'}</p>
@@ -1345,6 +1355,14 @@ export default function AdminAgents() {
               </tbody>
             </table>
           </div>
+
+          <Pagination
+            page={page}
+            limit={limit}
+            total={total}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
         </>
       )}
 

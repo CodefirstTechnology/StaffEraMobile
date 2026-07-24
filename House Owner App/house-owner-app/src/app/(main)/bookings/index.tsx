@@ -1,13 +1,14 @@
+import { useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, SectionList, RefreshControl } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import api from '@/lib/api';
 import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { useSkills } from '@/hooks/useSkills';
 import {
   BookingSummaryCard,
@@ -19,13 +20,22 @@ import { bookingsListPollInterval } from '@/lib/bookingPoll';
 export default function BookingsListScreen() {
   const { t } = useTranslation();
   const { data: skills = [] } = useSkills();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['bookings'],
+    queryKey: ['bookings', page, limit],
     queryFn: async () => {
-      const res = await api.get('/bookings');
-      return res.data.data.bookings as BookingSummary[];
+      const res = await api.get('/bookings', { params: { page, limit } });
+      return {
+        bookings: res.data.data.bookings as BookingSummary[],
+        total: (res.data.data.pagination?.total ?? res.data.data.bookings.length) as number,
+      };
     },
-    refetchInterval: (query) => bookingsListPollInterval(query.state.data as BookingSummary[] | undefined),
+    refetchInterval: (query) =>
+      bookingsListPollInterval(
+        (query.state.data as { bookings: BookingSummary[] } | undefined)?.bookings,
+      ),
   });
 
   useFocusEffect(
@@ -34,7 +44,8 @@ export default function BookingsListScreen() {
     }, [refetch]),
   );
 
-  const bookings = data || [];
+  const bookings = data?.bookings || [];
+  const total = data?.total || 0;
   const { active, recent } = splitBookings(bookings);
 
   const sections = useMemo(
@@ -100,6 +111,17 @@ export default function BookingsListScreen() {
           />
         )}
         SectionSeparatorComponent={() => <View style={styles.sectionGap} />}
+        ListFooterComponent={
+          bookings.length > 0 ? (
+            <PaginationControls
+              page={page}
+              limit={limit}
+              total={total}
+              onPageChange={setPage}
+              onLimitChange={setLimit}
+            />
+          ) : null
+        }
       />
     </View>
   );

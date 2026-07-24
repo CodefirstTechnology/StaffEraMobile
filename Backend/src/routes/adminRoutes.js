@@ -23,4 +23,7 @@ router.post("/skills", validate(createSkillSchema), skillController.adminCreateS
 router.patch("/skills/:id", validate(updateSkillSchema), skillController.adminUpdateSkill);
 router.delete("/skills/:id", skillController.adminDeleteSkill);
 
+router.get("/pricing", adminController.getPricingConfig);
+router.put("/pricing", adminController.updatePricingConfig);
+
 module.exports = router;

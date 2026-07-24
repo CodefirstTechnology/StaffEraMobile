@@ -26,16 +26,25 @@ const STATUS_OPTIONS = [
   ['REJECTED', 'Rejected'],
 ]
 
+import { Pagination } from '../../components/ui/Pagination'
+
 export default function AdminServants() {
   const [status, setStatus] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+
+  const handleStatusChange = (newStatus) => {
+    setStatus(newStatus)
+    setPage(1)
+  }
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-servants', status],
+    queryKey: ['admin-servants', status, page, limit],
     queryFn: async () => {
       const res = await api.get('/admin/servants', {
-        params: { status: status || undefined },
+        params: { status: status || undefined, page, limit },
       })
-      return res.data.data.servants
+      return res.data.data
     },
   })
 
@@ -49,7 +58,8 @@ export default function AdminServants() {
     },
   })
 
-  const servants = data || []
+  const servants = data?.servants || []
+  const total = data?.pagination?.total ?? servants.length
   const allServants = allServantsData || []
 
   const stats = useMemo(() => {
@@ -92,10 +102,10 @@ export default function AdminServants() {
       )}
 
       <FilterBar
-        count={servants.length}
-        countLabel={servants.length === 1 ? 'servant' : 'servants'}
+        count={total}
+        countLabel="total servants"
       >
-        <SelectFilter value={status} onChange={setStatus} options={STATUS_OPTIONS} />
+        <SelectFilter value={status} onChange={handleStatusChange} options={STATUS_OPTIONS} />
       </FilterBar>
 
       {isLoading ? (
@@ -104,7 +114,7 @@ export default function AdminServants() {
         <EmptyState
           icon="👥"
           title="No servants found"
-          description="Change the status filter or onboard a new helper."
+          description="Adjust status filters to find helpers."
         />
       ) : (
         <>
@@ -112,70 +122,43 @@ export default function AdminServants() {
             {servants.map((s) => (
               <MobileCard key={s.id}>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3">
                     <Avatar name={s.user?.name} />
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          to={`/servants/${s.id}`}
-                          className="font-semibold text-primary hover:text-secondary"
-                        >
-                          {s.user?.name}
-                        </Link>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-primary">{s.user?.name || 'Unnamed'}</span>
                         {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
                       </div>
-                      <p className="text-sm text-on-surface-variant">
-                        Agent: {s.agent?.user?.name || 'Unassigned'}
-                      </p>
+                      <p className="text-xs text-on-surface-variant">{s.user?.email}</p>
                     </div>
                   </div>
                   <Badge status={s.verificationStatus} />
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800">
-                    {(s.rating ?? 0).toFixed(1)} ★
-                  </span>
-                  {s.skills?.length > 0 && (
-                    <span className="rounded-full bg-surface-container px-2.5 py-1 text-xs text-on-surface-variant">
-                      {s.skills.length} skill{s.skills.length === 1 ? '' : 's'}
-                    </span>
-                  )}
+                <div className="mt-3 flex items-center justify-between border-t border-outline-variant/20 pt-3 text-xs text-on-surface-variant">
+                  <span>Rating: {(s.rating ?? 0).toFixed(1)} ★</span>
+                  <Link
+                    to={`/servants/${s.id}`}
+                    className="font-semibold text-primary hover:underline"
+                  >
+                    View details →
+                  </Link>
                 </div>
-                <Link
-                  to={`/servants/${s.id}`}
-                  className="mt-4 block w-full rounded-xl bg-primary/10 py-2 text-center text-sm font-semibold text-primary hover:bg-primary/15"
-                >
-                  View profile
-                </Link>
               </MobileCard>
             ))}
           </div>
 
-          <DataTable columns={['Servant', 'Agent', 'Status', 'Rating', '']}>
+          <DataTable columns={['Servant', 'Agent', 'Status', 'Rating', 'Actions']}>
             {servants.map((s) => (
               <TableRow key={s.id}>
                 <td className="px-4 py-4">
                   <div className="flex items-center gap-3">
                     <Avatar name={s.user?.name} />
                     <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          to={`/servants/${s.id}`}
-                          className="font-semibold text-primary hover:text-secondary"
-                        >
-                          {s.user?.name}
-                        </Link>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-primary">{s.user?.name || 'Unnamed'}</span>
                         {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
                       </div>
-                      {s.skills?.length > 0 && (
-                        <p className="mt-0.5 text-xs text-on-surface-variant">
-                          {s.skills
-                            .slice(0, 2)
-                            .map((sk) => sk.skillName.replace(/_/g, ' '))
-                            .join(', ')}
-                          {s.skills.length > 2 ? ` +${s.skills.length - 2}` : ''}
-                        </p>
-                      )}
+                      <p className="text-xs text-on-surface-variant">{s.user?.email}</p>
                     </div>
                   </div>
                 </td>
@@ -205,6 +188,14 @@ export default function AdminServants() {
               </TableRow>
             ))}
           </DataTable>
+
+          <Pagination
+            page={page}
+            limit={limit}
+            total={total}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
         </>
       )}
     </div>

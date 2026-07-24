@@ -138,6 +138,25 @@ export default function BookingDetailScreen() {
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
   const editMode = getBookingEditMode(booking.status);
 
+  const { data: pricingConfig } = useQuery({
+    queryKey: ['pricingConfig'],
+    queryFn: async () => {
+      const res = await api.get('/pricing/config');
+      return res.data.data.pricing;
+    },
+  });
+
+  const feePct = pricingConfig?.platformFeePercentage ?? 10;
+  const hours = booking?.sessionHours || 1;
+  const servantHourly = booking?.servant?.hourlyRate || 0;
+  const servantMonthly = booking?.servant?.monthlyRate || 0;
+  const baseSubtotal =
+    booking?.bookingType === 'SESSION'
+      ? servantHourly * hours
+      : servantMonthly || (booking?.totalAmount ? Math.round(booking.totalAmount / (1 + feePct / 100)) : 0);
+  const platformFee = Math.round(baseSubtotal * (feePct / 100) * 100) / 100;
+  const totalAmount = booking?.totalAmount ?? Math.round((baseSubtotal + platformFee) * 100) / 100;
+
   return (
     <View style={styles.root}>
       <BackHeader title={t('bookings.bookingDetails')} />
@@ -176,12 +195,25 @@ export default function BookingDetailScreen() {
             {t('bookings.addressRow', { address: booking.address })}
           </Text>
         ) : null}
-        {booking.totalAmount != null && (
-          <Text style={styles.amount}>
-            {Stitch.copy.rupee}
-            {formatCurrency(booking.totalAmount)}
-          </Text>
-        )}
+
+        <View style={styles.priceCard}>
+          <Text style={styles.priceCardTitle}>Itemized Charges Breakdown</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>
+              Helper Base Rate ({booking.bookingType === 'SESSION' ? `${hours} hrs × ${Stitch.copy.rupee}${servantHourly}/hr` : `1 Month`})
+            </Text>
+            <Text style={styles.priceValue}>{Stitch.copy.rupee}{formatCurrency(baseSubtotal)}</Text>
+          </View>
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>Platform Service Fee ({feePct}%)</Text>
+            <Text style={styles.priceFee}>+{Stitch.copy.rupee}{formatCurrency(platformFee)}</Text>
+          </View>
+          <View style={[styles.priceRow, styles.priceTotalRow]}>
+            <Text style={styles.priceTotalLabel}>Total Payable Amount</Text>
+            <Text style={styles.priceTotalValue}>{Stitch.copy.rupee}{formatCurrency(totalAmount)}</Text>
+          </View>
+        </View>
+
         {booking.notes ? (
           <Text style={styles.row}>{t('bookings.notesRow', { notes: booking.notes })}</Text>
         ) : null}
@@ -365,5 +397,58 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Stitch.colors.error,
     fontWeight: '600',
+  },
+  priceCard: {
+    backgroundColor: Stitch.colors.surfaceLow,
+    borderRadius: 14,
+    padding: 14,
+    marginVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  priceCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  priceLabel: {
+    fontSize: 13,
+    color: Stitch.colors.onSurfaceVariant,
+  },
+  priceValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Stitch.colors.onBackground,
+  },
+  priceFee: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Stitch.colors.secondary,
+  },
+  priceTotalRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.08)',
+    paddingTop: 10,
+    marginTop: 6,
+    marginBottom: 0,
+  },
+  priceTotalLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+  },
+  priceTotalValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Stitch.colors.secondary,
   },
 });

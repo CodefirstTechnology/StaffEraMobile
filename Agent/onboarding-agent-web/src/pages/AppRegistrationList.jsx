@@ -30,28 +30,44 @@ const STATUS_OPTIONS = [
   ['UNDER_REVIEW', 'Under review'],
 ]
 
+import { Pagination } from '../components/ui/Pagination'
+
 export default function AppRegistrationList() {
   const qc = useQueryClient()
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
   const [passwordTarget, setPasswordTarget] = useState(null)
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [passwordSaveError, setPasswordSaveError] = useState('')
   const [credentials, setCredentials] = useState(null)
 
+  const handleStatusChange = (newStatus) => {
+    setStatus(newStatus)
+    setPage(1)
+  }
+
+  const handleSearchChange = (newSearch) => {
+    setSearch(newSearch)
+    setPage(1)
+  }
+
   const { data, isLoading } = useQuery({
-    queryKey: ['agent-registrations', status, search],
+    queryKey: ['agent-registrations', status, search, page, limit],
     queryFn: async () => {
       const res = await api.get('/agent/servants', {
         params: {
           category: 'registered',
           status: status || undefined,
           search: search || undefined,
-          limit: 100,
+          page,
+          limit,
         },
       })
       return {
         servants: res.data.data.servants,
+        total: res.data.data.pagination?.total ?? res.data.data.servants.length,
         locationNotice: res.data.data.locationNotice,
       }
     },
@@ -139,13 +155,13 @@ export default function AppRegistrationList() {
       )}
 
       <FilterBar
-        count={rows.length}
-        countLabel={rows.length === 1 ? 'registration' : 'registrations'}
+        count={data?.total ?? rows.length}
+        countLabel="total registrations"
       >
-        <SelectFilter value={status} onChange={setStatus} options={STATUS_OPTIONS} />
+        <SelectFilter value={status} onChange={handleStatusChange} options={STATUS_OPTIONS} />
         <SearchInput
           value={search}
-          onChange={setSearch}
+          onChange={handleSearchChange}
           placeholder="Search by name, mobile no…"
         />
       </FilterBar>
@@ -163,34 +179,36 @@ export default function AppRegistrationList() {
           <div className="grid gap-4 lg:hidden">
             {rows.map((s) => (
               <MobileCard key={s.id}>
-                <div className="flex items-start gap-3">
-                  <Avatar name={s.user.name} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-primary">{s.user.name}</p>
-                      {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={s.user.name} />
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-primary">{s.user.name}</span>
+                        {s.verificationStatus === 'VERIFIED' && <VerifiedBadge />}
+                      </div>
+                      <p className="text-xs text-on-surface-variant">{s.user.email}</p>
                     </div>
-                    <p className="truncate text-sm text-on-surface-variant">{s.user.email}</p>
-                    <p className="text-sm text-on-surface-variant">{s.user.phone || 'No phone'}</p>
                   </div>
                   <Badge status={s.verificationStatus} />
                 </div>
-                <div className="mt-3">
+                <div className="mt-3 flex items-center justify-between border-t border-outline-variant/20 pt-3">
                   <PasswordPill set={s.user.agentSetPassword} />
-                </div>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <Button
-                    variant="gradient"
-                    className="flex-1 text-sm"
-                    onClick={() => setPasswordTarget(s)}
-                  >
-                    {s.user.agentSetPassword ? 'Change password' : 'Set password'}
-                  </Button>
-                  <Link to={`/servants/${s.id}?from=registrations`} className="flex-1">
-                    <Button variant="secondary" className="w-full text-sm">
-                      Review
-                    </Button>
-                  </Link>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPasswordTarget(s)}
+                      className="text-xs font-semibold text-secondary hover:underline"
+                    >
+                      {s.user.agentSetPassword ? 'Password' : 'Set password'}
+                    </button>
+                    <Link
+                      to={`/servants/${s.id}?from=registrations`}
+                      className="text-xs font-semibold text-primary hover:underline"
+                    >
+                      Review →
+                    </Link>
+                  </div>
                 </div>
               </MobileCard>
             ))}
@@ -242,6 +260,14 @@ export default function AppRegistrationList() {
               </TableRow>
             ))}
           </DataTable>
+
+          <Pagination
+            page={page}
+            limit={limit}
+            total={data?.total ?? rows.length}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
         </>
       )}
 
