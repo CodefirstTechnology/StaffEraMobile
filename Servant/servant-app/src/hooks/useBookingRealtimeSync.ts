@@ -20,6 +20,8 @@ export function useBookingRealtimeSync() {
         qc.refetchQueries({ queryKey: ['open-requests'] }),
         qc.refetchQueries({ queryKey: ['notifications'] }),
         qc.refetchQueries({ queryKey: ['declined-open-booking-ids'] }),
+        qc.refetchQueries({ queryKey: ['time-today'] }),
+        qc.refetchQueries({ queryKey: ['time-month'] }),
         qc.refetchQueries({
           predicate: (query) => query.queryKey[0] === 'booking',
         }),

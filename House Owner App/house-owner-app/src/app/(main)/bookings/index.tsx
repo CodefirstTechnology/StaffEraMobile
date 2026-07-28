@@ -35,15 +35,16 @@ export default function BookingsListScreen() {
   );
 
   const bookings = data || [];
-  const { active, recent } = splitBookings(bookings);
+  const { active, completed, past } = splitBookings(bookings);
 
   const sections = useMemo(
     () =>
       [
         { key: 'active', title: t('common.active'), data: active },
-        { key: 'recent', title: t('common.recent'), data: recent },
+        { key: 'completed', title: t('bookings.completedJobs'), data: completed },
+        { key: 'past', title: t('common.recent'), data: past },
       ].filter((section) => section.data.length > 0),
-    [active, recent, t],
+    [active, completed, past, t],
   );
 
   return (

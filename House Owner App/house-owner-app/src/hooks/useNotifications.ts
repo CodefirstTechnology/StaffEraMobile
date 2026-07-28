@@ -53,7 +53,11 @@ export function useNotifications() {
 
     for (const notification of notifications) {
       if (seenIds.current.has(notification.id)) continue;
-      if (notification.type !== 'BOOKING_CONFIRMED' && notification.type !== 'WORK_COMPLETED') {
+      if (
+        notification.type !== 'BOOKING_CONFIRMED' &&
+        notification.type !== 'WORK_COMPLETED' &&
+        notification.type !== 'BOOKING_COMPLETED'
+      ) {
         continue;
       }
 

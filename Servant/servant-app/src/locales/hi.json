@@ -311,6 +311,10 @@
     "contactMessageToCustomer": "नमस्ते {{name}}, आपकी StaffEra बुकिंग के बारे में:",
     "navigate": "नेविगेट",
     "emptyCalendar": "No upcoming jobs on your calendar",
+    "activeJobs": "सक्रिय नौकरियाँ",
+    "completedJobs": "पूर्ण नौकरियाँ",
+    "noActiveJobs": "अभी कोई सक्रिय नौकरी नहीं",
+    "noCompletedJobs": "अभी कोई पूर्ण नौकरी नहीं",
     "addressTbd": "Address TBD"
   },
   "time": {
@@ -522,6 +526,9 @@
     "decline": "अस्वीकार",
     "newRequestsSection": "नए अनुरोध — स्वीकार या अस्वीकार",
     "todayJobsSection": "आज की नौकरियाँ",
+    "activeJobsSection": "सक्रिय नौकरियाँ",
+    "completedJobsSection": "पूर्ण नौकरियाँ",
+    "noCompletedJobs": "आज कोई पूर्ण नौकरी नहीं",
     "noConfirmedJobs": "कोई पुष्टि नौकरी नहीं — ऑनलाइन रहें",
     "addressOnFile": "फ़ाइल पर पता",
     "locationShared": "ग्राहक के साथ स्थान साझा",

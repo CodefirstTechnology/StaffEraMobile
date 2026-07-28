@@ -6,7 +6,7 @@ const {
   notifyWorkCompletedOnce
 } = require("../services/notificationService");
 const { hasPendingWorkOtp } = require("../services/workStartOtpService");
-const { computeBookingEarnings, isSessionPast, expireStaleSessionBookings, syncCompletedBookingAmounts } = require("../services/bookingService");
+const { computeBookingEarnings, expireStaleSessionBookings, syncCompletedBookingAmounts } = require("../services/bookingService");
 
 const getMonthBounds = (ref = new Date()) => {
   const start = new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0);
@@ -149,18 +149,33 @@ exports.clockOut = async (req, res) => {
       { ...booking, timeEntries: timeEntriesWithClose },
       booking.servant?.hourlyRate
     );
-    const sessionEnded =
-      booking.bookingType === "SESSION" &&
-      isSessionPast(booking, now) &&
-      booking.extensionStatus !== "PENDING";
+    const isSession = booking.bookingType === "SESSION";
+    const canCompleteSession = isSession && booking.extensionStatus !== "PENDING";
+
+    let nextStatus = booking.status;
+    if (canCompleteSession) {
+      nextStatus = "COMPLETED";
+    } else if (booking.status === "ACTIVE" && booking.bookingType === "MONTHLY") {
+      nextStatus = "CONFIRMED";
+    }
 
     await prisma.booking.update({
       where: { id: booking.id },
       data: {
         ...(totalAmount > 0 ? { totalAmount } : {}),
-        ...(sessionEnded ? { status: "COMPLETED" } : {})
+        ...(nextStatus !== booking.status ? { status: nextStatus } : {})
       }
     });
+
+    if (nextStatus === "COMPLETED" && booking.houseOwner?.user?.id) {
+      await createNotification({
+        userId: booking.houseOwner.user.id,
+        title: "Booking completed",
+        body: "Your booking has been marked completed",
+        type: "BOOKING_COMPLETED",
+        data: { bookingId: booking.id }
+      });
+    }
   }
 
   if (!wasAlreadyCompleted && booking.houseOwner?.user?.id) {
@@ -173,7 +188,12 @@ exports.clockOut = async (req, res) => {
     });
   }
 
-  sendSuccess(res, { entry });
+  const updatedBooking = await prisma.booking.findUnique({
+    where: { id: booking.id },
+    select: { id: true, status: true, totalAmount: true, bookingType: true }
+  });
+
+  sendSuccess(res, { entry, booking: updatedBooking });
 };
 
 exports.getToday = async (req, res) => {

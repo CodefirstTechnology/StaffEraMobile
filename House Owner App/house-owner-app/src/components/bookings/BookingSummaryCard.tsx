@@ -154,7 +154,8 @@ export function BookingSummaryCard({
 }
 
 const ACTIVE_STATUSES = ['PENDING', 'CONFIRMED', 'ACTIVE', 'OTP_PENDING', 'ARRIVED'];
-const RECENT_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED', 'EXPIRED'];
+const COMPLETED_STATUSES = ['COMPLETED'];
+const PAST_STATUSES = ['CANCELLED', 'REJECTED', 'EXPIRED'];
 
 const ACTIVE_RANK: Record<string, number> = {
   ACTIVE: 0,
@@ -177,15 +178,18 @@ function bookingSortKey(booking: BookingSummary): number {
 
 export function splitBookings(bookings: BookingSummary[]) {
   const active: BookingSummary[] = [];
-  const recent: BookingSummary[] = [];
+  const completed: BookingSummary[] = [];
+  const past: BookingSummary[] = [];
 
   for (const booking of bookings) {
     const status = normalizeStatus(booking.status);
     const row = status === booking.status ? booking : { ...booking, status };
     if (ACTIVE_STATUSES.includes(status)) {
       active.push(row);
-    } else if (RECENT_STATUSES.includes(status)) {
-      recent.push(row);
+    } else if (COMPLETED_STATUSES.includes(status)) {
+      completed.push(row);
+    } else if (PAST_STATUSES.includes(status)) {
+      past.push(row);
     } else {
       active.push(row);
     }
@@ -199,9 +203,10 @@ export function splitBookings(bookings: BookingSummary[]) {
     return bookingSortKey(b) - bookingSortKey(a);
   });
 
-  recent.sort((a, b) => bookingSortKey(b) - bookingSortKey(a));
+  completed.sort((a, b) => bookingSortKey(b) - bookingSortKey(a));
+  past.sort((a, b) => bookingSortKey(b) - bookingSortKey(a));
 
-  return { active, recent };
+  return { active, completed, past, recent: [...completed, ...past] };
 }
 
 const styles = StyleSheet.create({

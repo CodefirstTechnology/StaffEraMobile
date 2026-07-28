@@ -34,7 +34,8 @@ import {
   syncPendingRequestVibration,
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
-import { isCancelled, isPendingRequest, isTodayJob } from '@/lib/bookingVisibility';
+import { isCancelled, isPendingRequest, isTodayJob, isCompletedJob } from '@/lib/bookingVisibility';
+import { isCompletedToday } from '@/lib/earnings';
 import { showsHouseOwnerContact } from '@/lib/bookingContact';
 import { declineBooking } from '@/lib/declineBooking';
 import { HouseOwnerContactCard } from '@/components/bookings/HouseOwnerContactCard';
@@ -189,16 +190,21 @@ export default function ServantHomeScreen() {
 
   const pending = (bookings || []).filter((b) => isPendingRequest(b.status));
   const todayJobs = (bookings || []).filter((b) => isTodayJob(b.status));
+  const completedJobs = (bookings || []).filter(
+    (b) => isCompletedJob(b.status) && isCompletedToday(b),
+  );
 
   useEffect(() => {
     if (!bookings?.length) return;
-    const cancelledIds = new Set(
-      bookings.filter((b) => isCancelled(b.status)).map((b) => b.id),
+    const removedFromActiveIds = new Set(
+      bookings
+        .filter((b) => isCancelled(b.status) || isCompletedJob(b.status))
+        .map((b) => b.id),
     );
-    if (onWayBookingId != null && cancelledIds.has(onWayBookingId)) {
+    if (onWayBookingId != null && removedFromActiveIds.has(onWayBookingId)) {
       setOnWayBookingId(null);
     }
-    if (activeBookingId != null && cancelledIds.has(activeBookingId)) {
+    if (activeBookingId != null && removedFromActiveIds.has(activeBookingId)) {
       setActiveBookingId(null);
       setActiveEntry(null);
     }
@@ -234,13 +240,25 @@ export default function ServantHomeScreen() {
 
   const clockOut = async () => {
     try {
-      await api.post('/time/clock-out');
+      const res = await api.post('/time/clock-out');
+      const updated = res.data.data.booking as { id: number; status: string } | undefined;
       setActiveEntry(null);
       setActiveBookingId(null);
+      setOnWayBookingId(null);
+      if (updated?.id) {
+        qc.setQueryData(['bookings'], (current: Booking[] | undefined) =>
+          current?.map((row) =>
+            row.id === updated.id ? { ...row, status: updated.status } : row,
+          ),
+        );
+      }
       await Promise.all([
         qc.invalidateQueries({ queryKey: ['time-today'] }),
         qc.invalidateQueries({ queryKey: ['time-month'] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
+        qc.invalidateQueries({
+          predicate: (query) => query.queryKey[0] === 'booking',
+        }),
       ]);
       Alert.alert(t('servantHome.clockedOutTitle'), t('servantHome.hoursSaved'));
     } catch (e: unknown) {
@@ -442,7 +460,7 @@ export default function ServantHomeScreen() {
             </LinearGradient>
           </Pressable>
           {(() => {
-            const activeJob = todayJobs.find((b) => b.id === activeBookingId);
+            const activeJob = (bookings || []).find((b) => b.id === activeBookingId);
             const home =
               activeJob?.latitude != null && activeJob?.longitude != null
                 ? { latitude: activeJob.latitude, longitude: activeJob.longitude }
@@ -585,7 +603,7 @@ export default function ServantHomeScreen() {
         </>
       )}
 
-      <Text style={styles.section}>{t('servantHome.todayJobsSection')}</Text>
+      <Text style={styles.section}>{t('servantHome.activeJobsSection')}</Text>
       {bookingsLoading && !bookings ? (
         <GlassCard>
           <Text style={styles.empty}>{t('common.loading')}</Text>
@@ -693,6 +711,35 @@ export default function ServantHomeScreen() {
             </GlassCard>
           );
         })
+      )}
+
+      <Text style={styles.section}>{t('servantHome.completedJobsSection')}</Text>
+      {completedJobs.length === 0 ? (
+        <GlassCard>
+          <Text style={styles.empty}>{t('servantHome.noCompletedJobs')}</Text>
+        </GlassCard>
+      ) : (
+        completedJobs.map((b) => (
+          <GlassCard key={`done-${b.id}`} style={styles.mb}>
+            <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
+              <View style={styles.jobRow}>
+                <MaterialIcons name="check-circle" size={18} color={Stitch.colors.success} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
+                  <Text style={styles.cardMeta}>
+                    {formatVisitAddressLines(b).join(' · ') || b.address || t('servantHome.addressOnFile')}
+                  </Text>
+                </View>
+                <MaterialIcons
+                  name="chevron-right"
+                  size={22}
+                  color={Stitch.colors.onSurfaceVariant}
+                />
+              </View>
+            </Pressable>
+            <StatusPill status={b.status} />
+          </GlassCard>
+        ))
       )}
     </ScrollView>
     <DeclineReasonSheet

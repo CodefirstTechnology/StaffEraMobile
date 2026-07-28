@@ -111,10 +111,11 @@ export default function HomeScreen() {
   );
   const bookingsForHome = bookingList.filter((b) => !openInquiryIds.has(b.id));
   const otpBooking = bookingList.find((b) => b.workStartOtp?.code);
-  const { active, recent } = splitBookings(bookingsForHome);
+  const { active, completed, past } = splitBookings(bookingsForHome);
   const homeActive = active.slice(0, 2);
-  const homeRecent = recent.slice(0, 2);
-  const hasBookings = homeActive.length > 0 || homeRecent.length > 0;
+  const homeCompleted = completed.slice(0, 2);
+  const homePast = past.slice(0, 2);
+  const hasBookings = homeActive.length > 0 || homeCompleted.length > 0 || homePast.length > 0;
   const isRefreshing = summaryLoading || summaryFetching || bookingsLoading;
 
   const handleRefresh = useCallback(() => {
@@ -263,12 +264,32 @@ export default function HomeScreen() {
                 ))}
               </>
             ) : null}
-            {homeRecent.length > 0 ? (
+            {homeCompleted.length > 0 ? (
               <>
                 <Text style={[styles.bookingsSub, homeActive.length > 0 && styles.bookingsSubGap]}>
+                  {t('bookings.completedJobs')}
+                </Text>
+                {homeCompleted.map((b) => (
+                  <BookingSummaryCard
+                    key={b.id}
+                    booking={b}
+                    skills={skills}
+                    onPress={() => router.push(`/(main)/bookings/${b.id}`)}
+                  />
+                ))}
+              </>
+            ) : null}
+            {homePast.length > 0 ? (
+              <>
+                <Text
+                  style={[
+                    styles.bookingsSub,
+                    (homeActive.length > 0 || homeCompleted.length > 0) && styles.bookingsSubGap,
+                  ]}
+                >
                   {t('common.recent')}
                 </Text>
-                {homeRecent.map((b) => (
+                {homePast.map((b) => (
                   <BookingSummaryCard
                     key={b.id}
                     booking={b}
