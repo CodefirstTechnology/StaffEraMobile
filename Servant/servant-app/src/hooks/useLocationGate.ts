@@ -13,7 +13,7 @@ export function useLocationGate() {
   );
   const evaluatingRef = useRef(false);
 
-  const evaluate = useCallback(async (options?: { showChecking?: boolean }) => {
+  const evaluate = useCallback(async (options?: { showChecking?: boolean; userInitiated?: boolean }) => {
     if (Platform.OS === 'web') {
       setStatus('granted');
       return;
@@ -27,18 +27,28 @@ export function useLocationGate() {
     }
 
     try {
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
-      if (!servicesEnabled) {
-        setStatus('blocked');
-        return;
+      let servicesEnabled = true;
+      try {
+        servicesEnabled = await Location.hasServicesEnabledAsync();
+      } catch {
+        servicesEnabled = true;
       }
 
       let permission = await Location.getForegroundPermissionsAsync();
-      if (permission.status === 'undetermined') {
+      if (permission.status !== 'granted' && options?.userInitiated) {
         permission = await Location.requestForegroundPermissionsAsync();
       }
 
-      setStatus(permission.status === 'granted' ? 'granted' : 'blocked');
+      if (permission.status !== 'granted' && options?.userInitiated) {
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          void Location.enableNetworkProviderAsync().catch(() => {});
+        }
+      }
+
+      const isGranted = permission.status === 'granted' && servicesEnabled;
+      setStatus(isGranted ? 'granted' : 'blocked');
+    } catch {
+      setStatus('granted');
     } finally {
       evaluatingRef.current = false;
     }
@@ -62,6 +72,6 @@ export function useLocationGate() {
     checking: status === 'checking',
     blocked: status === 'blocked',
     granted: status === 'granted',
-    retry: () => evaluate({ showChecking: true }),
+    retry: () => evaluate({ showChecking: true, userInitiated: true }),
   };
-};
+}

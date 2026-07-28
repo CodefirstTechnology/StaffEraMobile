@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/i18n/format';
 import { formatDurationFromHours } from '@/lib/formatDuration';
 import { GlassCard } from '@/components/ui/GlassCard';
 import {
+  EarningsBooking,
   bookingEarningAmount,
   computeTodayEarnings,
   computeMonthlyEarnings,
@@ -16,7 +17,7 @@ import {
 
 export default function EarningsScreen() {
   const { t } = useTranslation();
-  const { data: bookings } = useQuery({
+  const { data: bookings = [] } = useQuery<EarningsBooking[]>({
     queryKey: ['bookings'],
     queryFn: async () => {
       const res = await api.get('/bookings');
@@ -67,10 +68,9 @@ export default function EarningsScreen() {
   const completed = (bookings || []).filter((b) => isCompletedToday(b));
   const completedMonth = (bookings || []).filter((b) => isCompletedThisMonth(b));
 
-  const allCompleted = (bookings || []).filter((b: { status: string }) => b.status === 'COMPLETED');
+  const allCompleted = (bookings || []).filter((b) => b.status === 'COMPLETED');
   const totalAll = allCompleted.reduce(
-    (s: number, b: { totalAmount?: number; sessionHours?: number | null }) =>
-      s + bookingEarningAmount(b, hourlyRate),
+    (s: number, b) => s + bookingEarningAmount(b, hourlyRate),
     0,
   );
 
@@ -126,15 +126,10 @@ export default function EarningsScreen() {
         <Text style={styles.empty}>{t('earnings.noMonthJobs')}</Text>
       ) : (
         completedMonth.map(
-          (b: {
-            id: number;
-            totalAmount?: number;
-            sessionHours?: number | null;
-            houseOwner: { user: { name: string } };
-          }) => (
+          (b: EarningsBooking & { houseOwner?: { user: { name: string } } }) => (
             <GlassCard key={`m-${b.id}`} style={styles.row}>
               <View>
-                <Text style={styles.rowName}>{b.houseOwner.user.name}</Text>
+                <Text style={styles.rowName}>{b.houseOwner?.user?.name ?? 'Customer'}</Text>
                 <Text style={styles.rowMeta}>{monthLabel}</Text>
               </View>
               <Text style={styles.amt}>
@@ -151,15 +146,10 @@ export default function EarningsScreen() {
         <Text style={styles.empty}>{t('earnings.noTodayJobs')}</Text>
       ) : (
         completed.map(
-          (b: {
-            id: number;
-            totalAmount?: number;
-            sessionHours?: number | null;
-            houseOwner: { user: { name: string } };
-          }) => (
+          (b: EarningsBooking & { houseOwner?: { user: { name: string } } }) => (
             <GlassCard key={b.id} style={styles.row}>
               <View>
-                <Text style={styles.rowName}>{b.houseOwner.user.name}</Text>
+                <Text style={styles.rowName}>{b.houseOwner?.user?.name ?? 'Customer'}</Text>
                 <Text style={styles.rowMeta}>{t('earnings.completedToday')}</Text>
               </View>
               <Text style={styles.amt}>

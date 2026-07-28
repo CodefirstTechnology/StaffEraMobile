@@ -137,7 +137,8 @@ export default function ServantHomeScreen() {
     staleTime: 0,
   });
 
-  const { data: notifications } = useNotifications();
+  const { data: notificationsData } = useNotifications();
+  const notifications = notificationsData?.notifications ?? [];
   const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
 
   const { data: today, refetch: refetchToday } = useQuery({

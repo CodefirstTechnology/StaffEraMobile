@@ -33,6 +33,21 @@ import {
   type BookingFieldErrors,
 } from '@/lib/bookingValidation';
 
+function getDefaultBookingTimes() {
+  const now = new Date();
+  const currentHour = now.getHours();
+  if (currentHour >= 19) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    return { sessionDate: tomorrow, start: '09:00', end: '13:00' };
+  }
+  const startHour = Math.min(20, Math.max(9, currentHour + 1));
+  const endHour = Math.min(22, startHour + 3);
+  const fmt = (h: number) => String(h).padStart(2, '0') + ':00';
+  return { sessionDate: now, start: fmt(startHour), end: fmt(endHour) };
+}
+
 export default function NewBookingScreen() {
   const { t } = useTranslation();
   const { servantId } = useLocalSearchParams<{ servantId: string }>();
@@ -42,9 +57,10 @@ export default function NewBookingScreen() {
     defaultBookingLocationMode(ho),
   );
   const [bookingType, setBookingType] = useState<'SESSION' | 'MONTHLY'>('SESSION');
-  const [sessionDate, setSessionDate] = useState(new Date());
-  const [sessionStart, setSessionStart] = useState('09:00');
-  const [sessionEnd, setSessionEnd] = useState('13:00');
+  const [initialTimes] = useState(() => getDefaultBookingTimes());
+  const [sessionDate, setSessionDate] = useState(() => initialTimes.sessionDate);
+  const [sessionStart, setSessionStart] = useState(() => initialTimes.start);
+  const [sessionEnd, setSessionEnd] = useState(() => initialTimes.end);
   const [monthlyStart, setMonthlyStart] = useState(new Date());
   const [monthlyEnd, setMonthlyEnd] = useState(() => {
     const d = new Date();
@@ -80,15 +96,18 @@ export default function NewBookingScreen() {
     },
   });
 
-  const totalAmount =
+  const hours = Math.max(
+    1,
+    (parseInt(sessionEnd.split(':')[0], 10) || 0) -
+      (parseInt(sessionStart.split(':')[0], 10) || 0),
+  );
+  const baseSubtotal =
     bookingType === 'SESSION'
-      ? (servant?.hourlyRate || 0) *
-        Math.max(
-          1,
-          (parseInt(sessionEnd.split(':')[0], 10) || 0) -
-            (parseInt(sessionStart.split(':')[0], 10) || 0),
-        )
+      ? (servant?.hourlyRate || 0) * hours
       : servant?.monthlyRate || 0;
+  const feePct = 10;
+  const platformFee = Math.round(baseSubtotal * (feePct / 100));
+  const totalAmount = baseSubtotal + platformFee;
 
   const submit = async () => {
     if (!servantId) {
@@ -161,32 +180,7 @@ export default function NewBookingScreen() {
         err.response?.status === 409
           ? t('bookings.timeNotAvailable')
           : t('bookings.bookingFailed');
-      const buttons =
-        err.response?.status === 409
-          ? [
-              { text: t('bookings.changeTime'), style: 'cancel' as const },
-              {
-        sessionDate: bookingType === 'SESSION' ? sessionDate.toISOString() : undefined,
-        sessionStartTime: bookingType === 'SESSION' ? sessionStart : undefined,
-        sessionEndTime: bookingType === 'SESSION' ? sessionEnd : undefined,
-        sessionHours: bookingType === 'SESSION' ? hours : undefined,
-        monthlyStartDate: bookingType === 'MONTHLY' ? monthlyStart.toISOString() : undefined,
-        monthlyEndDate: bookingType === 'MONTHLY' ? monthlyEnd.toISOString() : undefined,
-        address: location.address,
-        flatNo: addressUnit.flatNo || undefined,
-        building: addressUnit.building || undefined,
-        area: location.area || undefined,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        totalAmount,
-        notes: notes || undefined,
-      });
-
-      showAlert(t('bookings.bookingCreated'), t('bookings.bookingCreatedBody'), [
-        { text: t('common.ok'), onPress: () => router.replace('/(main)/bookings') },
-      ]);
-    } catch (err: unknown) {
-      showAlert(t('bookings.requestFailed'), te(t, err, 'bookings.requestFailed'));
+      showAlert(title, message);
     } finally {
       setLoading(false);
     }

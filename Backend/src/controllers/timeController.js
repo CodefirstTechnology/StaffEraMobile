@@ -208,7 +208,29 @@ exports.getToday = async (req, res) => {
       servantId: servant.id,
       date: { gte: start, lte: end }
     },
-    include: { booking: { select: { id: true, address: true, bookingType: true } } },
+    include: {
+      booking: {
+        select: {
+          id: true,
+          address: true,
+          flatNo: true,
+          building: true,
+          area: true,
+          bookingType: true,
+          requestedSkill: true,
+          houseOwner: {
+            select: {
+              user: {
+                select: {
+                  name: true,
+                  phone: true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     orderBy: { clockIn: "desc" }
   });
 
@@ -271,7 +293,22 @@ exports.getHistory = async (req, res) => {
   const [entries, total] = await Promise.all([
     prisma.timeEntry.findMany({
       where: { servantId: servant.id },
-      include: { booking: true },
+      include: {
+        booking: {
+          include: {
+            houseOwner: {
+              select: {
+                user: {
+                  select: {
+                    name: true,
+                    phone: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       orderBy: { date: "desc" },
       skip: (page - 1) * limit,
       take: limit

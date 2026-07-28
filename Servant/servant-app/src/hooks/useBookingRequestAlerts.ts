@@ -8,7 +8,8 @@ import { useNotifications } from '@/hooks/useNotifications';
 
 /** Vibrate and play alert when a new home-owner booking request notification arrives. */
 export function useBookingRequestAlerts() {
-  const { data: notifications = [], isSuccess: notificationsReady } = useNotifications();
+  const { data: notificationsData, isSuccess: notificationsReady } = useNotifications();
+  const notifications = notificationsData?.notifications ?? [];
   const seenIds = useRef<Set<number>>(new Set());
   const bootstrapped = useRef(false);
 

@@ -74,8 +74,24 @@ export function validateBookingForm(input: ValidateBookingFormInput): {
       } else if (!isValidTimeFormat(end)) {
         errors.sessionEnd = input.t('bookings.invalidTimeFormat');
       }
-      if (!errors.sessionStart && !errors.sessionEnd && start && end && !isValidSessionTimeRange(start, end)) {
-        errors.sessionEnd = input.t('bookings.invalidTimeRange');
+      if (!errors.sessionStart && !errors.sessionEnd && start && end) {
+        if (!isValidSessionTimeRange(start, end)) {
+          errors.sessionEnd = input.t('bookings.invalidTimeRange');
+        } else {
+          const isToday =
+            new Date(input.sessionDate).toDateString() === new Date().toDateString();
+          if (isToday) {
+            const [eh, em] = end.split(':').map(Number);
+            const now = new Date();
+            const endMinutes = eh * 60 + em;
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+            if (endMinutes <= currentMinutes) {
+              errors.sessionEnd = input.t('bookings.timeInPast', {
+                defaultValue: 'Selected time slot has already passed today',
+              });
+            }
+          }
+        }
       }
     }
   }

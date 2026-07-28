@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -42,6 +42,9 @@ export default function RegisterScreen() {
     isError: skillsError,
     refetch: refetchSkills,
   } = useSkills();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const fieldPositions = useRef<Record<string, number>>({});
+
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -111,7 +114,30 @@ export default function RegisterScreen() {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    const hasErrors = Object.keys(newErrors).length > 0;
+    if (hasErrors) {
+      const fieldOrder: Array<keyof typeof newErrors> = [
+        'name',
+        'email',
+        'phone',
+        'skills',
+        'addressText',
+        'city',
+      ];
+      const firstErrorKey = fieldOrder.find((key) => newErrors[key]);
+      if (firstErrorKey && fieldPositions.current[firstErrorKey] !== undefined) {
+        const targetY = Math.max(0, fieldPositions.current[firstErrorKey] - 40);
+        setTimeout(() => {
+          scrollViewRef.current?.scrollTo({
+            y: targetY,
+            animated: true,
+          });
+        }, 50);
+      }
+    }
+
+    return !hasErrors;
   };
 
   const submit = async () => {
@@ -149,6 +175,15 @@ export default function RegisterScreen() {
           ...prev,
           email: 'This email is already registered.',
         }));
+        if (fieldPositions.current['email'] !== undefined) {
+          const targetY = Math.max(0, fieldPositions.current['email'] - 40);
+          setTimeout(() => {
+            scrollViewRef.current?.scrollTo({
+              y: targetY,
+              animated: true,
+            });
+          }, 50);
+        }
       } else {
         setFormError(errorMsg);
       }
@@ -169,6 +204,7 @@ export default function RegisterScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
+        ref={scrollViewRef}
         style={styles.root}
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -194,50 +230,62 @@ export default function RegisterScreen() {
         ) : (
           <View>
             {fields.map((f) => (
-              <GhostInput
+              <View
                 key={f.key}
-                label={f.label}
-                {...('keyboard' in f ? { keyboardType: f.keyboard } : {})}
-                autoCapitalize={f.key === 'email' ? 'none' : 'words'}
-                value={form[f.key]}
-                error={errors[f.key]}
-                required={f.required}
-                onChangeText={(v) => {
-                  const next = f.key === 'phone' ? digitsOnlyPhone(v) : v;
-                  setForm((prev) => ({ ...prev, [f.key]: next }));
-                  if (errors[f.key]) setErrors((prev) => ({ ...prev, [f.key]: undefined }));
-                  if (formError) setFormError('');
+                onLayout={(e) => {
+                  fieldPositions.current[f.key] = e.nativeEvent.layout.y;
                 }}
-                onBlur={
-                  f.key === 'phone'
-                    ? () => {
-                        validatePhoneField(form.phone);
-                      }
-                    : undefined
-                }
-              />
+              >
+                <GhostInput
+                  label={f.label}
+                  {...('keyboard' in f ? { keyboardType: f.keyboard } : {})}
+                  autoCapitalize={f.key === 'email' ? 'none' : 'words'}
+                  value={form[f.key]}
+                  error={errors[f.key]}
+                  required={f.required}
+                  onChangeText={(v) => {
+                    const next = f.key === 'phone' ? digitsOnlyPhone(v) : v;
+                    setForm((prev) => ({ ...prev, [f.key]: next }));
+                    if (errors[f.key]) setErrors((prev) => ({ ...prev, [f.key]: undefined }));
+                    if (formError) setFormError('');
+                  }}
+                  onBlur={
+                    f.key === 'phone'
+                      ? () => {
+                          validatePhoneField(form.phone);
+                        }
+                      : undefined
+                  }
+                />
+              </View>
             ))}
 
-            <SkillSelect
-              label={t('auth.skills')}
-              placeholder={t('auth.selectSkills')}
-              skills={skills}
-              loading={skillsLoading}
-              value={form.skills}
-              onChange={(skillsSelected) => {
-                setForm((prev) => ({ ...prev, skills: skillsSelected }));
-                if (errors.skills) setErrors((prev) => ({ ...prev, skills: undefined }));
-                if (formError) setFormError('');
+            <View
+              onLayout={(e) => {
+                fieldPositions.current['skills'] = e.nativeEvent.layout.y;
               }}
-            />
-            {errors.skills ? <Text style={styles.inlineError}>{errors.skills}</Text> : null}
-            {skillsError && !skillsLoading ? (
-              <Pressable onPress={() => refetchSkills()}>
-                <Text style={styles.skillsError}>
-                  {t('auth.skillsUnavailable')} {t('auth.tapToRetry')}
-                </Text>
-              </Pressable>
-            ) : null}
+            >
+              <SkillSelect
+                label={t('auth.skills')}
+                placeholder={t('auth.selectSkills')}
+                skills={skills}
+                loading={skillsLoading}
+                value={form.skills}
+                onChange={(skillsSelected) => {
+                  setForm((prev) => ({ ...prev, skills: skillsSelected }));
+                  if (errors.skills) setErrors((prev) => ({ ...prev, skills: undefined }));
+                  if (formError) setFormError('');
+                }}
+              />
+              {errors.skills ? <Text style={styles.inlineError}>{errors.skills}</Text> : null}
+              {skillsError && !skillsLoading ? (
+                <Pressable onPress={() => refetchSkills()}>
+                  <Text style={styles.skillsError}>
+                    {t('auth.skillsUnavailable')} {t('auth.tapToRetry')}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
 
             <LocationPicker
               label={t('auth.address')}
@@ -255,33 +303,45 @@ export default function RegisterScreen() {
               }}
             />
 
-            <GhostInput
-              label={t('auth.addressManual')}
-              placeholder={t('auth.addressManualPlaceholder')}
-              value={form.addressText}
-              onChangeText={(v) => {
-                setForm((prev) => ({ ...prev, addressText: v }));
-                if (errors.addressText) setErrors((prev) => ({ ...prev, addressText: undefined }));
-                if (formError) setFormError('');
+            <View
+              onLayout={(e) => {
+                fieldPositions.current['addressText'] = e.nativeEvent.layout.y;
               }}
-              error={errors.addressText}
-              multiline
-              style={styles.addressInput}
-              required
-            />
-
-            {!homeLocation ? (
+            >
               <GhostInput
-                label={t('auth.cityIfNoLocation')}
-                value={form.city}
+                label={t('auth.addressManual')}
+                placeholder={t('auth.addressManualPlaceholder')}
+                value={form.addressText}
                 onChangeText={(v) => {
-                  setForm((prev) => ({ ...prev, city: v }));
-                  if (errors.city) setErrors((prev) => ({ ...prev, city: undefined }));
+                  setForm((prev) => ({ ...prev, addressText: v }));
+                  if (errors.addressText) setErrors((prev) => ({ ...prev, addressText: undefined }));
                   if (formError) setFormError('');
                 }}
-                error={errors.city}
+                error={errors.addressText}
+                multiline
+                style={styles.addressInput}
                 required
               />
+            </View>
+
+            {!homeLocation ? (
+              <View
+                onLayout={(e) => {
+                  fieldPositions.current['city'] = e.nativeEvent.layout.y;
+                }}
+              >
+                <GhostInput
+                  label={t('auth.cityIfNoLocation')}
+                  value={form.city}
+                  onChangeText={(v) => {
+                    setForm((prev) => ({ ...prev, city: v }));
+                    if (errors.city) setErrors((prev) => ({ ...prev, city: undefined }));
+                    if (formError) setFormError('');
+                  }}
+                  error={errors.city}
+                  required
+                />
+              </View>
             ) : null}
 
             {formError ? <Text style={styles.formError}>{formError}</Text> : null}

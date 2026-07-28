@@ -51,7 +51,8 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const { data: skills = [] } = useSkills();
-  const { data: notifications = [] } = useNotifications();
+  const { data: notificationsData } = useNotifications();
+  const notifications = notificationsData?.notifications ?? [];
   const { location: liveLocation, loading: locLoading } = useLiveLocation();
   const unreadNotifications = notifications.filter((n) => !n.isRead).length;
 
