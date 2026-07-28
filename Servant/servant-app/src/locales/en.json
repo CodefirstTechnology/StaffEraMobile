@@ -405,6 +405,11 @@
     "jobDetails": "Job details",
     "customer": "Customer",
     "customerContact": "Customer contact",
+    "call": "Call",
+    "message": "Message",
+    "callCustomer": "Call customer",
+    "messageCustomer": "Message customer",
+    "contactMessageToCustomer": "Hi {{name}}, regarding your StaffEra booking:",
     "navigate": "Navigate"
   },
   "time": {

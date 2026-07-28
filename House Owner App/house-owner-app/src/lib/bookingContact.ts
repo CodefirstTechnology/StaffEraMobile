@@ -3,6 +3,11 @@ export function showsHelperContact(status: string) {
   return status === 'CONFIRMED' || status === 'ACTIVE' || status === 'COMPLETED';
 }
 
+/** Call / SMS actions are available once the booking is confirmed and work may be in progress. */
+export function allowsContactActions(status: string) {
+  return status === 'CONFIRMED' || status === 'ACTIVE';
+}
+
 export type HelperContactUser = {
   name?: string | null;
   phone?: string | null;

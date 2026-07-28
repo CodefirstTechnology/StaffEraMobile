@@ -23,7 +23,7 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { BookingWorkTimesCard } from '@/components/bookings/BookingWorkTimesCard';
 import { getBookingEditMode } from '@/lib/bookingEdit';
 import { bookingDetailPollInterval } from '@/lib/bookingPoll';
-import { getHelperContact, showsHelperContact } from '@/lib/bookingContact';
+import { getHelperContact, showsHelperContact, allowsContactActions } from '@/lib/bookingContact';
 import { HelperContactCard } from '@/components/bookings/HelperContactCard';
 import { useNotifications } from '@/hooks/useNotifications';
 
@@ -167,6 +167,7 @@ export default function BookingDetailScreen() {
             bio={helperContact.bio}
             rating={helperContact.rating}
             verificationStatus={helperContact.verificationStatus}
+            showActions={allowsContactActions(booking.status)}
           />
         ) : booking.servant?.user?.name && !showsHelperContact(booking.status) ? (
           <Text style={styles.pendingHelper}>

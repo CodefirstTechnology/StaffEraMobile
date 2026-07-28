@@ -303,6 +303,11 @@
     "jobDetails": "नोकरी तपशील",
     "customer": "ग्राहक",
     "customerContact": "ग्राहक संपर्क",
+    "call": "कॉल",
+    "message": "संदेश",
+    "callCustomer": "ग्राहकाला कॉल करा",
+    "messageCustomer": "ग्राहकाला संदेश पाठवा",
+    "contactMessageToCustomer": "नमस्कार {{name}}, तुमच्या StaffEra बुकингबद्दल:",
     "navigate": "नेव्हिगेट",
     "emptyCalendar": "No upcoming jobs on your calendar",
     "addressTbd": "Address TBD"

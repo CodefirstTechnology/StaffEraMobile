@@ -29,7 +29,7 @@ import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
 import { useZoneGate } from '@/hooks/useZoneGate';
 import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
 import { isActionableBooking, isCancelled } from '@/lib/bookingVisibility';
-import { showsHouseOwnerContact } from '@/lib/bookingContact';
+import { showsHouseOwnerContact, allowsContactActions } from '@/lib/bookingContact';
 import { HouseOwnerContactCard } from '@/components/bookings/HouseOwnerContactCard';
 import { declineBooking } from '@/lib/declineBooking';
 
@@ -299,6 +299,7 @@ export default function ScheduleDetailScreen() {
           <HouseOwnerContactCard
             name={booking.houseOwner.user.name}
             phone={booking.houseOwner.user.phone}
+            showActions={allowsContactActions(booking.status)}
           />
         ) : null}
         <Text style={styles.meta}>{visitType}</Text>

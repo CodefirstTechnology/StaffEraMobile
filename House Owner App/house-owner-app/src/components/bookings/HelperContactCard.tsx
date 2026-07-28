@@ -3,6 +3,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Stitch } from '@/theme/stitch';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { ContactActionButtons } from '@/components/bookings/ContactActionButtons';
 import type { HelperContactUser } from '@/lib/bookingContact';
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
   rating?: number | null;
   verificationStatus?: string | null;
   compact?: boolean;
+  showActions?: boolean;
 };
 
 export function HelperContactCard({
@@ -23,6 +25,7 @@ export function HelperContactCard({
   rating,
   verificationStatus,
   compact = false,
+  showActions = false,
 }: Props) {
   const { t } = useTranslation();
 
@@ -76,6 +79,9 @@ export function HelperContactCard({
         <Text style={styles.bio} numberOfLines={3}>
           {bio}
         </Text>
+      ) : null}
+      {showActions && phone ? (
+        <ContactActionButtons phone={phone} />
       ) : null}
     </View>
   );

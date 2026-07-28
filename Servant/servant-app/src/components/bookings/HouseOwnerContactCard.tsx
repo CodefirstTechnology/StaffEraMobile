@@ -1,22 +1,29 @@
-import { View, Text, StyleSheet, Linking, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Stitch } from '@/theme/stitch';
+import { ContactActionButtons } from '@/components/bookings/ContactActionButtons';
+import { openPhoneCall } from '@/lib/contactActions';
 
 type Props = {
   name?: string | null;
   phone?: string | null;
   compact?: boolean;
+  showActions?: boolean;
 };
 
-export function HouseOwnerContactCard({ name, phone, compact = false }: Props) {
+export function HouseOwnerContactCard({
+  name,
+  phone,
+  compact = false,
+  showActions = false,
+}: Props) {
   const { t } = useTranslation();
 
   if (!name && !phone) return null;
 
   const dialOwner = () => {
-    if (!phone) return;
-    void Linking.openURL(`tel:${phone}`);
+    openPhoneCall(phone);
   };
 
   return (
@@ -33,6 +40,9 @@ export function HouseOwnerContactCard({ name, phone, compact = false }: Props) {
           <MaterialIcons name="phone" size={18} color={Stitch.colors.primary} />
           <Text style={[styles.value, styles.phone]}>{phone}</Text>
         </Pressable>
+      ) : null}
+      {showActions && phone ? (
+        <ContactActionButtons phone={phone} />
       ) : null}
     </View>
   );
