@@ -19,6 +19,9 @@ import { useNotifications, type AppNotification } from '@/hooks/useNotifications
 import { localizeNotification } from '@/lib/i18n/notifications';
 import { formatRelativeTime } from '@/lib/i18n/format';
 
+import { useState } from 'react';
+import { PaginationControls } from '@/components/ui/PaginationControls';
+
 function getBookingId(n: AppNotification) {
   const id = n.data?.bookingId;
   return typeof id === 'number' ? id : null;
@@ -27,7 +30,11 @@ function getBookingId(n: AppNotification) {
 export default function NotificationsScreen() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const { data: notifications = [], isLoading, refetch, isRefetching } = useNotifications();
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const { data, isLoading, refetch, isRefetching } = useNotifications(page, limit);
+  const notifications = data?.notifications || [];
+  const total = data?.total || 0;
   const unread = notifications.filter((n) => !n.isRead).length;
 
   const openNotification = async (n: AppNotification) => {
@@ -109,6 +116,17 @@ export default function NotificationsScreen() {
               </Pressable>
             );
           }}
+          ListFooterComponent={
+            notifications.length > 0 ? (
+              <PaginationControls
+                page={page}
+                limit={limit}
+                total={total}
+                onPageChange={setPage}
+                onLimitChange={setLimit}
+              />
+            ) : null
+          }
         />
       )}
     </View>

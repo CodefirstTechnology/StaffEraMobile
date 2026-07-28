@@ -23,6 +23,8 @@ import { useLiveLocation } from '@/hooks/useLiveLocation';
 import { useAuthStore } from '@/store/authStore';
 import type { LocationValue } from '@/lib/locationTypes';
 
+import { PaginationControls } from '@/components/ui/PaginationControls';
+
 export default function BrowseScreen() {
   const { t } = useTranslation();
   const { skill: skillParam } = useLocalSearchParams<{ skill?: string }>();
@@ -32,7 +34,14 @@ export default function BrowseScreen() {
   const [skill, setSkill] = useState('');
   const [city, setCity] = useState('');
   const [zone, setZone] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const skillCodes = skills.map((s) => s.code);
+
+  const handleSkillChange = (newSkill: string) => {
+    setSkill(newSkill);
+    setPage(1);
+  };
 
   const searchLocation = useMemo<LocationValue | null>(() => {
     if (
@@ -65,11 +74,12 @@ export default function BrowseScreen() {
     const next = raw?.toUpperCase();
     if (next && skillCodes.includes(next)) {
       setSkill(next);
+      setPage(1);
     }
   }, [skillParam, skillCodes.join(',')]);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['servants', skill, city, zone, searchLocation?.latitude, searchLocation?.longitude],
+    queryKey: ['servants', skill, city, zone, searchLocation?.latitude, searchLocation?.longitude, page, limit],
     enabled: !locLoading && !!searchLocation,
     queryFn: async () => {
       const params: Record<string, string | number> = {
@@ -78,13 +88,20 @@ export default function BrowseScreen() {
         zone: zone || undefined,
         latitude: searchLocation!.latitude,
         longitude: searchLocation!.longitude,
+        page,
+        limit,
       } as Record<string, string | number>;
       const res = await api.get('/servants', { params });
-      return res.data.data.servants;
+      return {
+        servants: res.data.data.servants,
+        total: res.data.data.pagination?.total ?? res.data.data.servants.length,
+      };
     },
   });
 
-  const nearbyCount = data?.length ?? 0;
+  const servants = data?.servants ?? [];
+  const total = data?.total ?? 0;
+  const nearbyCount = total;
   const skillLabel = skill ? localizedSkillLabel(skill, skills) : null;
 
   const broadcastMessage = (() => {
@@ -249,6 +266,15 @@ export default function BrowseScreen() {
               : t('browse.countHintNoHelpers')}
           </Text>
         ) : null}
+
+        <PaginationControls
+          page={page}
+          limit={limit}
+          total={total}
+          onPageChange={setPage}
+          onLimitChange={setLimit}
+        />
+
         <GradientButton
           title={
             skillLabel ? t('bookings.requestBooking') : t('browse.sendAreaRequestBtn')

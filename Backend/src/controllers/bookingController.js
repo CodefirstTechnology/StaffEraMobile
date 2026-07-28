@@ -1,6 +1,7 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/response");
+const { getPricingConfig, calculateBookingPrice } = require("../services/pricingService");
 const {
   checkBookingConflict,
   filterServantsAvailableForBooking,
@@ -333,15 +334,27 @@ exports.listBookings = async (req, res) => {
 
   if (status) where.status = status;
 
-  const bookings = await prisma.booking.findMany({
-    where,
-    include: bookingInclude,
-    orderBy: { createdAt: "desc" }
-  });
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const isAll = req.query.limit === "all";
+  const limit = isAll ? undefined : Math.min(100, parseInt(req.query.limit, 10) || 20);
+
+  const [bookings, total] = await Promise.all([
+    prisma.booking.findMany({
+      where,
+      include: bookingInclude,
+      ...(limit ? { skip: (page - 1) * limit, take: limit } : {}),
+      orderBy: { createdAt: "desc" }
+    }),
+    prisma.booking.count({ where })
+  ]);
 
   const enriched = await attachWorkOtpFields(bookings, req.user.role);
+  const activeLimit = limit || total || 1;
+  const totalPages = Math.ceil(total / activeLimit) || 1;
+
   sendSuccess(res, {
-    bookings: enriched.map((booking) => presentBooking(booking, req.user.role))
+    bookings: enriched.map(normalizeBookingRow),
+    pagination: { page, limit: activeLimit, total, totalPages }
   });
 };
 
@@ -442,7 +455,20 @@ exports.getBooking = async (req, res) => {
   await assertBookingAccess(req, booking);
 
   const [enriched] = await attachWorkOtpFields([booking], req.user.role);
-  sendSuccess(res, { booking: presentBooking(enriched, req.user.role) });
+  const config = await getPricingConfig();
+  const priceBreakdown = calculateBookingPrice({
+    bookingType: booking.bookingType,
+    hourlyRate: booking.servant?.hourlyRate || config.minHourlyRate,
+    monthlyRate: booking.servant?.monthlyRate || config.minMonthlyRate,
+    sessionHours: booking.sessionHours || 1,
+    monthsCount: 1,
+    platformFeePercentage: config.platformFeePercentage,
+  });
+
+  sendSuccess(res, {
+    booking: normalizeBookingRow(enriched),
+    priceBreakdown
+  });
 };
 
 const assertBookingAccess = async (req, booking) => {

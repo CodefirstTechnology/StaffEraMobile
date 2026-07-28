@@ -40,12 +40,26 @@ function houseOwnerMeta(user) {
   return parts.length ? parts.join(' · ') : null
 }
 
+import { Pagination } from '../../components/ui/Pagination'
+
 export default function AdminUsers() {
   const [role, setRole] = useState('')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
   const [confirmTarget, setConfirmTarget] = useState(null)
   const qc = useQueryClient()
   const toast = useToast()
+
+  const handleRoleChange = (newRole) => {
+    setRole(newRole)
+    setPage(1)
+  }
+
+  const handleSearchChange = (newSearch) => {
+    setSearch(newSearch)
+    setPage(1)
+  }
 
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
@@ -56,13 +70,14 @@ export default function AdminUsers() {
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-users', role, search],
+    queryKey: ['admin-users', role, search, page, limit],
     queryFn: async () => {
       const res = await api.get('/admin/users', {
         params: {
           role: role || undefined,
           search: search || undefined,
-          limit: 200,
+          page,
+          limit,
         },
       })
       return res.data.data
@@ -128,11 +143,11 @@ export default function AdminUsers() {
         </div>
       )}
 
-      <FilterBar count={users.length} countLabel={`of ${total} users`}>
-        <SelectFilter value={role} onChange={setRole} options={ROLE_OPTIONS} />
+      <FilterBar count={total} countLabel="total users">
+        <SelectFilter value={role} onChange={handleRoleChange} options={ROLE_OPTIONS} />
         <SearchInput
           value={search}
-          onChange={setSearch}
+          onChange={handleSearchChange}
           placeholder="Search by name or email…"
         />
       </FilterBar>
@@ -159,38 +174,24 @@ export default function AdminUsers() {
                     <Avatar name={displayName(u)} />
                     <div className="min-w-0">
                       <p className="font-semibold text-primary truncate">{displayName(u)}</p>
-                      <p className="text-sm text-on-surface-variant truncate">{u.email}</p>
-                      {u.phone && (
-                        <p className="text-xs text-on-surface-variant">{u.phone}</p>
-                      )}
-                      {houseOwnerMeta(u) && (
-                        <p className="text-xs text-on-surface-variant">{houseOwnerMeta(u)}</p>
-                      )}
+                      <p className="text-xs text-on-surface-variant truncate">{u.email}</p>
                     </div>
                   </div>
                   <ActivePill active={u.isActive} />
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/20 pt-3">
                   <RolePill role={u.role} />
+                  {u.phone && (
+                    <span className="text-xs text-on-surface-variant">{u.phone}</span>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setConfirmTarget(u)}
-                  disabled={u.role === 'ADMIN' && u.isActive}
-                  title={u.role === 'ADMIN' && u.isActive ? 'Admin users cannot be deactivated' : undefined}
-                  className={`mt-4 w-full rounded-xl border py-2 text-sm font-medium ${
-                    u.role === 'ADMIN' && u.isActive
-                      ? 'border-outline-variant/20 text-on-surface-variant/40 cursor-not-allowed bg-gray-50'
-                      : 'border-outline-variant/40 text-on-surface-variant hover:bg-surface-low'
-                  }`}
-                >
-                  {u.isActive ? 'Deactivate account' : 'Activate account'}
-                </button>
               </MobileCard>
             ))}
           </div>
 
-          <DataTable columns={['User', 'Email', 'Phone', 'Role', 'Status', 'Actions']}>
+          <DataTable
+            columns={['Name', 'Email', 'Phone', 'Role', 'Status', 'Action']}
+          >
             {users.map((u) => (
               <TableRow key={u.id}>
                 <td className="px-4 py-4">
@@ -232,6 +233,14 @@ export default function AdminUsers() {
               </TableRow>
             ))}
           </DataTable>
+
+          <Pagination
+            page={page}
+            limit={limit}
+            total={total}
+            onPageChange={setPage}
+            onLimitChange={setLimit}
+          />
         </>
       )}
 

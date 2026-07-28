@@ -18,7 +18,7 @@ function AdminOverviewLink() {
   const isExact = pathname === '/admin'
   const isChildRoute =
     pathname.startsWith('/admin/') &&
-    !['/admin/agents', '/admin/users', '/admin/bookings', '/admin/servants', '/admin/skills'].some(
+    !['/admin/agents', '/admin/users', '/admin/bookings', '/admin/servants', '/admin/skills', '/admin/pricing'].some(
       (route) => pathname.startsWith(route)
     )
 
@@ -55,7 +55,7 @@ export function DashboardLayout() {
             Dashboard
           </NavLink>
           <NavLink to="/registrations" className={navLinkClass}>
-            App registrations
+            App Registrations
           </NavLink>
           <NavLink to="/servants" className={navLinkClass}>
             Servants
@@ -80,10 +80,13 @@ export function DashboardLayout() {
                 Bookings
               </NavLink>
               <NavLink to="/admin/servants" end className={navLinkClass}>
-                All servants
+                All Servants
               </NavLink>
               <NavLink to="/admin/skills" end className={navLinkClass}>
                 Skills
+              </NavLink>
+              <NavLink to="/admin/pricing" end className={navLinkClass}>
+                Pricing & Limits
               </NavLink>
             </>
           )}

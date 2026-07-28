@@ -12,14 +12,17 @@ export type AppNotification = {
   createdAt: string;
 };
 
-export function useNotifications() {
+export function useNotifications(page = 1, limit = 10) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   return useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', page, limit],
     queryFn: async () => {
-      const res = await api.get('/notifications');
-      return res.data.data.notifications as AppNotification[];
+      const res = await api.get('/notifications', { params: { page, limit } });
+      return {
+        notifications: res.data.data.notifications as AppNotification[],
+        total: (res.data.data.pagination?.total ?? res.data.data.notifications.length) as number,
+      };
     },
     enabled: isAuthenticated,
     staleTime: 0,

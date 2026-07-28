@@ -7,6 +7,7 @@ const { sendSuccess } = require("../utils/response");
 const { createNotification } = require("../services/notificationService");
 const { normalizeEmail, normalizePhone } = require("../utils/normalize");
 const { validateActiveSkillCodes } = require("../services/skillService");
+const { getPricingConfig } = require("../services/pricingService");
 const {
   ROLE_IDS,
   getRoleCode,
@@ -220,6 +221,26 @@ exports.createServant = async (req, res) => {
 
   const profilePhoto = `/uploads/${req.files.profilePhoto[0].filename}`;
   const idProofUrl = `/uploads/${req.files.idProof[0].filename}`;
+
+  const pricingConfig = await getPricingConfig();
+  if (hourlyRate != null && hourlyRate !== "") {
+    const hr = parseFloat(hourlyRate);
+    if (hr < pricingConfig.minHourlyRate || hr > pricingConfig.maxHourlyRate) {
+      throw new ApiError(
+        400,
+        `Hourly rate must be between ₹${pricingConfig.minHourlyRate} and ₹${pricingConfig.maxHourlyRate}`
+      );
+    }
+  }
+  if (monthlyRate != null && monthlyRate !== "") {
+    const mr = parseFloat(monthlyRate);
+    if (mr < pricingConfig.minMonthlyRate || mr > pricingConfig.maxMonthlyRate) {
+      throw new ApiError(
+        400,
+        `Monthly rate must be between ₹${pricingConfig.minMonthlyRate} and ₹${pricingConfig.maxMonthlyRate}`
+      );
+    }
+  }
 
   const skillList = await validateActiveSkillCodes(parseSkills(skills));
   const hashed = await bcrypt.hash(password, 12);

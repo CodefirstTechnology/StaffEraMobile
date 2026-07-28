@@ -318,3 +318,16 @@ model Notification {
   data      Json?
   createdAt DateTime @default(now())
 }
+
+model PricingConfig {
+  id                    Int      @id @default(1)
+  minHourlyRate         Float    @default(50)
+  maxHourlyRate         Float    @default(1000)
+  minMonthlyRate        Float    @default(3000)
+  maxMonthlyRate        Float    @default(50000)
+  platformFeePercentage Float    @default(10)
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+
+  @@map("pricing_configs")
+}

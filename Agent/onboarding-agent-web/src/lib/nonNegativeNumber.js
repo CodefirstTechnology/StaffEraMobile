@@ -3,7 +3,7 @@ export function sanitizeNonNegativeInput(value) {
 }
 
 /** Validate optional non-negative number. Returns error message or empty string. */
-export function validateNonNegativeNumber(value, fieldLabel) {
+export function validateNonNegativeNumber(value, fieldLabel, config) {
   const trimmed = String(value ?? "").trim();
   if (!trimmed) return "";
   const num = Number(trimmed);
@@ -18,23 +18,31 @@ export function validateNonNegativeNumber(value, fieldLabel) {
       return `${fieldLabel} cannot have more than 2 decimal places`;
     }
   }
-  if (fieldLabel.toLowerCase().includes("experience") && num > 20) {
-    return "Years of experience must be under 20 years";
+  if (fieldLabel.toLowerCase().includes("experience") && num > 50) {
+    return "Years of experience must be under 50 years";
   }
-  if (fieldLabel.toLowerCase().includes("hourly rate") && num > 999) {
-    return "Hourly rate must be under 999";
+  if (fieldLabel.toLowerCase().includes("hourly rate")) {
+    const min = config?.minHourlyRate ?? 50;
+    const max = config?.maxHourlyRate ?? 1000;
+    if (num < min || num > max) {
+      return `Hourly rate must be between ₹${min} and ₹${max}`;
+    }
   }
-  if (fieldLabel.toLowerCase().includes("monthly rate") && num > 30000) {
-    return "Monthly rate must be under 30000";
+  if (fieldLabel.toLowerCase().includes("monthly rate")) {
+    const min = config?.minMonthlyRate ?? 3000;
+    const max = config?.maxMonthlyRate ?? 50000;
+    if (num < min || num > max) {
+      return `Monthly rate must be between ₹${min.toLocaleString("en-IN")} and ₹${max.toLocaleString("en-IN")}`;
+    }
   }
   return "";
 }
 
 /** Validate required non-negative number. Returns error message or empty string. */
-export function validateRequiredNonNegativeNumber(value, fieldLabel) {
+export function validateRequiredNonNegativeNumber(value, fieldLabel, config) {
   const trimmed = String(value ?? "").trim();
   if (!trimmed) return `${fieldLabel} is required`;
-  return validateNonNegativeNumber(value, fieldLabel);
+  return validateNonNegativeNumber(value, fieldLabel, config);
 }
 
 export const SKILLS_RATE_FIELDS = [
@@ -47,12 +55,12 @@ export function emptySkillsRateErrors() {
   return { experience: "", hourlyRate: "", monthlyRate: "" };
 }
 
-export function validateSkillsRateFields(form, { required = true } = {}) {
+export function validateSkillsRateFields(form, { required = true, config } = {}) {
   const errors = emptySkillsRateErrors();
   for (const { key, label } of SKILLS_RATE_FIELDS) {
     errors[key] = required
-      ? validateRequiredNonNegativeNumber(form[key], label)
-      : validateNonNegativeNumber(form[key], label);
+      ? validateRequiredNonNegativeNumber(form[key], label, config)
+      : validateNonNegativeNumber(form[key], label, config);
   }
   return errors;
 }

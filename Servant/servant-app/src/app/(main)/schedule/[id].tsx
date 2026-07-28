@@ -345,6 +345,23 @@ export default function ScheduleDetailScreen() {
                   })
                 : `${Stitch.copy.rupee}${formatCurrency(displayAmount)}`}
             </Text>
+          const hours = booking.sessionHours || 1;
+          const rate = booking.servant?.hourlyRate || (booking.totalAmount ? Math.round(booking.totalAmount / 1.1 / hours) : 0);
+          const servantNetEarning =
+            booking.bookingType === 'SESSION'
+              ? rate * hours
+              : booking.servant?.monthlyRate || Math.round(booking.totalAmount / 1.1);
+
+          return (
+            <View style={styles.earningBox}>
+              <Text style={styles.earningTitle}>Your Earnings</Text>
+              <View style={styles.earningRow}>
+                <Text style={styles.earningLabel}>
+                  Rate ({booking.bookingType === 'SESSION' ? `${hours} hrs × ${Stitch.copy.rupee}${rate}/hr` : `1 Month`})
+                </Text>
+                <Text style={styles.earningValue}>{Stitch.copy.rupee}{formatCurrency(servantNetEarning)}</Text>
+              </View>
+            </View>
           );
         })()}
         {booking.notes ? (
@@ -472,6 +489,36 @@ const styles = StyleSheet.create({
   detailRow: { marginTop: 6, color: Stitch.colors.onBackground },
   address: { marginTop: 10, color: Stitch.colors.onBackground, lineHeight: 20 },
   amount: { marginTop: 12, fontSize: 20, fontWeight: '700', color: Stitch.colors.secondary },
+  earningBox: {
+    backgroundColor: Stitch.colors.surfaceLow,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  earningTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  earningRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  earningLabel: {
+    fontSize: 13,
+    color: Stitch.colors.onSurfaceVariant,
+  },
+  earningValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Stitch.colors.secondary,
+  },
   notes: { marginTop: 10, fontStyle: 'italic', color: Stitch.colors.onSurfaceVariant },
   onWayBtn: {
     marginTop: 12,

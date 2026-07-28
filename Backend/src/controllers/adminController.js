@@ -403,3 +403,25 @@ exports.toggleUser = async (req, res) => {
 
   sendSuccess(res, { user: serializeUser(updated) });
 };
+
+const {
+  getPricingConfig: getServicePricingConfig,
+  updatePricingConfig: updateServicePricingConfig
+} = require("../services/pricingService");
+
+exports.getPricingConfig = async (req, res) => {
+  const config = await getServicePricingConfig();
+  sendSuccess(res, { pricing: config });
+};
+
+exports.updatePricingConfig = async (req, res) => {
+  try {
+    const config = await updateServicePricingConfig(req.body);
+    sendSuccess(res, {
+      pricing: config,
+      message: "Pricing configuration updated successfully"
+    });
+  } catch (err) {
+    throw new ApiError(400, err.message);
+  }
+};
