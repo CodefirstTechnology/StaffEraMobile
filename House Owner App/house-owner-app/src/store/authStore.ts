@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
-import { clearAuthTokens, getToken, setToken } from '@/lib/tokenStorage';
+import { setSessionExpiredHandler } from '@/lib/authSession';
+import { restoreAuthenticatedUser } from '@/lib/authHydrate';
+import { isNetworkError } from '@/lib/sessionRestore';
+import {
+  clearAuthSession,
+  getToken,
+  setToken,
+  persistUser,
+  loadPersistedUser,
+  clearPersistedUser,
+} from '@/lib/tokenStorage';
 import { useLanguageStore } from '@/store/languageStore';
 import i18n, { isSupportedLanguage } from '@/lib/i18n';
 import { te } from '@/lib/i18n/alertMessages';
@@ -35,6 +45,13 @@ type AuthState = {
   setUser: (user: User | null) => void;
 };
 
+async function applyUserSession(user: User) {
+  await persistUser(user);
+  if (isSupportedLanguage(user?.preferredLanguage)) {
+    await useLanguageStore.getState().syncFromUser(user.preferredLanguage);
+  }
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isAuthenticated: false,
@@ -42,20 +59,40 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   hydrate: async () => {
     try {
-      const token = await getToken('accessToken');
-      if (!token) {
-        set({ isLoading: false });
+      const accessToken = await getToken('accessToken');
+      const refreshToken = await getToken('refreshToken');
+
+      if (!accessToken && !refreshToken) {
+        set({ user: null, isAuthenticated: false, isLoading: false });
         return;
       }
-      const { data } = await api.get('/auth/me');
-      const user = data.data.user;
-      set({ user, isAuthenticated: true, isLoading: false });
-      if (isSupportedLanguage(user?.preferredLanguage)) {
-        await useLanguageStore.getState().syncFromUser(user.preferredLanguage);
+
+      try {
+        const user = await restoreAuthenticatedUser<User>();
+        if (user) {
+          await applyUserSession(user);
+          set({ user, isAuthenticated: true, isLoading: false });
+          return;
+        }
+        set({ user: null, isAuthenticated: false, isLoading: false });
+      } catch (error) {
+        if (isNetworkError(error)) {
+          const cachedUser = await loadPersistedUser<User>();
+          if (cachedUser && (accessToken || refreshToken)) {
+            set({ user: cachedUser, isAuthenticated: true, isLoading: false });
+            return;
+          }
+        }
+        set({ user: null, isAuthenticated: false, isLoading: false });
       }
     } catch {
-      await clearAuthTokens();
-      set({ user: null, isAuthenticated: false, isLoading: false });
+      const cachedUser = await loadPersistedUser<User>();
+      const refreshToken = await getToken('refreshToken');
+      if (cachedUser && refreshToken) {
+        set({ user: cachedUser, isAuthenticated: true, isLoading: false });
+      } else {
+        set({ user: null, isAuthenticated: false, isLoading: false });
+      }
     }
   },
 
@@ -75,7 +112,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
     await setToken('accessToken', data.data.accessToken);
     await setToken('refreshToken', data.data.refreshToken);
-    const user = data.data.user;
+    const user = data.data.user as User;
+    await applyUserSession(user);
     set({ user, isAuthenticated: true });
     const lang = useLanguageStore.getState().language;
     void useLanguageStore.getState().setLanguage(lang, { syncProfile: true });
@@ -93,7 +131,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
     await setToken('accessToken', data.data.accessToken);
     await setToken('refreshToken', data.data.refreshToken);
-    const user = data.data.user;
+    const user = data.data.user as User;
+    await applyUserSession(user);
     set({ user, isAuthenticated: true });
     void useLanguageStore.getState().setLanguage(lang, { syncProfile: true });
   },
@@ -105,9 +144,17 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch {
       /* ignore */
     }
-    await clearAuthTokens();
+    await clearAuthSession();
     set({ user: null, isAuthenticated: false });
   },
 
-  setUser: (user) => set({ user, isAuthenticated: !!user }),
+  setUser: (user) => {
+    if (user) void persistUser(user);
+    else void clearPersistedUser();
+    set({ user, isAuthenticated: !!user });
+  },
 }));
+
+setSessionExpiredHandler(() => {
+  useAuthStore.setState({ user: null, isAuthenticated: false, isLoading: false });
+});

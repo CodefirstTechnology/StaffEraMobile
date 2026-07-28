@@ -1,6 +1,8 @@
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL } from '@/lib/apiConfig';
-import { getToken, setToken, clearAuthTokens } from '@/lib/tokenStorage';
+import { getToken } from '@/lib/tokenStorage';
+import { refreshAccessToken } from '@/lib/sessionRestore';
+import { isAuthRoute } from '@/lib/authHydrate';
 
 const API_BASE = API_BASE_URL;
 
@@ -18,23 +20,22 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const original = error.config;
-    if (error.response?.status === 401 && original && !original._retry) {
-      original._retry = true;
-      const refreshToken = await getToken('refreshToken');
-      if (refreshToken) {
-        try {
-          const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
-          await setToken('accessToken', data.data.accessToken);
-          await setToken('refreshToken', data.data.refreshToken);
-          original.headers.Authorization = `Bearer ${data.data.accessToken}`;
-          return api(original);
-        } catch {
-          await clearAuthTokens();
-        }
-      }
+    const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    if (
+      error.response?.status !== 401 ||
+      !original ||
+      original._retry ||
+      isAuthRoute(original.url ?? '')
+    ) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    original._retry = true;
+    const accessToken = await refreshAccessToken({ clearOnFailure: true });
+    if (!accessToken) return Promise.reject(error);
+
+    original.headers.Authorization = `Bearer ${accessToken}`;
+    return api(original);
   },
 );
 
