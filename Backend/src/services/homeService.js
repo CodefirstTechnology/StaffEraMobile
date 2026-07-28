@@ -13,7 +13,7 @@ const {
 
 const isServantEligibleForArea = (servant) => {
   if (servant.verificationStatus !== "VERIFIED") return false;
-  if (!servant.user?.isActive) return false;
+  if (servant.user?.isActive === false) return false;
   if (isAadhaarVerificationRequired() && !servant.aadhaarVerified) return false;
   if (!Array.isArray(servant.zones) || servant.zones.length === 0) return false;
   return true;

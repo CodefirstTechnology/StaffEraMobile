@@ -368,12 +368,18 @@ exports.listBookings = async (req, res) => {
 exports.listOpenRequests = async (req, res) => {
   const servant = await prisma.servant.findUnique({
     where: { userId: req.user.id },
-    include: { skills: true, zones: true, user: { select: { name: true } } }
+    include: {
+      skills: true,
+      zones: true,
+      user: { select: { name: true, isActive: true } },
+    },
   });
   if (!servant) throw new ApiError(403, "Servant profile required");
   if (!isServantEligibleForArea(servant)) {
     return sendSuccess(res, { requests: [] });
   }
+
+  await expireStaleSessionBookings();
 
   const openBookings = await prisma.booking.findMany({
     where: {

@@ -527,6 +527,7 @@
     "newRequestsSection": "नवीन विनंत्या — स्वीकार किंवा नाकारा",
     "todayJobsSection": "आजच्या नोकऱ्या",
     "activeJobsSection": "सक्रिय नोकऱ्या",
+    "noActiveJobs": "अद्याप सक्रिय नोकऱ्या नाहीत — नवीन ग्राहक विनंती येथे दिसतील",
     "completedJobsSection": "पूर्ण नोकऱ्या",
     "noCompletedJobs": "आज पूर्ण नोकऱ्या नाहीत",
     "noConfirmedJobs": "पुष्टी नोकऱ्या नाहीत — ऑनलाइन राहा",

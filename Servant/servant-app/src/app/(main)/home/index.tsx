@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -127,7 +127,7 @@ export default function ServantHomeScreen() {
     profile?.verificationStatus === 'VERIFIED' ||
     user?.servant?.verificationStatus === 'VERIFIED';
 
-  const { data: openRequests } = useQuery({
+  const { data: openRequests, refetch: refetchOpenRequests } = useQuery({
     queryKey: ['open-requests'],
     queryFn: async () => {
       const res = await api.get('/bookings/open-requests');
@@ -135,7 +135,16 @@ export default function ServantHomeScreen() {
     },
     enabled: isAuthenticated,
     staleTime: 0,
+    refetchOnMount: 'always',
+    refetchInterval: isAuthenticated ? 2000 : false,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetchOpenRequests();
+      void refetchBookings();
+    }, [refetchOpenRequests, refetchBookings]),
+  );
 
   const { data: notificationsData } = useNotifications();
   const notifications = notificationsData?.notifications ?? [];
@@ -189,7 +198,15 @@ export default function ServantHomeScreen() {
     return () => clearInterval(t);
   }, [activeEntry]);
 
-  const pending = (bookings || []).filter((b) => isPendingRequest(b.status));
+  const incomingRequests = useMemo(() => {
+    const open = openRequests ?? [];
+    const openIds = new Set(open.map((b) => b.id));
+    const direct = (bookings ?? []).filter(
+      (b) => isPendingRequest(b.status) && !openIds.has(b.id),
+    );
+    return [...open, ...direct];
+  }, [openRequests, bookings]);
+
   const todayJobs = (bookings || []).filter((b) => isTodayJob(b.status));
   const completedJobs = (bookings || []).filter(
     (b) => isCompletedJob(b.status) && isCompletedToday(b),
@@ -418,7 +435,7 @@ export default function ServantHomeScreen() {
           </Text>
         </View>
         <View style={styles.jobsBadge}>
-          <Text style={styles.jobsNum}>{todayJobs.length}</Text>
+          <Text style={styles.jobsNum}>{incomingRequests.length + todayJobs.length}</Text>
           <Text style={styles.jobsLbl}>{t('servantHome.jobsLabel')}</Text>
         </View>
       </View>
@@ -492,11 +509,12 @@ export default function ServantHomeScreen() {
         </>
       ) : null}
 
-      {openRequests && openRequests.length > 0 && (
+      <Text style={styles.section}>{t('servantHome.activeJobsSection')}</Text>
+      {incomingRequests.length > 0 ? (
         <>
-          <Text style={styles.section}>{t('servantHome.openRequestsTitle')}</Text>
-          <Text style={styles.sectionSub}>{t('servantHome.openRequestsSub')}</Text>
-          {openRequests.map((b) => {
+          <Text style={styles.sectionSub}>{t('servantHome.newRequestsSection')}</Text>
+          {incomingRequests.map((b) => {
+            const isOpenRequest = b.servantId == null;
             const slotLabel = formatSessionSlotsLabel(
               b.sessionSlots,
               b.sessionStartTime,
@@ -504,108 +522,64 @@ export default function ServantHomeScreen() {
             );
             const visitDate = b.sessionDate ? formatDate(b.sessionDate) : null;
             return (
-            <GlassCard key={`open-${b.id}`} style={styles.mb}>
-              <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
-                  <Text style={styles.cardMeta}>
-                    {localizedSkillLabel(b.requestedSkill || '', []) || t('servantHome.generalHelp')}
-                    {' · '}
-                    {b.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly')}
-                  </Text>
-                  {visitDate && slotLabel ? (
-                    <Text style={styles.slotText}>
-                      {visitDate} · {slotLabel}
+              <GlassCard key={`incoming-${b.id}`} style={styles.mb}>
+                <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
+                    <Text style={styles.cardMeta}>
+                      {localizedSkillLabel(b.requestedSkill || '', []) || t('servantHome.generalHelp')}
+                      {' · '}
+                      {b.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly')}
                     </Text>
-                  ) : slotLabel ? (
-                    <Text style={styles.slotText}>{slotLabel}</Text>
-                  ) : null}
-                  {b.address ? <Text style={styles.addr}>{b.address}</Text> : null}
-                </View>
-                <MaterialIcons
-                  name="chevron-right"
-                  size={22}
-                  color={Stitch.colors.onSurfaceVariant}
+                    {visitDate && slotLabel ? (
+                      <Text style={styles.slotText}>
+                        {visitDate} · {slotLabel}
+                      </Text>
+                    ) : slotLabel ? (
+                      <Text style={styles.slotText}>{slotLabel}</Text>
+                    ) : null}
+                    {b.address ? <Text style={styles.addr}>{b.address}</Text> : null}
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={22}
+                    color={Stitch.colors.onSurfaceVariant}
+                  />
+                </Pressable>
+                <LocationMapPreview
+                  latitude={b.latitude}
+                  longitude={b.longitude}
+                  address={b.address}
+                  height={140}
                 />
-              </Pressable>
-              <LocationMapPreview
-                latitude={b.latitude}
-                longitude={b.longitude}
-                address={b.address}
-                height={140}
-              />
-              <View style={styles.row}>
-                <TouchableOpacity
-                  style={[styles.accept, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
-                  onPress={() => confirm(b.id)}
-                  disabled={actingId != null || actionsBlocked}
-                >
-                  <Text style={styles.acceptText}>
-                    {actingId === b.id ? t('servantHome.pleaseWait') : t('schedule.accept')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.reject, actingId === b.id && styles.btnDisabled]}
-                  onPress={() => openDecline(b.id, true)}
-                  disabled={actingId != null}
-                >
-                  <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
-                </TouchableOpacity>
-              </View>
-            </GlassCard>
+                <View style={styles.row}>
+                  <TouchableOpacity
+                    style={[
+                      styles.accept,
+                      (actingId === b.id || actionsBlocked) && styles.btnDisabled,
+                    ]}
+                    onPress={() => confirm(b.id)}
+                    disabled={actingId != null || actionsBlocked}
+                  >
+                    <Text style={styles.acceptText}>
+                      {actingId === b.id ? t('servantHome.pleaseWait') : t('schedule.accept')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.reject, actingId === b.id && styles.btnDisabled]}
+                    onPress={() => openDecline(b.id, isOpenRequest)}
+                    disabled={actingId != null}
+                  >
+                    <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </GlassCard>
             );
           })}
         </>
-      )}
+      ) : null}
 
-      {pending.length > 0 && (
-        <>
-          <Text style={styles.section}>{t('servantHome.newRequestsSection')}</Text>
-          {pending.map((b) => (
-            <GlassCard key={b.id} style={styles.mb}>
-              <Pressable onPress={() => openJobDetail(b.id)} style={styles.jobHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>{b.houseOwner.user.name}</Text>
-                  <Text style={styles.cardMeta}>{b.bookingType}</Text>
-                  {b.address ? <Text style={styles.addr}>{b.address}</Text> : null}
-                </View>
-                <MaterialIcons
-                  name="chevron-right"
-                  size={22}
-                  color={Stitch.colors.onSurfaceVariant}
-                />
-              </Pressable>
-              <LocationMapPreview
-                latitude={b.latitude}
-                longitude={b.longitude}
-                address={b.address}
-                height={140}
-              />
-              <View style={styles.row}>
-                <TouchableOpacity
-                  style={[styles.accept, (actingId === b.id || actionsBlocked) && styles.btnDisabled]}
-                  onPress={() => confirm(b.id)}
-                  disabled={actingId != null || actionsBlocked}
-                >
-                  <Text style={styles.acceptText}>
-                    {actingId === b.id ? t('servantHome.pleaseWait') : t('schedule.accept')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.reject, actingId === b.id && styles.btnDisabled]}
-                  onPress={() => openDecline(b.id, false)}
-                  disabled={actingId != null}
-                >
-                  <Text style={styles.rejectText}>{t('servantHome.decline')}</Text>
-                </TouchableOpacity>
-              </View>
-            </GlassCard>
-          ))}
-        </>
-      )}
-
-      <Text style={styles.section}>{t('servantHome.activeJobsSection')}</Text>
-      {bookingsLoading && !bookings ? (
+      {bookingsLoading && !bookings && openRequests == null ? (
         <GlassCard>
           <Text style={styles.empty}>{t('common.loading')}</Text>
         </GlassCard>
@@ -616,12 +590,16 @@ export default function ServantHomeScreen() {
             <Text style={styles.retry}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </GlassCard>
-      ) : todayJobs.length === 0 ? (
+      ) : incomingRequests.length === 0 && todayJobs.length === 0 ? (
         <GlassCard>
-          <Text style={styles.empty}>{t('servantHome.noConfirmedJobs')}</Text>
+          <Text style={styles.empty}>{t('servantHome.noActiveJobs')}</Text>
         </GlassCard>
-      ) : (
-        todayJobs.map((b) => {
+      ) : todayJobs.length > 0 ? (
+        <>
+          {incomingRequests.length > 0 ? (
+            <Text style={[styles.sectionSub, styles.sectionSubGap]}>{t('servantHome.todayJobsSection')}</Text>
+          ) : null}
+          {todayJobs.map((b) => {
           const isActive = b.status === 'ACTIVE' || activeBookingId === b.id;
           return (
             <GlassCard key={b.id} style={styles.mb}>
@@ -711,8 +689,9 @@ export default function ServantHomeScreen() {
               )}
             </GlassCard>
           );
-        })
-      )}
+        })}
+        </>
+      ) : null}
 
       <Text style={styles.section}>{t('servantHome.completedJobsSection')}</Text>
       {completedJobs.length === 0 ? (
@@ -871,6 +850,7 @@ const styles = StyleSheet.create({
     marginTop: -6,
     lineHeight: 18,
   },
+  sectionSubGap: { marginTop: 8 },
   mb: { marginHorizontal: 24, marginBottom: 12 },
   cardTitle: { fontSize: 17, fontWeight: '600' },
   cardMeta: { color: Stitch.colors.onSurfaceVariant, marginTop: 4, marginBottom: 4 },

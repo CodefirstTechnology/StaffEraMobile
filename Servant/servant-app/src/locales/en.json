@@ -303,6 +303,7 @@
     "newRequestsSection": "New requests — accept or decline",
     "todayJobsSection": "Today's jobs",
     "activeJobsSection": "Active jobs",
+    "noActiveJobs": "No active jobs yet — new customer requests appear here",
     "completedJobsSection": "Completed jobs",
     "noCompletedJobs": "No completed jobs today",
     "noConfirmedJobs": "No confirmed jobs — stay online for new requests",
