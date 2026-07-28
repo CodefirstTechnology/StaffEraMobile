@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { showAlert } from '@/lib/alert';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -75,6 +75,14 @@ export default function BookingDetailScreen() {
   const trackLive = booking?.status === 'CONFIRMED';
   const { data: tracking } = useBookingTrackingPoll(bookingId, trackLive);
 
+  const { data: pricingConfig } = useQuery({
+    queryKey: ['pricingConfig'],
+    queryFn: async () => {
+      const res = await api.get('/pricing/config');
+      return res.data.data.pricing;
+    },
+  });
+
   const home =
     booking?.latitude != null && booking?.longitude != null
       ? { latitude: booking.latitude, longitude: booking.longitude }
@@ -138,14 +146,6 @@ export default function BookingDetailScreen() {
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
   const editMode = getBookingEditMode(booking.status);
 
-  const { data: pricingConfig } = useQuery({
-    queryKey: ['pricingConfig'],
-    queryFn: async () => {
-      const res = await api.get('/pricing/config');
-      return res.data.data.pricing;
-    },
-  });
-
   const feePct = pricingConfig?.platformFeePercentage ?? 10;
   const hours = booking?.sessionHours || 1;
   const servantHourly = booking?.servant?.hourlyRate || 0;
@@ -169,6 +169,22 @@ export default function BookingDetailScreen() {
           {booking.servant &&
           (booking.servant.verificationStatus === 'VERIFIED' || !booking.servant.verificationStatus) ? (
             <VerifiedBadge size="md" />
+          ) : null}
+          {['CONFIRMED', 'ACTIVE'].includes(booking.status) && booking.servant?.user?.phone ? (
+            <View style={styles.contactActions}>
+              <TouchableOpacity
+                style={styles.contactBtn}
+                onPress={() => Linking.openURL(`tel:${booking.servant.user.phone}`)}
+              >
+                <MaterialIcons name="call" size={20} color={Stitch.colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.contactBtn}
+                onPress={() => Linking.openURL(`sms:${booking.servant.user.phone}`)}
+              >
+                <MaterialIcons name="message" size={20} color={Stitch.colors.primary} />
+              </TouchableOpacity>
+            </View>
           ) : null}
         </View>
         <StatusPill status={booking.status} />
@@ -326,11 +342,23 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  name: { fontSize: 22, fontWeight: '700' },
+  name: { fontSize: 22, fontWeight: '700', flex: 1 },
+  contactActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  contactBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Stitch.colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   hint: { marginTop: 12, color: Stitch.colors.onSurfaceVariant, lineHeight: 20 },
   row: { marginTop: 8, color: Stitch.colors.onBackground },
   helpers: { marginTop: 10, fontSize: 13, color: Stitch.colors.secondary, lineHeight: 18 },

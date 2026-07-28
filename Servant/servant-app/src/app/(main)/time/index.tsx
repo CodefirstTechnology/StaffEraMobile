@@ -25,7 +25,21 @@ export default function TimeScreen() {
     clockIn: string;
     clockOut: string | null;
     hoursWorked?: number;
-    booking?: { address?: string };
+    booking?: {
+      id?: number;
+      address?: string;
+      flatNo?: string;
+      building?: string;
+      area?: string;
+      bookingType?: string;
+      requestedSkill?: string;
+      houseOwner?: {
+        user?: {
+          name?: string;
+          phone?: string;
+        };
+      };
+    };
   };
   const entries = (data?.entries || []) as Entry[];
 
@@ -48,23 +62,40 @@ export default function TimeScreen() {
             <Text style={styles.empty}>{t('time.clockInHint')}</Text>
           </GlassCard>
         }
-        renderItem={({ item }) => (
-          <GlassCard style={styles.card}>
-            <Text style={styles.row}>
-              {t('time.clockInAt', { time: formatTime(item.clockIn) })}
-            </Text>
-            <Text style={styles.row}>
-              {item.clockOut
-                ? t('time.clockOutAt', { time: formatTime(item.clockOut) })
-                : t('time.onDuty')}
-            </Text>
-            {item.hoursWorked != null && (
-              <Text style={styles.hours}>
-                {t('time.hoursShort', { duration: formatDurationFromHours(item.hoursWorked) })}
+        renderItem={({ item }) => {
+          const ownerName = item.booking?.houseOwner?.user?.name || t('schedule.customer');
+          const jobTypeLabel =
+            item.booking?.bookingType === 'SESSION'
+              ? t('common.oneVisit')
+              : item.booking?.bookingType === 'MONTHLY'
+                ? t('common.monthly')
+                : null;
+          const skill = item.booking?.requestedSkill;
+
+          return (
+            <GlassCard style={styles.card}>
+              <View style={styles.headerRow}>
+                <Text style={styles.ownerName}>{ownerName}</Text>
+                {jobTypeLabel ? <Text style={styles.jobTypeBadge}>{jobTypeLabel}</Text> : null}
+              </View>
+              {skill ? <Text style={styles.skillText}>Skill: {skill}</Text> : null}
+              <View style={styles.timeDivider} />
+              <Text style={styles.row}>
+                {t('time.clockInAt', { time: formatTime(item.clockIn) })}
               </Text>
-            )}
-          </GlassCard>
-        )}
+              <Text style={styles.row}>
+                {item.clockOut
+                  ? t('time.clockOutAt', { time: formatTime(item.clockOut) })
+                  : t('time.onDuty')}
+              </Text>
+              {item.hoursWorked != null && (
+                <Text style={styles.hours}>
+                  {t('time.hoursShort', { duration: formatDurationFromHours(item.hoursWorked) })}
+                </Text>
+              )}
+            </GlassCard>
+          );
+        }}
       />
     </View>
   );
@@ -86,7 +117,37 @@ const styles = StyleSheet.create({
   },
   list: { paddingHorizontal: Stitch.spacing.padding, paddingBottom: 100 },
   card: { marginBottom: 12 },
-  row: { fontSize: 15, color: Stitch.colors.onBackground },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  ownerName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Stitch.colors.primary,
+  },
+  jobTypeBadge: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Stitch.colors.secondary,
+    backgroundColor: Stitch.colors.secondaryContainer,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  skillText: {
+    fontSize: 13,
+    color: Stitch.colors.onSurfaceVariant,
+    marginBottom: 6,
+  },
+  timeDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    marginVertical: 6,
+  },
+  row: { fontSize: 14, color: Stitch.colors.onBackground, marginTop: 2 },
   hours: { marginTop: 6, fontWeight: '700', color: Stitch.colors.secondary },
   empty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant },
 });

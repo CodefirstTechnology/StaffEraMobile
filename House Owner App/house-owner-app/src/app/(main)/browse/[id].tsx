@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';

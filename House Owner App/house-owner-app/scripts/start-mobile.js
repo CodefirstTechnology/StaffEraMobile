@@ -7,14 +7,35 @@ const os = require('os');
 
 function getLanIp() {
   const nets = os.networkInterfaces();
+  const candidates = [];
+
   for (const name of Object.keys(nets)) {
     for (const net of nets[name] || []) {
       if (net.family === 'IPv4' && !net.internal) {
-        return net.address;
+        const isVirtual =
+          name.includes('Local Area Connection*') ||
+          name.includes('vEthernet') ||
+          name.includes('Virtual') ||
+          name.includes('VMware') ||
+          name.includes('vboxnet') ||
+          net.address.startsWith('192.168.137.');
+
+        const isPreferred =
+          name.toLowerCase().includes('wi-fi') ||
+          name.toLowerCase().includes('ethernet');
+
+        candidates.push({ name, address: net.address, isVirtual, isPreferred });
       }
     }
   }
-  return null;
+
+  const preferred = candidates.find((c) => c.isPreferred && !c.isVirtual);
+  if (preferred) return preferred.address;
+
+  const nonVirtual = candidates.find((c) => !c.isVirtual);
+  if (nonVirtual) return nonVirtual.address;
+
+  return candidates[0]?.address || null;
 }
 
 const lanIp = process.env.REACT_NATIVE_PACKAGER_HOSTNAME || getLanIp();

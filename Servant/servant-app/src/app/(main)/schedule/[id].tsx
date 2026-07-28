@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Linking } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -46,14 +46,14 @@ export default function ScheduleDetailScreen() {
   const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
 
   const { data: booking, isLoading, isError } = useQuery({
-    queryKey: ['booking', id],
-    enabled: !!id,
+    queryKey: ['booking', bookingId],
+    enabled: bookingId != null && !Number.isNaN(bookingId),
     refetchInterval: (query) => {
       const status = query.state.data?.status as string | undefined;
       return status && isActionableBooking(status) ? 2000 : false;
     },
     queryFn: async () => {
-      const res = await api.get(`/bookings/${id}`);
+      const res = await api.get(`/bookings/${bookingId}`);
       return res.data.data.booking;
     },
   });
@@ -105,7 +105,7 @@ export default function ScheduleDetailScreen() {
     try {
       await api.patch(`/bookings/${id}/confirm`);
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['booking', id] }),
+        qc.invalidateQueries({ queryKey: ['booking', bookingId] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
         qc.invalidateQueries({ queryKey: ['open-requests'] }),
         qc.invalidateQueries({ queryKey: ['schedule'] }),
@@ -145,7 +145,7 @@ export default function ScheduleDetailScreen() {
       }
 
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['booking', id] }),
+        qc.invalidateQueries({ queryKey: ['booking', bookingId] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
         qc.invalidateQueries({ queryKey: ['open-requests'] }),
         qc.invalidateQueries({ queryKey: ['declined-open-booking-ids'] }),
@@ -173,7 +173,7 @@ export default function ScheduleDetailScreen() {
       await api.patch(`/bookings/${id}/arrived`);
       setSharingLocation(false);
       await Promise.all([
-        qc.invalidateQueries({ queryKey: ['booking', id] }),
+        qc.invalidateQueries({ queryKey: ['booking', bookingId] }),
         qc.invalidateQueries({ queryKey: ['bookings'] }),
       ]);
       toast.info(t('workOtp.requestedBody'));
@@ -291,7 +291,25 @@ export default function ScheduleDetailScreen() {
       )}
 
       <GlassCard>
-        <Text style={styles.title}>{booking.houseOwner.user.name}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{booking.houseOwner.user.name}</Text>
+          {['CONFIRMED', 'ACTIVE'].includes(booking.status) && booking.houseOwner.user.phone ? (
+            <View style={styles.contactActions}>
+              <TouchableOpacity
+                style={styles.contactBtn}
+                onPress={() => Linking.openURL(`tel:${booking.houseOwner.user.phone}`)}
+              >
+                <MaterialIcons name="call" size={20} color={Stitch.colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.contactBtn}
+                onPress={() => Linking.openURL(`sms:${booking.houseOwner.user.phone}`)}
+              >
+                <MaterialIcons name="message" size={20} color={Stitch.colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
         <StatusPill status={booking.status} />
         <Text style={styles.meta}>{visitType}</Text>
         {skill ? <Text style={styles.detailRow}>{t('servantHome.skillLabel', { skill })}</Text> : null}
@@ -325,11 +343,13 @@ export default function ScheduleDetailScreen() {
         ) : null}
         {(() => {
           const hours = booking.sessionHours || 1;
-          const rate = booking.servant?.hourlyRate || (booking.totalAmount ? Math.round(booking.totalAmount / 1.1 / hours) : 0);
+          const rate = booking.servant?.hourlyRate || (booking.totalAmount ? Math.round(booking.totalAmount / hours) : 0);
           const servantNetEarning =
-            booking.bookingType === 'SESSION'
-              ? rate * hours
-              : booking.servant?.monthlyRate || Math.round(booking.totalAmount / 1.1);
+            booking.totalAmount != null && booking.totalAmount > 0
+              ? booking.totalAmount
+              : booking.bookingType === 'SESSION'
+                ? rate * hours
+                : booking.servant?.monthlyRate || rate * hours;
 
           return (
             <View style={styles.earningBox}>
@@ -405,7 +425,39 @@ export default function ScheduleDetailScreen() {
             </>
           )}
           {clockedInHere && (
-            <Text style={styles.onDuty}>{t('servantHome.clockedInSharing')}</Text>
+            <View style={{ marginTop: 12 }}>
+              <Text style={styles.onDuty}>{t('servantHome.clockedInSharing')}</Text>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: Stitch.colors.error,
+                  paddingVertical: 12,
+                  paddingHorizontal: 20,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  marginTop: 12,
+                }}
+                onPress={async () => {
+                  try {
+                    await api.post('/time/clock-out');
+                    await Promise.all([
+                      qc.invalidateQueries({ queryKey: ['time-today'] }),
+                      qc.invalidateQueries({ queryKey: ['time-month'] }),
+                      qc.invalidateQueries({ queryKey: ['booking', id] }),
+                      qc.invalidateQueries({ queryKey: ['bookings'] }),
+                      qc.invalidateQueries({ queryKey: ['schedule'] }),
+                    ]);
+                    Alert.alert(t('servantHome.clockedOutTitle'), t('servantHome.hoursSaved'));
+                  } catch (e: unknown) {
+                    const err = e as { response?: { data?: { message?: string } } };
+                    Alert.alert(t('errors.generic'), err.response?.data?.message || t('servantHome.couldNotClockOut'));
+                  }
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 16 }}>
+                  {t('servantHome.endWorkClockOut')}
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
         </>
       ) : home ? (
@@ -461,9 +513,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: Stitch.spacing.padding,
     paddingBottom: 16,
   },
-  backBtn: { width: 40 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: Stitch.colors.primary },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { ...Stitch.typography.headline, color: Stitch.colors.primary },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  title: { fontSize: 22, fontWeight: '700', flex: 1 },
+  contactActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  contactBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Stitch.colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   meta: { marginTop: 8, color: Stitch.colors.onSurfaceVariant },
   detailRow: { marginTop: 6, color: Stitch.colors.onBackground },
   address: { marginTop: 10, color: Stitch.colors.onBackground, lineHeight: 20 },

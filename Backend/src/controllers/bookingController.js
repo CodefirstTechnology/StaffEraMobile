@@ -118,6 +118,13 @@ exports.createBooking = async (req, res) => {
       : undefined
   };
 
+  if (bookingData.bookingType === "SESSION" && isSessionPast(bookingData)) {
+    throw new ApiError(
+      400,
+      "Selected booking time slot has already passed. Please select a future time slot or date."
+    );
+  }
+
   const latitude = bookingData.latitude ?? houseOwner.latitude ?? undefined;
   const longitude = bookingData.longitude ?? houseOwner.longitude ?? undefined;
   const address = bookingData.address || houseOwner.address;

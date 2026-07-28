@@ -6,6 +6,7 @@ import { useNotifications, type AppNotification } from '@/hooks/useNotifications
 import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
 import { stopPendingRequestVibration } from '@/lib/bookingRequestVibration';
 import { localizeNotification } from '@/lib/i18n/notifications';
+import { postSystemNotification } from '@/lib/notificationAlerts';
 
 const CANCELLATION_TYPES = new Set(['BOOKING_CANCELLED']);
 
@@ -15,7 +16,8 @@ type BookingRow = { id: number; status: string };
 export function useBookingCancellationAlerts() {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const { data: notifications = [], isSuccess: notificationsReady } = useNotifications();
+  const { data: notificationsData, isSuccess: notificationsReady } = useNotifications();
+  const notifications = notificationsData?.notifications ?? [];
   const { data: declinedOpenIds = [] } = useDeclinedOpenBookingIds();
   const declinedOpenIdsRef = useRef(declinedOpenIds);
   const seenNotificationIds = useRef<Set<number>>(new Set());
@@ -54,11 +56,12 @@ export function useBookingCancellationAlerts() {
     if (notification) {
       const { title, body } = localizeNotification(notification);
       Alert.alert(title, body);
+      void postSystemNotification(title, body, notification.data ?? {});
     } else {
-      Alert.alert(
-        t('pushNotifications.BOOKING_CANCELLED.title'),
-        t('pushNotifications.BOOKING_CANCELLED.body'),
-      );
+      const title = t('pushNotifications.BOOKING_CANCELLED.title');
+      const body = t('pushNotifications.BOOKING_CANCELLED.body');
+      Alert.alert(title, body);
+      void postSystemNotification(title, body);
     }
     return true;
   };

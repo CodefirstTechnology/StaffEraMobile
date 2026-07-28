@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Linking, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import * as Location from 'expo-location';
 import { Stitch } from '@/theme/stitch';
 import { GradientButton } from '@/components/ui/GradientButton';
 
@@ -11,6 +12,22 @@ type Props = {
 
 export function LocationRequiredScreen({ onRetry, checking }: Props) {
   const { t } = useTranslation();
+
+  const handleEnableLocation = async () => {
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      const current = await Location.getForegroundPermissionsAsync();
+      if (current.status === 'denied' && !current.canAskAgain) {
+        void Linking.openSettings();
+        return;
+      }
+      const res = await Location.requestForegroundPermissionsAsync();
+      if (res.status !== 'granted') {
+        void Linking.openSettings();
+        return;
+      }
+    }
+    onRetry();
+  };
 
   const openSettings = () => {
     if (Platform.OS === 'ios' || Platform.OS === 'android') {
@@ -27,7 +44,7 @@ export function LocationRequiredScreen({ onRetry, checking }: Props) {
       <Text style={styles.sub}>{t('locationGate.sub')}</Text>
       <GradientButton
         title={checking ? t('common.loading') : t('locationGate.enable')}
-        onPress={onRetry}
+        onPress={handleEnableLocation}
         loading={checking}
         style={styles.btn}
       />
