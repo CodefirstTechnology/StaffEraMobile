@@ -46,15 +46,33 @@ const redactOwnerContactForServant = (booking) => {
   };
 };
 
+const redactHelperContactForOwner = (booking) => {
+  if (!booking?.servant?.user) return booking;
+  if (SERVANT_OWNER_CONTACT_STATUSES.has(booking.status)) return booking;
+  return {
+    ...booking,
+    servant: {
+      ...booking.servant,
+      user: {
+        ...booking.servant.user,
+        phone: null,
+        email: null
+      }
+    }
+  };
+};
+
 const presentBooking = (booking, role) => {
   const row = normalizeBookingRow(booking);
-  return role === "SERVANT" ? redactOwnerContactForServant(row) : row;
+  if (role === "SERVANT") return redactOwnerContactForServant(row);
+  if (role === "HOUSE_OWNER") return redactHelperContactForOwner(row);
+  return row;
 };
 
 const bookingInclude = {
   servant: {
     include: {
-      user: { select: { id: true, name: true, phone: true } },
+      user: { select: { id: true, name: true, phone: true, email: true } },
       skills: true
     }
   },

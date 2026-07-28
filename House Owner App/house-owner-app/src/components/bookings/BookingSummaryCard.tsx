@@ -9,6 +9,8 @@ import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatDateShort, formatCurrency } from '@/lib/i18n/format';
 import i18n from '@/lib/i18n';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { HelperContactCard } from '@/components/bookings/HelperContactCard';
+import { showsHelperContact } from '@/lib/bookingContact';
 
 export type BookingSummary = {
   id: number;
@@ -20,7 +22,10 @@ export type BookingSummary = {
   sessionEndTime?: string | null;
   sessionSlots?: string | null;
   createdAt?: string;
-  servant?: { user: { name: string }; verificationStatus?: string } | null;
+  servant?: {
+    user: { name: string; phone?: string | null; email?: string | null };
+    verificationStatus?: string;
+  } | null;
   totalAmount?: number | null;
   address?: string | null;
 };
@@ -63,6 +68,7 @@ export function BookingSummaryCard({
   const visitType =
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
   const canTrack = booking.status === 'CONFIRMED' || booking.status === 'ACTIVE';
+  const showContact = showsHelperContact(booking.status) && booking.servant?.user;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
@@ -98,6 +104,16 @@ export function BookingSummaryCard({
             <MaterialIcons name="schedule" size={16} color={Stitch.colors.secondary} />
             <Text style={styles.detailText}>{when}</Text>
           </View>
+        ) : null}
+
+        {showContact ? (
+          <HelperContactCard
+            name={booking.servant?.user.name}
+            phone={booking.servant?.user.phone}
+            email={booking.servant?.user.email}
+            verificationStatus={booking.servant?.verificationStatus}
+            compact
+          />
         ) : null}
 
         {booking.address ? (

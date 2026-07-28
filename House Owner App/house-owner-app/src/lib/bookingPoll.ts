@@ -1,7 +1,7 @@
 export const BOOKING_POLL_MS = {
-  awaitingAccept: 1000,
-  active: 5000,
-  confirmed: 5000,
+  awaitingAccept: 2000,
+  active: 3000,
+  confirmed: 2000,
   idle: 15000,
 } as const;
 

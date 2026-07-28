@@ -23,6 +23,9 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { BookingWorkTimesCard } from '@/components/bookings/BookingWorkTimesCard';
 import { getBookingEditMode } from '@/lib/bookingEdit';
 import { bookingDetailPollInterval } from '@/lib/bookingPoll';
+import { getHelperContact, showsHelperContact } from '@/lib/bookingContact';
+import { HelperContactCard } from '@/components/bookings/HelperContactCard';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export default function BookingDetailScreen() {
   const { t } = useTranslation();
@@ -30,6 +33,7 @@ export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const bookingId = id ? parseInt(id, 10) : null;
   const qc = useQueryClient();
+  useNotifications();
 
   const { data: booking, isLoading, refetch } = useQuery({
     queryKey: ['booking', id],
@@ -137,6 +141,7 @@ export default function BookingDetailScreen() {
   const visitType =
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
   const editMode = getBookingEditMode(booking.status);
+  const helperContact = getHelperContact(booking);
 
   return (
     <View style={styles.root}>
@@ -154,6 +159,20 @@ export default function BookingDetailScreen() {
         </View>
         <StatusPill status={booking.status} />
         <Text style={styles.hint}>{statusHint[booking.status] || ''}</Text>
+        {helperContact ? (
+          <HelperContactCard
+            name={helperContact.name}
+            phone={helperContact.phone}
+            email={helperContact.email}
+            bio={helperContact.bio}
+            rating={helperContact.rating}
+            verificationStatus={helperContact.verificationStatus}
+          />
+        ) : booking.servant?.user?.name && !showsHelperContact(booking.status) ? (
+          <Text style={styles.pendingHelper}>
+            {t('bookings.waitingHelperAccept', { name: booking.servant.user.name })}
+          </Text>
+        ) : null}
         <Text style={styles.row}>{t('bookings.typeLabel', { type: visitType })}</Text>
         {booking.requestedSkill ? (
           <Text style={styles.row}>
@@ -300,6 +319,13 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 22, fontWeight: '700' },
   hint: { marginTop: 12, color: Stitch.colors.onSurfaceVariant, lineHeight: 20 },
+  pendingHelper: {
+    marginTop: 12,
+    fontSize: 14,
+    color: Stitch.colors.secondary,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
   row: { marginTop: 8, color: Stitch.colors.onBackground },
   helpers: { marginTop: 10, fontSize: 13, color: Stitch.colors.secondary, lineHeight: 18 },
   amount: { marginTop: 12, fontSize: 20, fontWeight: '700', color: Stitch.colors.secondary },
