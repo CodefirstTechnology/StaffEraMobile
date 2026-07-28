@@ -10,6 +10,8 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { SCHEDULE_VISIBLE_STATUSES } from '@/lib/bookingVisibility';
 import { showsHouseOwnerContact } from '@/lib/bookingContact';
+import { getBookingDisplayAmount, isFinalBookingPrice } from '@/lib/bookingPricing';
+import { formatCurrency } from '@/lib/i18n/format';
 import { HouseOwnerContactCard } from '@/components/bookings/HouseOwnerContactCard';
 
 type ScheduleBooking = {
@@ -18,6 +20,10 @@ type ScheduleBooking = {
   bookingType: string;
   address?: string;
   sessionDate?: string | null;
+  totalAmount?: number | null;
+  finalAmount?: number | null;
+  sessionHours?: number | null;
+  timeEntries?: { hoursWorked?: number | null }[];
   houseOwner: { user: { name: string; phone?: string | null } };
 };
 
@@ -70,7 +76,10 @@ export default function ScheduleScreen() {
           <Text style={styles.empty}>{t('schedule.emptyCalendar')}</Text>
         </GlassCard>
       ) : (
-        scheduleJobs.map((b) => (
+        scheduleJobs.map((b) => {
+          const displayAmount = getBookingDisplayAmount(b);
+          const showFinalPrice = isFinalBookingPrice(b.status);
+          return (
           <Pressable key={b.id} onPress={() => router.push(`/(main)/schedule/${b.id}`)}>
             <GlassCard style={styles.card}>
               <View style={styles.cardRow}>
@@ -80,6 +89,15 @@ export default function ScheduleScreen() {
                     {b.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly')} ·{' '}
                     {b.address || t('schedule.addressTbd')}
                   </Text>
+                  {displayAmount != null ? (
+                    <Text style={styles.amount}>
+                      {showFinalPrice
+                        ? t('bookings.finalPrice', {
+                            amount: `${t('common.rupee')}${formatCurrency(displayAmount)}`,
+                          })
+                        : `${t('common.rupee')}${formatCurrency(displayAmount)}`}
+                    </Text>
+                  ) : null}
                   {showsHouseOwnerContact(b.status) ? (
                     <HouseOwnerContactCard compact phone={b.houseOwner.user.phone} />
                   ) : null}
@@ -93,7 +111,8 @@ export default function ScheduleScreen() {
               </View>
             </GlassCard>
           </Pressable>
-        ))
+          );
+        })
       )}
     </ScrollView>
   );
@@ -107,6 +126,7 @@ const styles = StyleSheet.create({
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontSize: 17, fontWeight: '600' },
   meta: { color: Stitch.colors.onSurfaceVariant, marginVertical: 6 },
+  amount: { fontSize: 15, fontWeight: '700', color: Stitch.colors.secondary, marginBottom: 6 },
   empty: { textAlign: 'center', color: Stitch.colors.onSurfaceVariant },
   loader: { alignItems: 'center', paddingVertical: 32, gap: 12 },
 });

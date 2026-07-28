@@ -17,6 +17,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { useServantLocationReporter } from '@/hooks/useServantLocationReporter';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import { getBookingDisplayAmount, isFinalBookingPrice } from '@/lib/bookingPricing';
 import {
   stopPendingRequestVibration,
   syncPendingRequestVibration,
@@ -332,12 +333,20 @@ export default function ScheduleDetailScreen() {
         ) : booking.address ? (
           <Text style={styles.address}>{booking.address}</Text>
         ) : null}
-        {booking.totalAmount != null && (
-          <Text style={styles.amount}>
-            {Stitch.copy.rupee}
-            {formatCurrency(booking.totalAmount)}
-          </Text>
-        )}
+        {(() => {
+          const displayAmount = getBookingDisplayAmount(booking);
+          if (displayAmount == null) return null;
+          const showFinalPrice = isFinalBookingPrice(booking.status);
+          return (
+            <Text style={styles.amount}>
+              {showFinalPrice
+                ? t('bookings.finalPrice', {
+                    amount: `${Stitch.copy.rupee}${formatCurrency(displayAmount)}`,
+                  })
+                : `${Stitch.copy.rupee}${formatCurrency(displayAmount)}`}
+            </Text>
+          );
+        })()}
         {booking.notes ? (
           <Text style={styles.notes}>{t('servantHome.notesLabel', { notes: booking.notes })}</Text>
         ) : null}

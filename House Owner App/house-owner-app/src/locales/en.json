@@ -251,6 +251,7 @@
     "monthlyPlan": "Monthly plan",
     "when": "When",
     "amount": "Amount",
+    "finalPrice": "Final price: {{amount}}",
     "reviewTitle": "Rate your visit",
     "reviewPlaceholder": "Share how the visit went (optional)",
     "submitReview": "Submit review",

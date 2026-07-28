@@ -248,6 +248,7 @@
     "monthlyPlan": "मासिक योजना",
     "when": "कधी",
     "amount": "रक्कम",
+    "finalPrice": "अंतिम किंमत: {{amount}}",
     "reviewTitle": "भेट रेट करा",
     "reviewPlaceholder": "अनुभव सांगा (ऐच्छिक)",
     "submitReview": "पुनरावलोकन पाठवा",

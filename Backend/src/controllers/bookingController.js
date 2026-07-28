@@ -10,6 +10,7 @@ const {
   expireStaleSessionBookings,
   isSessionPast,
   computeBookingEarnings,
+  enrichBookingPricing,
   normalizeBookingRow
 } = require("../services/bookingService");
 const { createNotification, findUsersNotifiedForOpenBooking } = require("../services/notificationService");
@@ -63,7 +64,7 @@ const redactHelperContactForOwner = (booking) => {
 };
 
 const presentBooking = (booking, role) => {
-  const row = normalizeBookingRow(booking);
+  const row = enrichBookingPricing(normalizeBookingRow(booking));
   if (role === "SERVANT") return redactOwnerContactForServant(row);
   if (role === "HOUSE_OWNER") return redactHelperContactForOwner(row);
   return row;
@@ -921,9 +922,18 @@ exports.completeBooking = async (req, res) => {
     throw new ApiError(400, "Booking cannot be completed");
   }
 
+  const fullBooking = await prisma.booking.findUnique({
+    where: { id },
+    include: bookingInclude
+  });
+  const totalAmount = computeBookingEarnings(fullBooking, fullBooking?.servant?.hourlyRate);
+
   const updated = await prisma.booking.update({
     where: { id },
-    data: { status: "COMPLETED" },
+    data: {
+      status: "COMPLETED",
+      ...(totalAmount > 0 ? { totalAmount } : {})
+    },
     include: bookingInclude
   });
 

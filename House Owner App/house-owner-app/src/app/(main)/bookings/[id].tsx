@@ -19,6 +19,7 @@ import { formatVisitAddressLines } from '@/lib/visitAddress';
 import { localizedSkillLabel } from '@/lib/skills';
 import { useSkills } from '@/hooks/useSkills';
 import { formatDate, formatCurrency } from '@/lib/i18n/format';
+import { getBookingDisplayAmount, isFinalBookingPrice } from '@/lib/bookingPricing';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { BookingWorkTimesCard } from '@/components/bookings/BookingWorkTimesCard';
 import { getBookingEditMode } from '@/lib/bookingEdit';
@@ -196,12 +197,20 @@ export default function BookingDetailScreen() {
             {t('bookings.addressRow', { address: booking.address })}
           </Text>
         ) : null}
-        {booking.totalAmount != null && (
-          <Text style={styles.amount}>
-            {Stitch.copy.rupee}
-            {formatCurrency(booking.totalAmount)}
-          </Text>
-        )}
+        {(() => {
+          const displayAmount = getBookingDisplayAmount(booking);
+          if (displayAmount == null) return null;
+          const showFinalPrice = isFinalBookingPrice(booking.status);
+          return (
+            <Text style={styles.amount}>
+              {showFinalPrice
+                ? t('bookings.finalPrice', {
+                    amount: `${Stitch.copy.rupee}${formatCurrency(displayAmount)}`,
+                  })
+                : `${Stitch.copy.rupee}${formatCurrency(displayAmount)}`}
+            </Text>
+          );
+        })()}
         {booking.notes ? (
           <Text style={styles.row}>{t('bookings.notesRow', { notes: booking.notes })}</Text>
         ) : null}

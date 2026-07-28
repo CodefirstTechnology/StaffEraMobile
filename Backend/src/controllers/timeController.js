@@ -6,7 +6,7 @@ const {
   notifyWorkCompletedOnce
 } = require("../services/notificationService");
 const { hasPendingWorkOtp } = require("../services/workStartOtpService");
-const { computeBookingEarnings, isSessionPast, expireStaleSessionBookings } = require("../services/bookingService");
+const { computeBookingEarnings, isSessionPast, expireStaleSessionBookings, syncCompletedBookingAmounts } = require("../services/bookingService");
 
 const getMonthBounds = (ref = new Date()) => {
   const start = new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0);
@@ -138,9 +138,15 @@ exports.clockOut = async (req, res) => {
     data: { clockOut: now, hoursWorked: Math.round(hoursWorked * 100) / 100 }
   });
 
+  const timeEntriesWithClose = (booking.timeEntries || []).map((row) =>
+    row.id === openEntry.id
+      ? { ...row, clockOut: now, hoursWorked: entry.hoursWorked }
+      : row
+  );
+
   if (["CONFIRMED", "ACTIVE"].includes(booking.status)) {
     const totalAmount = computeBookingEarnings(
-      { ...booking, timeEntries: booking.timeEntries },
+      { ...booking, timeEntries: timeEntriesWithClose },
       booking.servant?.hourlyRate
     );
     const sessionEnded =
@@ -210,8 +216,13 @@ exports.getMonth = async (req, res) => {
       servantId: servant.id,
       status: "COMPLETED"
     },
-    include: { timeEntries: true }
+    include: {
+      timeEntries: true,
+      servant: { select: { hourlyRate: true, monthlyRate: true } }
+    }
   });
+
+  await syncCompletedBookingAmounts(completed);
 
   const hourlyRate = servant.hourlyRate || 0;
   const inMonth = completed.filter((booking) => {

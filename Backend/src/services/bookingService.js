@@ -182,23 +182,67 @@ const isSessionPast = (booking, now = new Date()) => {
 };
 
 const computeBookingEarnings = (booking, hourlyRate) => {
-  if (booking.totalAmount != null && booking.totalAmount > 0) {
-    return booking.totalAmount;
+  const rate = hourlyRate ?? booking.servant?.hourlyRate ?? 0;
+
+  if (booking.bookingType === "MONTHLY") {
+    if (booking.totalAmount != null && booking.totalAmount > 0) {
+      return booking.totalAmount;
+    }
+    if (booking.servant?.monthlyRate != null && booking.servant.monthlyRate > 0) {
+      return booking.servant.monthlyRate;
+    }
+    return 0;
   }
-  const rate = hourlyRate || 0;
-  if (!rate) return 0;
 
   const entries = booking.timeEntries || [];
   const hoursFromEntries = entries.reduce((sum, e) => sum + (e.hoursWorked || 0), 0);
-  if (hoursFromEntries > 0) {
+  if (hoursFromEntries > 0 && rate > 0) {
     return Math.round(hoursFromEntries * rate * 100) / 100;
   }
 
-  if (booking.sessionHours && booking.sessionHours > 0) {
+  if (booking.totalAmount != null && booking.totalAmount > 0) {
+    return booking.totalAmount;
+  }
+
+  if (booking.sessionHours && booking.sessionHours > 0 && rate > 0) {
     return Math.round(booking.sessionHours * rate * 100) / 100;
   }
 
   return 0;
+};
+
+const enrichBookingPricing = (booking) => {
+  if (!booking) return booking;
+  const finalAmount = computeBookingEarnings(booking, booking.servant?.hourlyRate);
+  const roundedFinal = finalAmount > 0 ? finalAmount : null;
+  const isFinalized = booking.status === "COMPLETED";
+
+  return {
+    ...booking,
+    finalAmount: roundedFinal,
+    totalAmount:
+      isFinalized && roundedFinal != null
+        ? roundedFinal
+        : booking.totalAmount ?? roundedFinal
+  };
+};
+
+const syncCompletedBookingAmounts = async (bookings = []) => {
+  const updates = bookings
+    .filter((booking) => booking.status === "COMPLETED")
+    .map(async (booking) => {
+      const amount = computeBookingEarnings(booking, booking.servant?.hourlyRate);
+      if (amount <= 0 || amount === booking.totalAmount) return;
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { totalAmount: amount }
+      });
+      booking.totalAmount = amount;
+    });
+
+  if (updates.length) {
+    await Promise.allSettled(updates);
+  }
 };
 
 const resolveExpiredSessionStatus = (booking) => {
@@ -344,6 +388,8 @@ module.exports = {
   getSessionEndAt,
   isSessionPast,
   computeBookingEarnings,
+  enrichBookingPricing,
+  syncCompletedBookingAmounts,
   expireStaleSessionBookings,
   normalizeBookingStatus,
   normalizeBookingRow,

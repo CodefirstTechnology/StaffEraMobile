@@ -1,10 +1,16 @@
+import { getBookingDisplayAmount } from '@/lib/bookingPricing';
+
 export type EarningsBooking = {
   id: number;
   status: string;
+  bookingType?: string;
   sessionDate?: string | null;
   sessionHours?: number | null;
   monthlyStartDate?: string | null;
   totalAmount?: number | null;
+  finalAmount?: number | null;
+  timeEntries?: { hoursWorked?: number | null }[];
+  servant?: { hourlyRate?: number | null; monthlyRate?: number | null };
   updatedAt?: string;
 };
 
@@ -46,15 +52,7 @@ export const isCompletedThisMonth = (
 export const bookingEarningAmount = (
   booking: EarningsBooking,
   hourlyRate = 0,
-) => {
-  if (booking.totalAmount != null && booking.totalAmount > 0) {
-    return booking.totalAmount;
-  }
-  if (booking.sessionHours && hourlyRate > 0) {
-    return Math.round(booking.sessionHours * hourlyRate * 100) / 100;
-  }
-  return 0;
-};
+) => getBookingDisplayAmount(booking, hourlyRate) ?? 0;
 
 export const computeTodayEarnings = (
   bookings: EarningsBooking[],

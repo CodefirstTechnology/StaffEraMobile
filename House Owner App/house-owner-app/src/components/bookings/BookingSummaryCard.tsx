@@ -7,6 +7,7 @@ import { StatusPill } from '@/components/ui/StatusPill';
 import { formatSessionSlotsLabel } from '@/lib/timeSlots';
 import { localizedSkillLabel } from '@/lib/skills';
 import { formatDate, formatDateShort, formatCurrency } from '@/lib/i18n/format';
+import { getBookingDisplayAmount, isFinalBookingPrice } from '@/lib/bookingPricing';
 import i18n from '@/lib/i18n';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { HelperContactCard } from '@/components/bookings/HelperContactCard';
@@ -27,6 +28,9 @@ export type BookingSummary = {
     verificationStatus?: string;
   } | null;
   totalAmount?: number | null;
+  finalAmount?: number | null;
+  sessionHours?: number | null;
+  timeEntries?: { hoursWorked?: number | null }[];
   address?: string | null;
 };
 
@@ -69,6 +73,8 @@ export function BookingSummaryCard({
     booking.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly');
   const canTrack = booking.status === 'CONFIRMED' || booking.status === 'ACTIVE';
   const showContact = showsHelperContact(booking.status) && booking.servant?.user;
+  const displayAmount = getBookingDisplayAmount(booking);
+  const showFinalPrice = isFinalBookingPrice(booking.status);
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
@@ -125,10 +131,13 @@ export function BookingSummaryCard({
           </View>
         ) : null}
 
-        {booking.totalAmount != null ? (
+        {displayAmount != null ? (
           <Text style={styles.amount}>
-            {t('common.rupee')}
-            {formatCurrency(booking.totalAmount)}
+            {showFinalPrice
+              ? t('bookings.finalPrice', {
+                  amount: `${t('common.rupee')}${formatCurrency(displayAmount)}`,
+                })
+              : `${t('common.rupee')}${formatCurrency(displayAmount)}`}
           </Text>
         ) : null}
 

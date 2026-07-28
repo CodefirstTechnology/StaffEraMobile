@@ -1,6 +1,30 @@
 const prisma = require("../config/prisma");
+const { computeBookingEarnings } = require("./bookingService");
 
 const roundMoney = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+const bookingRevenueSelect = {
+  id: true,
+  bookingType: true,
+  status: true,
+  totalAmount: true,
+  sessionHours: true,
+  updatedAt: true,
+  servantId: true,
+  timeEntries: { select: { hoursWorked: true } },
+  servant: {
+    select: {
+      id: true,
+      hourlyRate: true,
+      monthlyRate: true,
+      agentId: true,
+      user: { select: { name: true } }
+    }
+  }
+};
+
+const bookingAmount = (booking) =>
+  computeBookingEarnings(booking, booking.servant?.hourlyRate);
 
 const getYearBounds = (year = new Date().getFullYear()) => ({
   year,
@@ -15,7 +39,7 @@ const completedBookingsForAgentYear = (agentId, { start, end }) => ({
 });
 
 const sumAmount = (bookings) =>
-  roundMoney(bookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0));
+  roundMoney(bookings.reduce((sum, b) => sum + bookingAmount(b), 0));
 
 const buildMonthlySeries = (bookings, year) => {
   const months = [];
@@ -47,7 +71,7 @@ const buildServantBreakdown = (bookings) => {
       revenue: 0
     };
     existing.completedBookings += 1;
-    existing.revenue = roundMoney(existing.revenue + (booking.totalAmount || 0));
+    existing.revenue = roundMoney(existing.revenue + bookingAmount(booking));
     byServant.set(key, existing);
   }
   return [...byServant.values()].sort((a, b) => b.revenue - a.revenue);
@@ -60,18 +84,7 @@ const getAgentAnnualRevenue = async (agentId, year = new Date().getFullYear()) =
   const [bookings, servantCounts] = await Promise.all([
     prisma.booking.findMany({
       where,
-      select: {
-        id: true,
-        totalAmount: true,
-        updatedAt: true,
-        servantId: true,
-        servant: {
-          select: {
-            id: true,
-            user: { select: { name: true } }
-          }
-        }
-      },
+      select: bookingRevenueSelect,
       orderBy: { updatedAt: "desc" }
     }),
     prisma.servant.groupBy({
@@ -120,18 +133,7 @@ const getPlatformAnnualRevenue = async (year = new Date().getFullYear()) => {
   const [bookings, servantCounts] = await Promise.all([
     prisma.booking.findMany({
       where: bookingWhere,
-      select: {
-        id: true,
-        totalAmount: true,
-        updatedAt: true,
-        servantId: true,
-        servant: {
-          select: {
-            id: true,
-            user: { select: { name: true } }
-          }
-        }
-      },
+      select: bookingRevenueSelect,
       orderBy: { updatedAt: "desc" }
     }),
     prisma.servant.groupBy({
@@ -169,10 +171,7 @@ const attachAnnualRevenueToAgents = async (agents, year = new Date().getFullYear
       updatedAt: { gte: bounds.start, lte: bounds.end },
       servant: { agentId: { in: agentIds } }
     },
-    select: {
-      totalAmount: true,
-      servant: { select: { agentId: true } }
-    }
+    select: bookingRevenueSelect
   });
 
   const revenueByAgent = new Map(agentIds.map((id) => [id, 0]));
@@ -181,7 +180,7 @@ const attachAnnualRevenueToAgents = async (agents, year = new Date().getFullYear
   for (const booking of bookings) {
     const agentId = booking.servant?.agentId;
     if (!agentId) continue;
-    revenueByAgent.set(agentId, roundMoney((revenueByAgent.get(agentId) || 0) + (booking.totalAmount || 0)));
+    revenueByAgent.set(agentId, roundMoney((revenueByAgent.get(agentId) || 0) + bookingAmount(booking)));
     bookingsByAgent.set(agentId, (bookingsByAgent.get(agentId) || 0) + 1);
   }
 

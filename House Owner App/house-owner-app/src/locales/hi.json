@@ -248,6 +248,7 @@
     "monthlyPlan": "मासिक योजना",
     "when": "कब",
     "amount": "राशि",
+    "finalPrice": "अंतिम कीमत: {{amount}}",
     "reviewTitle": "विज़िट रेट करें",
     "reviewPlaceholder": "अनुभव साझा करें (वैकल्पिक)",
     "submitReview": "समीक्षा भेजें",
