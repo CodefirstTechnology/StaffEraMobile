@@ -167,13 +167,34 @@ const checkOwnerPendingDuplicate = async (houseOwnerId, servantId, bookingData) 
   return false;
 };
 
+const APP_TIMEZONE = "Asia/Kolkata";
+
+const formatSessionTimePart = (timeStr) => {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(":").map(Number);
+  if (Number.isNaN(h)) return null;
+  return `${String(h).padStart(2, "0")}:${String(m || 0).padStart(2, "0")}`;
+};
+
+const getSessionCalendarDateStr = (sessionDate) => {
+  const d = new Date(sessionDate);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
+};
+
+const combineSessionDateAndTime = (sessionDate, timeStr) => {
+  const dateStr = getSessionCalendarDateStr(sessionDate);
+  const time = formatSessionTimePart(timeStr);
+  if (!dateStr || !time) return null;
+  return new Date(`${dateStr}T${time}:00+05:30`);
+};
+
 const getSessionEndAt = (booking) => {
   if (booking.bookingType !== "SESSION" || !booking.sessionDate) return null;
-  const endTime = booking.sessionEndTime || "23:59";
-  const [h, m] = endTime.split(":").map(Number);
-  const endAt = new Date(booking.sessionDate);
-  endAt.setHours(h, m || 0, 0, 0);
-  return endAt;
+  return combineSessionDateAndTime(
+    booking.sessionDate,
+    booking.sessionEndTime || "23:59"
+  );
 };
 
 const isSessionPast = (booking, now = new Date()) => {

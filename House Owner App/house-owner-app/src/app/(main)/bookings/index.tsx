@@ -46,7 +46,7 @@ export default function BookingsListScreen() {
 
   const bookings = data?.bookings || [];
   const total = data?.total || 0;
-  const { active, recent } = splitBookings(bookings);
+  const { active, completed, past } = splitBookings(bookings);
 
   const sections = useMemo(
     () =>

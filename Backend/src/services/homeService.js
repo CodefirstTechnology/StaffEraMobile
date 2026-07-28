@@ -94,14 +94,6 @@ const buildHomeSummary = async ({ houseOwnerId, latitude, longitude }) => {
   const openInquiries = [];
   for (const booking of openCandidates) {
     const availableHelpers = await getAvailableHelpersForOpenBooking(booking);
-    if (availableHelpers.length === 0) {
-      await prisma.booking.update({
-        where: { id: booking.id },
-        data: { status: "EXPIRED" }
-      });
-      continue;
-    }
-
     const declinedCount = (await getDeclinedServantIds(booking.id)).size;
 
     openInquiries.push({
@@ -116,7 +108,7 @@ const buildHomeSummary = async ({ houseOwnerId, latitude, longitude }) => {
       createdAt: booking.createdAt,
       eligibleHelperCount: availableHelpers.length,
       declinedCount,
-      canAcceptResponses: true
+      canAcceptResponses: availableHelpers.length > 0
     });
   }
 

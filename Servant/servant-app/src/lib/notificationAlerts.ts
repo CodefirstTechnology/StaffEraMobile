@@ -1,4 +1,5 @@
 import { Platform, Vibration } from 'react-native';
+import { isRunningInExpoGo } from 'expo';
 import * as Haptics from 'expo-haptics';
 import { localizeNotification, type NotificationPayload } from '@/lib/i18n/notifications';
 
@@ -7,8 +8,12 @@ const BOOKING_REQUEST_CHANNEL = 'booking-requests';
 let initialized = false;
 let notificationsModule: typeof import('expo-notifications') | null = null;
 
+function canUseSystemNotifications() {
+  return Platform.OS !== 'web' && !isRunningInExpoGo();
+}
+
 async function getNotifications() {
-  if (Platform.OS === 'web') return null;
+  if (!canUseSystemNotifications()) return null;
 
   if (!notificationsModule) {
     try {
@@ -34,10 +39,10 @@ async function getNotifications() {
 export const BOOKING_REQUEST_TYPES = new Set(['BOOKING_OPEN', 'BOOKING_CREATED']);
 
 export async function initNotificationAlerts(): Promise<boolean> {
-  if (initialized) return true;
+  if (initialized) return canUseSystemNotifications();
   initialized = true;
 
-  if (Platform.OS === 'web') return false;
+  if (!canUseSystemNotifications()) return false;
 
   const Notifications = await getNotifications();
   if (!Notifications) return false;
