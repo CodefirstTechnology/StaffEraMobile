@@ -24,7 +24,32 @@ const {
   servantCoversLocation,
   bookingMatchesServantSkill
 } = require("../services/locationService");
-const { buildHomeSummary, getAvailableHelpersForOpenBooking } = require("../services/homeService");
+const {
+  buildHomeSummary,
+  isServantEligibleForArea
+} = require("../services/homeService");
+
+const SERVANT_OWNER_CONTACT_STATUSES = new Set(["CONFIRMED", "ACTIVE", "COMPLETED"]);
+
+const redactOwnerContactForServant = (booking) => {
+  if (!booking?.houseOwner?.user) return booking;
+  if (SERVANT_OWNER_CONTACT_STATUSES.has(booking.status)) return booking;
+  return {
+    ...booking,
+    houseOwner: {
+      ...booking.houseOwner,
+      user: {
+        ...booking.houseOwner.user,
+        phone: null
+      }
+    }
+  };
+};
+
+const presentBooking = (booking, role) => {
+  const row = normalizeBookingRow(booking);
+  return role === "SERVANT" ? redactOwnerContactForServant(row) : row;
+};
 
 const bookingInclude = {
   servant: {
@@ -296,7 +321,9 @@ exports.listBookings = async (req, res) => {
   });
 
   const enriched = await attachWorkOtpFields(bookings, req.user.role);
-  sendSuccess(res, { bookings: enriched.map(normalizeBookingRow) });
+  sendSuccess(res, {
+    bookings: enriched.map((booking) => presentBooking(booking, req.user.role))
+  });
 };
 
 exports.listOpenRequests = async (req, res) => {
@@ -305,6 +332,9 @@ exports.listOpenRequests = async (req, res) => {
     include: { skills: true, zones: true, user: { select: { name: true } } }
   });
   if (!servant) throw new ApiError(403, "Servant profile required");
+  if (!isServantEligibleForArea(servant)) {
+    return sendSuccess(res, { requests: [] });
+  }
 
   const openBookings = await prisma.booking.findMany({
     where: {
@@ -345,7 +375,9 @@ exports.listOpenRequests = async (req, res) => {
   );
   const requests = availability.filter((row) => !row.busy).map((row) => row.booking);
 
-  sendSuccess(res, { requests });
+  sendSuccess(res, {
+    requests: requests.map((booking) => presentBooking(booking, req.user.role))
+  });
 };
 
 exports.listDeclinedOpenBookingIds = async (req, res) => {
@@ -391,7 +423,7 @@ exports.getBooking = async (req, res) => {
   await assertBookingAccess(req, booking);
 
   const [enriched] = await attachWorkOtpFields([booking], req.user.role);
-  sendSuccess(res, { booking: normalizeBookingRow(enriched) });
+  sendSuccess(res, { booking: presentBooking(enriched, req.user.role) });
 };
 
 const assertBookingAccess = async (req, booking) => {
@@ -539,6 +571,7 @@ exports.confirmBooking = async (req, res) => {
 };
 
 const canServantViewOpenRequest = (servant, booking) =>
+  isServantEligibleForArea(servant) &&
   booking.servantId == null &&
   booking.status === "PENDING" &&
   booking.latitude != null &&
@@ -590,17 +623,7 @@ exports.declineOpenRequest = async (req, res) => {
 
   await recordOpenRequestDecline(servant, id, reason);
 
-  let updatedBooking = booking;
-  const availableHelpers = await getAvailableHelpersForOpenBooking(booking);
-  if (availableHelpers.length === 0) {
-    updatedBooking = await prisma.booking.update({
-      where: { id },
-      data: { status: "EXPIRED" },
-      include: bookingInclude
-    });
-  }
-
-  sendSuccess(res, { booking: normalizeBookingRow(updatedBooking), declined: true });
+  sendSuccess(res, { booking: presentBooking(booking, req.user.role), declined: true });
 };
 
 exports.rejectBooking = async (req, res) => {

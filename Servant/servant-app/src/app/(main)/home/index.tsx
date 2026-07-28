@@ -35,7 +35,9 @@ import {
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
 import { isCancelled, isPendingRequest, isTodayJob } from '@/lib/bookingVisibility';
+import { showsHouseOwnerContact } from '@/lib/bookingContact';
 import { declineBooking } from '@/lib/declineBooking';
+import { HouseOwnerContactCard } from '@/components/bookings/HouseOwnerContactCard';
 
 type Booking = {
   id: number;
@@ -56,7 +58,8 @@ type Booking = {
   monthlyStartDate?: string | null;
   totalAmount?: number | null;
   updatedAt?: string;
-  houseOwner: { user: { name: string } };
+  servantId?: number | null;
+  houseOwner: { user: { name: string; phone?: string | null } };
   pendingWorkOtp?: boolean;
   workOtpExpiresAt?: string | null;
 };
@@ -286,7 +289,10 @@ export default function ServantHomeScreen() {
   const submitDecline = async (reason: string) => {
     if (declineTargetId == null) return;
     const id = declineTargetId;
-    const wasOpenRequest = openRequests?.some((r) => r.id === id) ?? false;
+    const cachedOpen = qc.getQueryData<Booking[]>(['open-requests']) ?? [];
+    const cachedBookings = qc.getQueryData<Booking[]>(['bookings']) ?? [];
+    const target = cachedOpen.find((row) => row.id === id) ?? cachedBookings.find((row) => row.id === id);
+    const wasOpenRequest = target?.servantId == null && target?.status === 'PENDING';
     setDeclineLoading(true);
     setActingId(id);
     try {
@@ -608,6 +614,9 @@ export default function ServantHomeScreen() {
                     <Text style={styles.cardMeta}>
                       {formatVisitAddressLines(b).join(' · ') || b.address || t('servantHome.addressOnFile')}
                     </Text>
+                    {showsHouseOwnerContact(b.status) ? (
+                      <HouseOwnerContactCard compact phone={b.houseOwner.user.phone} />
+                    ) : null}
                   </View>
                   <MaterialIcons
                     name="chevron-right"

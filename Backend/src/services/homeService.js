@@ -124,5 +124,6 @@ const buildHomeSummary = async ({ houseOwnerId, latitude, longitude }) => {
 module.exports = {
   buildHomeSummary,
   countEligibleHelpersNear,
-  getAvailableHelpersForOpenBooking
+  getAvailableHelpersForOpenBooking,
+  isServantEligibleForArea
 };

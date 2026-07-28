@@ -29,6 +29,8 @@ import { ZoneRequiredBanner } from '@/components/zones/ZoneRequiredBanner';
 import { useZoneGate } from '@/hooks/useZoneGate';
 import { useDeclinedOpenBookingIds, isDeclinedOpenBooking } from '@/hooks/useDeclinedOpenBookingIds';
 import { isActionableBooking, isCancelled } from '@/lib/bookingVisibility';
+import { showsHouseOwnerContact } from '@/lib/bookingContact';
+import { HouseOwnerContactCard } from '@/components/bookings/HouseOwnerContactCard';
 import { declineBooking } from '@/lib/declineBooking';
 
 export default function ScheduleDetailScreen() {
@@ -293,6 +295,12 @@ export default function ScheduleDetailScreen() {
       <GlassCard>
         <Text style={styles.title}>{booking.houseOwner.user.name}</Text>
         <StatusPill status={booking.status} />
+        {showsHouseOwnerContact(booking.status) ? (
+          <HouseOwnerContactCard
+            name={booking.houseOwner.user.name}
+            phone={booking.houseOwner.user.phone}
+          />
+        ) : null}
         <Text style={styles.meta}>{visitType}</Text>
         {skill ? <Text style={styles.detailRow}>{t('servantHome.skillLabel', { skill })}</Text> : null}
         {sessionDate ? (

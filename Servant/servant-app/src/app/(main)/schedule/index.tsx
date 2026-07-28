@@ -9,6 +9,8 @@ import { Stitch } from '@/theme/stitch';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { SCHEDULE_VISIBLE_STATUSES } from '@/lib/bookingVisibility';
+import { showsHouseOwnerContact } from '@/lib/bookingContact';
+import { HouseOwnerContactCard } from '@/components/bookings/HouseOwnerContactCard';
 
 type ScheduleBooking = {
   id: number;
@@ -16,7 +18,7 @@ type ScheduleBooking = {
   bookingType: string;
   address?: string;
   sessionDate?: string | null;
-  houseOwner: { user: { name: string } };
+  houseOwner: { user: { name: string; phone?: string | null } };
 };
 
 const SCHEDULE_STATUSES = SCHEDULE_VISIBLE_STATUSES;
@@ -78,6 +80,9 @@ export default function ScheduleScreen() {
                     {b.bookingType === 'SESSION' ? t('common.oneVisit') : t('common.monthly')} ·{' '}
                     {b.address || t('schedule.addressTbd')}
                   </Text>
+                  {showsHouseOwnerContact(b.status) ? (
+                    <HouseOwnerContactCard compact phone={b.houseOwner.user.phone} />
+                  ) : null}
                   <StatusPill status={b.status} />
                 </View>
                 <MaterialIcons
