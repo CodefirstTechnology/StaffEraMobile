@@ -398,6 +398,23 @@ const filterServantsAvailableForBooking = async (
   return results.filter(Boolean);
 };
 
+/** Session visits finish as COMPLETED on checkout; monthly shifts back to CONFIRMED. */
+const resolveStatusAfterClockOut = (booking) => {
+  if (!["CONFIRMED", "ACTIVE"].includes(booking.status)) {
+    return booking.status;
+  }
+  if (booking.bookingType === "SESSION") {
+    if (booking.extensionStatus === "PENDING") {
+      return booking.status;
+    }
+    return "COMPLETED";
+  }
+  if (booking.bookingType === "MONTHLY" && booking.status === "ACTIVE") {
+    return "CONFIRMED";
+  }
+  return booking.status;
+};
+
 module.exports = {
   checkBookingConflict,
   hasServantScheduleConflict,
@@ -414,5 +431,6 @@ module.exports = {
   expireStaleSessionBookings,
   normalizeBookingStatus,
   normalizeBookingRow,
+  resolveStatusAfterClockOut,
   BLOCKING_STATUSES
 };

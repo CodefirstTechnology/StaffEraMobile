@@ -34,8 +34,8 @@ import {
   syncPendingRequestVibration,
   vibrateBookingAccepted,
 } from '@/lib/bookingRequestVibration';
-import { isCancelled, isPendingRequest, isTodayJob, isCompletedJob } from '@/lib/bookingVisibility';
-import { isCompletedToday } from '@/lib/earnings';
+import { isCancelled, isPendingRequest, isTodayJob, isCompletedJob, splitServantJobs } from '@/lib/bookingVisibility';
+import { syncAfterClockOut, type ClockOutBooking } from '@/lib/clockOutSync';
 import { showsHouseOwnerContact } from '@/lib/bookingContact';
 import { declineBooking } from '@/lib/declineBooking';
 import { HouseOwnerContactCard } from '@/components/bookings/HouseOwnerContactCard';
@@ -208,9 +208,7 @@ export default function ServantHomeScreen() {
   }, [openRequests, bookings]);
 
   const todayJobs = (bookings || []).filter((b) => isTodayJob(b.status));
-  const completedJobs = (bookings || []).filter(
-    (b) => isCompletedJob(b.status) && isCompletedToday(b),
-  );
+  const completedJobs = splitServantJobs(bookings || []).completed.slice(0, 5);
 
   useEffect(() => {
     if (!bookings?.length) return;
@@ -259,25 +257,11 @@ export default function ServantHomeScreen() {
   const clockOut = async () => {
     try {
       const res = await api.post('/time/clock-out');
-      const updated = res.data.data.booking as { id: number; status: string } | undefined;
+      const updated = res.data.data.booking as ClockOutBooking | undefined;
       setActiveEntry(null);
       setActiveBookingId(null);
       setOnWayBookingId(null);
-      if (updated?.id) {
-        qc.setQueryData(['bookings'], (current: Booking[] | undefined) =>
-          current?.map((row) =>
-            row.id === updated.id ? { ...row, status: updated.status } : row,
-          ),
-        );
-      }
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['time-today'] }),
-        qc.invalidateQueries({ queryKey: ['time-month'] }),
-        qc.invalidateQueries({ queryKey: ['bookings'] }),
-        qc.invalidateQueries({
-          predicate: (query) => query.queryKey[0] === 'booking',
-        }),
-      ]);
+      await syncAfterClockOut(qc, updated);
       Alert.alert(t('servantHome.clockedOutTitle'), t('servantHome.hoursSaved'));
     } catch (e: unknown) {
       Alert.alert(t('errors.generic'), apiError(e, t('servantHome.couldNotClockOut')));

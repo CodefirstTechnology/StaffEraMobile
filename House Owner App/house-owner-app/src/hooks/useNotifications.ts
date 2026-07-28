@@ -58,6 +58,8 @@ export function useNotifications(page = 1, limit = 10) {
       if (seenIds.current.has(notification.id)) continue;
       if (
         notification.type !== 'BOOKING_CONFIRMED' &&
+        notification.type !== 'BOOKING_DECLINED' &&
+        notification.type !== 'BOOKING_REJECTED' &&
         notification.type !== 'WORK_COMPLETED' &&
         notification.type !== 'BOOKING_COMPLETED'
       ) {

@@ -6,7 +6,14 @@ const {
   notifyWorkCompletedOnce
 } = require("../services/notificationService");
 const { hasPendingWorkOtp } = require("../services/workStartOtpService");
-const { computeBookingEarnings, expireStaleSessionBookings, syncCompletedBookingAmounts } = require("../services/bookingService");
+const {
+  computeBookingEarnings,
+  expireStaleSessionBookings,
+  syncCompletedBookingAmounts,
+  enrichBookingPricing,
+  normalizeBookingRow,
+  resolveStatusAfterClockOut
+} = require("../services/bookingService");
 
 const getMonthBounds = (ref = new Date()) => {
   const start = new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0);
@@ -133,67 +140,90 @@ exports.clockOut = async (req, res) => {
   const hoursWorked =
     (now.getTime() - new Date(openEntry.clockIn).getTime()) / (1000 * 60 * 60);
 
-  const entry = await prisma.timeEntry.update({
-    where: { id: openEntry.id },
-    data: { clockOut: now, hoursWorked: Math.round(hoursWorked * 100) / 100 }
-  });
-
   const timeEntriesWithClose = (booking.timeEntries || []).map((row) =>
     row.id === openEntry.id
-      ? { ...row, clockOut: now, hoursWorked: entry.hoursWorked }
+      ? { ...row, clockOut: now, hoursWorked: Math.round(hoursWorked * 100) / 100 }
       : row
   );
 
-  if (["CONFIRMED", "ACTIVE"].includes(booking.status)) {
-    const totalAmount = computeBookingEarnings(
-      { ...booking, timeEntries: timeEntriesWithClose },
-      booking.servant?.hourlyRate
-    );
-    const isSession = booking.bookingType === "SESSION";
-    const canCompleteSession = isSession && booking.extensionStatus !== "PENDING";
+  const nextStatus = resolveStatusAfterClockOut(booking);
+  const totalAmount = ["CONFIRMED", "ACTIVE"].includes(booking.status)
+    ? computeBookingEarnings(
+        { ...booking, timeEntries: timeEntriesWithClose },
+        booking.servant?.hourlyRate
+      )
+    : booking.totalAmount;
 
-    let nextStatus = booking.status;
-    if (canCompleteSession) {
-      nextStatus = "COMPLETED";
-    } else if (booking.status === "ACTIVE" && booking.bookingType === "MONTHLY") {
-      nextStatus = "CONFIRMED";
-    }
-
-    await prisma.booking.update({
-      where: { id: booking.id },
-      data: {
-        ...(totalAmount > 0 ? { totalAmount } : {}),
-        ...(nextStatus !== booking.status ? { status: nextStatus } : {})
-      }
+  const { entry, updatedBooking } = await prisma.$transaction(async (tx) => {
+    const closedEntry = await tx.timeEntry.update({
+      where: { id: openEntry.id },
+      data: { clockOut: now, hoursWorked: Math.round(hoursWorked * 100) / 100 }
     });
 
-    if (nextStatus === "COMPLETED" && booking.houseOwner?.user?.id) {
-      await createNotification({
-        userId: booking.houseOwner.user.id,
-        title: "Booking completed",
-        body: "Your booking has been marked completed",
-        type: "BOOKING_COMPLETED",
-        data: { bookingId: booking.id }
+    let bookingRow = booking;
+    if (["CONFIRMED", "ACTIVE"].includes(booking.status)) {
+      bookingRow = await tx.booking.update({
+        where: { id: booking.id },
+        data: {
+          ...(totalAmount > 0 ? { totalAmount } : {}),
+          ...(nextStatus !== booking.status ? { status: nextStatus } : {})
+        },
+        include: {
+          timeEntries: true,
+          servant: {
+            include: {
+              user: { select: { name: true } }
+            }
+          },
+          houseOwner: {
+            include: {
+              user: { select: { id: true } }
+            }
+          }
+        }
       });
     }
+
+    return { entry: closedEntry, updatedBooking: bookingRow };
+  });
+
+  if (
+    nextStatus === "COMPLETED" &&
+    booking.status !== "COMPLETED" &&
+    booking.houseOwner?.user?.id
+  ) {
+    await createNotification({
+      userId: booking.houseOwner.user.id,
+      title: "Booking completed",
+      body: "Your booking has been marked completed",
+      type: "BOOKING_COMPLETED",
+      data: { bookingId: booking.id }
+    });
   }
 
-  if (!wasAlreadyCompleted && booking.houseOwner?.user?.id) {
+  if (!wasAlreadyCompleted && updatedBooking.houseOwner?.user?.id) {
     await notifyWorkCompletedOnce({
-      userId: booking.houseOwner.user.id,
-      booking,
-      servant: booking.servant,
+      userId: updatedBooking.houseOwner.user.id,
+      booking: updatedBooking,
+      servant: updatedBooking.servant,
       timeEntry: entry,
       completedAt: now
     });
   }
 
-  const updatedBooking = await prisma.booking.findUnique({
-    where: { id: booking.id },
-    select: { id: true, status: true, totalAmount: true, bookingType: true }
-  });
+  const presented = enrichBookingPricing(normalizeBookingRow(updatedBooking));
 
-  sendSuccess(res, { entry, booking: updatedBooking });
+  sendSuccess(res, {
+    entry,
+    booking: {
+      id: presented.id,
+      status: presented.status,
+      totalAmount: presented.totalAmount,
+      finalAmount: presented.finalAmount,
+      bookingType: presented.bookingType,
+      updatedAt: presented.updatedAt
+    }
+  });
 };
 
 exports.getToday = async (req, res) => {

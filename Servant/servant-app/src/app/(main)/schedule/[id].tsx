@@ -33,6 +33,7 @@ import { isActionableBooking, isCancelled } from '@/lib/bookingVisibility';
 import { showsHouseOwnerContact, allowsContactActions } from '@/lib/bookingContact';
 import { HouseOwnerContactCard } from '@/components/bookings/HouseOwnerContactCard';
 import { declineBooking } from '@/lib/declineBooking';
+import { syncAfterClockOut, type ClockOutBooking } from '@/lib/clockOutSync';
 
 export default function ScheduleDetailScreen() {
   const { t } = useTranslation();
@@ -440,14 +441,9 @@ export default function ScheduleDetailScreen() {
                 }}
                 onPress={async () => {
                   try {
-                    await api.post('/time/clock-out');
-                    await Promise.all([
-                      qc.invalidateQueries({ queryKey: ['time-today'] }),
-                      qc.invalidateQueries({ queryKey: ['time-month'] }),
-                      qc.invalidateQueries({ queryKey: ['booking', id] }),
-                      qc.invalidateQueries({ queryKey: ['bookings'] }),
-                      qc.invalidateQueries({ queryKey: ['schedule'] }),
-                    ]);
+                    const res = await api.post('/time/clock-out');
+                    const updated = res.data.data.booking as ClockOutBooking | undefined;
+                    await syncAfterClockOut(qc, updated);
                     Alert.alert(t('servantHome.clockedOutTitle'), t('servantHome.hoursSaved'));
                   } catch (e: unknown) {
                     const err = e as { response?: { data?: { message?: string } } };
