@@ -300,16 +300,20 @@ export default function ScheduleDetailScreen() {
           {['CONFIRMED', 'ACTIVE'].includes(booking.status) && booking.houseOwner.user.phone ? (
             <View style={styles.contactActions}>
               <TouchableOpacity
-                style={styles.contactBtn}
+                style={[styles.contactBtn, styles.contactBtnCall]}
                 onPress={() => Linking.openURL(`tel:${booking.houseOwner.user.phone}`)}
+                accessibilityRole="button"
+                accessibilityLabel={t('schedule.callCustomer')}
               >
-                <MaterialIcons name="call" size={20} color={Stitch.colors.primary} />
+                <MaterialIcons name="call" size={20} color={Stitch.colors.success} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.contactBtn}
+                style={[styles.contactBtn, styles.contactBtnMessage]}
                 onPress={() => Linking.openURL(`sms:${booking.houseOwner.user.phone}`)}
+                accessibilityRole="button"
+                accessibilityLabel={t('schedule.messageCustomer')}
               >
-                <MaterialIcons name="message" size={20} color={Stitch.colors.primary} />
+                <MaterialIcons name="message" size={20} color={Stitch.colors.secondary} />
               </TouchableOpacity>
             </View>
           ) : null}
@@ -529,9 +533,18 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: Stitch.colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  contactBtnCall: {
+    backgroundColor: Stitch.colors.successBg,
+    borderWidth: 1,
+    borderColor: 'rgba(13, 148, 136, 0.22)',
+  },
+  contactBtnMessage: {
+    backgroundColor: Stitch.colors.secondaryFixed,
+    borderWidth: 1,
+    borderColor: 'rgba(125, 68, 164, 0.18)',
   },
   meta: { marginTop: 8, color: Stitch.colors.onSurfaceVariant },
   detailRow: { marginTop: 6, color: Stitch.colors.onBackground },
