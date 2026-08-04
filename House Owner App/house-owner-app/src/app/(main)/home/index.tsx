@@ -233,6 +233,7 @@ export default function HomeScreen() {
         {otpBooking?.workStartOtp?.code ? (
           <WorkStartOtpCard
             code={otpBooking.workStartOtp.code}
+            expiresAt={otpBooking.workStartOtp.expiresAt}
             helperName={otpBooking.servant?.user?.name}
           />
         ) : null}

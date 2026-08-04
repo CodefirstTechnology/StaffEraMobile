@@ -22,6 +22,7 @@ import { formatDate, formatCurrency } from '@/lib/i18n/format';
 import { getBookingDisplayAmount, isFinalBookingPrice } from '@/lib/bookingPricing';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { BookingWorkTimesCard } from '@/components/bookings/BookingWorkTimesCard';
+import { WorkStartOtpCard } from '@/components/bookings/WorkStartOtpCard';
 import { getBookingEditMode } from '@/lib/bookingEdit';
 import { bookingDetailPollInterval } from '@/lib/bookingPoll';
 import { getHelperContact, showsHelperContact, allowsContactActions } from '@/lib/bookingContact';
@@ -167,7 +168,14 @@ export default function BookingDetailScreen() {
     <View style={styles.root}>
       <BackHeader title={t('bookings.bookingDetails')} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-      <GlassCard>
+        {booking?.workStartOtp?.code ? (
+          <WorkStartOtpCard
+            code={booking.workStartOtp.code}
+            expiresAt={booking.workStartOtp.expiresAt}
+            helperName={booking.servant?.user?.name}
+          />
+        ) : null}
+        <GlassCard>
         <View style={styles.nameRow}>
           <Text style={styles.name}>
             {booking.servant?.user?.name || t('bookings.findingHelper')}

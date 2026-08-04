@@ -504,7 +504,9 @@
     "homeKicker": "Work start code",
     "homeTitle": "Share this OTP with your helper",
     "homeHelper": "{{name}} is ready to start",
-    "homeHint": "Tell them this 4-digit code so they can begin work. Expires in 5 minutes."
+    "homeHint": "Tell them this 4-digit code so they can begin work.",
+    "expiresIn": "Expires in {{time}}",
+    "expired": "OTP Expired. Ask helper to request a new code."
   },
   "pushNotifications": {
     "BOOKING_CREATED": {

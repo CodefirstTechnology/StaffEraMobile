@@ -465,7 +465,9 @@
     "homeKicker": "काम शुरू कोड",
     "homeTitle": "यह OTP सहायक को बताएं",
     "homeHelper": "{{name}} काम शुरू करने को तैयार",
-    "homeHint": "4 अंकों का कोड बताएं। 5 मिनट में समाप्त।"
+    "homeHint": "उन्हें यह 4 अंकों का कोड बताएं ताकि काम शुरू हो सके।",
+    "expiresIn": "{{time}} में समाप्त होगा",
+    "expired": "OTP समाप्त हो गया। सहायक से नया OTP मांगने को कहें।"
   },
   "pushNotifications": {
     "BOOKING_CREATED": {
