@@ -234,6 +234,8 @@
     "editNotesOnlyHint": "Work is in progress — only notes can be changed.",
     "notesRow": "Notes: {{notes}}",
     "cancelBooking": "Cancel booking",
+    "cancelConfirmTitle": "Cancel order?",
+    "cancelConfirmMessage": "Are you sure you want to cancel the order?",
     "writeReview": "Write a review",
     "liveTracking": "Live tracking",
     "visitAddress": "Visit address",

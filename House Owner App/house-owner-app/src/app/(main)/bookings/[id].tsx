@@ -99,7 +99,7 @@ export default function BookingDetailScreen() {
   const helperSharing = Boolean(servant);
   const canTrack = trackLive && home;
 
-  const cancel = async () => {
+  const performCancel = async () => {
     try {
       await api.patch(`/bookings/${id}/cancel`);
       qc.invalidateQueries({ queryKey: ['bookings'] });
@@ -110,6 +110,13 @@ export default function BookingDetailScreen() {
       const err = e as { response?: { data?: { message?: string } } };
       showAlert(t('bookings.requestFailed'), err.response?.data?.message || t('bookings.couldNotCancel'));
     }
+  };
+
+  const cancel = () => {
+    showAlert(t('bookings.cancelConfirmTitle'), t('bookings.cancelConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.confirm'), style: 'destructive', onPress: () => void performCancel() },
+    ]);
   };
 
   if (isLoading || !booking) {

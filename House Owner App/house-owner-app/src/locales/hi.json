@@ -231,6 +231,8 @@
     "editNotesOnlyHint": "काम चल रहा है — केवल नोट्स बदले जा सकते हैं।",
     "notesRow": "नोट्स: {{notes}}",
     "cancelBooking": "बुकिंग रद्द",
+    "cancelConfirmTitle": "ऑर्डर रद्द करें?",
+    "cancelConfirmMessage": "क्या आप वाकई ऑर्डर रद्द करना चाहते हैं?",
     "writeReview": "समीक्षा लिखें",
     "liveTracking": "लाइव ट्रैकिंग",
     "visitAddress": "विज़िट पता",

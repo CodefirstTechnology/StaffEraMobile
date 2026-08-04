@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, TextInput, Text, StyleSheet, TextInputProps, Pressable } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, TextInput, Text, StyleSheet, TextInputProps, Pressable, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stitch } from '@/theme/stitch';
 
@@ -7,7 +7,16 @@ type Props = TextInputProps & { label?: string; error?: string; required?: boole
 
 export function GhostInput({ label, style, secureTextEntry, error, required, ...props }: Props) {
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const inputRef = useRef<TextInput>(null);
   const isPassword = secureTextEntry === true;
+
+  const togglePasswordVisibility = () => {
+    const nextVisible = !passwordVisible;
+    setPasswordVisible(nextVisible);
+    if (Platform.OS === 'android') {
+      inputRef.current?.setNativeProps({ secureTextEntry: !nextVisible });
+    }
+  };
 
   return (
     <View style={styles.wrap}>
@@ -19,20 +28,21 @@ export function GhostInput({ label, style, secureTextEntry, error, required, ...
       ) : null}
       <View style={styles.inputWrap}>
         <TextInput
+          ref={inputRef}
           placeholderTextColor={Stitch.colors.onSurfaceVariant + '99'}
-          secureTextEntry={isPassword ? !passwordVisible : secureTextEntry}
           style={[styles.input, isPassword && styles.inputWithIcon, error ? styles.inputError : null, style]}
           {...props}
+          secureTextEntry={isPassword ? !passwordVisible : secureTextEntry}
         />
         {isPassword ? (
           <Pressable
             style={styles.eyeBtn}
-            onPress={() => setPasswordVisible((v) => !v)}
+            onPress={togglePasswordVisibility}
             accessibilityRole="button"
             accessibilityLabel={passwordVisible ? 'Hide password' : 'Show password'}
           >
             <MaterialIcons
-              name={passwordVisible ? 'visibility-off' : 'visibility'}
+              name={passwordVisible ? 'visibility' : 'visibility-off'}
               size={22}
               color={Stitch.colors.onSurfaceVariant}
             />
