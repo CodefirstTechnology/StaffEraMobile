@@ -221,7 +221,13 @@ exports.clockOut = async (req, res) => {
       totalAmount: presented.totalAmount,
       finalAmount: presented.finalAmount,
       bookingType: presented.bookingType,
-      updatedAt: presented.updatedAt
+      updatedAt: presented.updatedAt,
+      timeEntries: (presented.timeEntries || []).map((row) => ({
+        id: row.id,
+        clockIn: row.clockIn,
+        clockOut: row.clockOut,
+        hoursWorked: row.hoursWorked
+      }))
     }
   });
 };

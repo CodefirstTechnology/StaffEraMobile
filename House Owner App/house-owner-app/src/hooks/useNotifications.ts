@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { isAwaitingServantAccept } from '@/lib/bookingPoll';
+import { getBookingWorkTimes } from '@/lib/bookingWorkTimes';
+import { syncHouseOwnerBookingAfterCheckout } from '@/lib/bookingCheckoutSync';
 
 export type AppNotification = {
   id: number;
@@ -36,10 +38,21 @@ export function useNotifications(page = 1, limit = 10) {
       };
     },
     enabled: isAuthenticated,
-    refetchInterval: (q) => {
+    refetchInterval: () => {
       if (!isAuthenticated) return false;
-      const bookings = qc.getQueryData<{ status: string }[]>(['bookings']);
+      const bookings = qc.getQueryData<{ status: string; timeEntries?: { clockOut: string | null }[] }[]>(
+        ['bookings'],
+      );
       if (bookings?.some(isAwaitingServantAccept)) return 2000;
+      if (bookings?.some((b) => b.status === 'ACTIVE')) return 3000;
+      if (
+        bookings?.some((b) => {
+          const workTimes = getBookingWorkTimes(b);
+          return workTimes?.inProgress;
+        })
+      ) {
+        return 3000;
+      }
       return 15000;
     },
   });
@@ -67,10 +80,19 @@ export function useNotifications(page = 1, limit = 10) {
       }
 
       const bookingId = notification.data?.bookingId;
+      if (
+        bookingId != null &&
+        (notification.type === 'WORK_COMPLETED' || notification.type === 'BOOKING_COMPLETED')
+      ) {
+        void syncHouseOwnerBookingAfterCheckout(qc, bookingId, notification);
+        continue;
+      }
+
       void qc.invalidateQueries({ queryKey: ['bookings'] });
       void qc.invalidateQueries({ queryKey: ['home-summary'] });
       if (bookingId != null) {
-        void qc.invalidateQueries({ queryKey: ['booking', String(bookingId)] });
+        void qc.refetchQueries({ queryKey: ['booking', String(bookingId)] });
+        void qc.refetchQueries({ queryKey: ['booking', bookingId] });
       }
     }
 

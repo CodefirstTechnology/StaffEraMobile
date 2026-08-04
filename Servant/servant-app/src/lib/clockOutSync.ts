@@ -1,5 +1,12 @@
 import type { QueryClient } from '@tanstack/react-query';
 
+export type ClockOutTimeEntry = {
+  id?: number;
+  clockIn: string;
+  clockOut: string | null;
+  hoursWorked?: number | null;
+};
+
 export type ClockOutBooking = {
   id: number;
   status: string;
@@ -7,6 +14,7 @@ export type ClockOutBooking = {
   finalAmount?: number | null;
   bookingType?: string;
   updatedAt?: string;
+  timeEntries?: ClockOutTimeEntry[];
 };
 
 function patchBookingRow<T extends ClockOutBooking>(row: T, updated: ClockOutBooking): T {
@@ -16,7 +24,16 @@ function patchBookingRow<T extends ClockOutBooking>(row: T, updated: ClockOutBoo
     totalAmount: updated.totalAmount ?? row.totalAmount,
     finalAmount: updated.finalAmount ?? row.finalAmount,
     updatedAt: updated.updatedAt ?? new Date().toISOString(),
+    ...(updated.timeEntries ? { timeEntries: updated.timeEntries } : {}),
   };
+}
+
+function patchBookingDetailCaches(qc: QueryClient, updated: ClockOutBooking) {
+  for (const key of [['booking', updated.id], ['booking', String(updated.id)]] as const) {
+    qc.setQueryData(key, (current: ClockOutBooking | undefined) =>
+      current ? patchBookingRow(current, updated) : current,
+    );
+  }
 }
 
 /** Apply clock-out result locally, then refresh shared booking queries. */
@@ -28,9 +45,7 @@ export async function syncAfterClockOut(
     qc.setQueryData(['bookings'], (current: ClockOutBooking[] | undefined) =>
       current?.map((row) => (row.id === updated.id ? patchBookingRow(row, updated) : row)),
     );
-    qc.setQueryData(['booking', String(updated.id)], (current: ClockOutBooking | undefined) =>
-      current ? patchBookingRow(current, updated) : current,
-    );
+    patchBookingDetailCaches(qc, updated);
   }
 
   await Promise.all([
@@ -39,7 +54,7 @@ export async function syncAfterClockOut(
     qc.invalidateQueries({ queryKey: ['bookings'] }),
     qc.invalidateQueries({ queryKey: ['open-requests'] }),
     qc.invalidateQueries({ queryKey: ['schedule'] }),
-    qc.invalidateQueries({
+    qc.refetchQueries({
       predicate: (query) => query.queryKey[0] === 'booking',
     }),
   ]);
