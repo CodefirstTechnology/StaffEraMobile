@@ -10,7 +10,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
@@ -74,8 +74,6 @@ export default function HomeScreen() {
 
   const {
     data: homeSummary,
-    isLoading: summaryLoading,
-    isFetching: summaryFetching,
     refetch: refetchSummary,
   } = useHomeSummary(searchLocation, locLoading);
 
@@ -90,7 +88,7 @@ export default function HomeScreen() {
     });
   };
 
-  const { data: bookings, refetch: refetchBookings, isLoading: bookingsLoading } = useQuery({
+  const { data: bookings, refetch: refetchBookings } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
       const res = await api.get('/bookings');
@@ -117,11 +115,15 @@ export default function HomeScreen() {
   const homeCompleted = completed.slice(0, 2);
   const homePast = past.slice(0, 2);
   const hasBookings = homeActive.length > 0 || homeCompleted.length > 0 || homePast.length > 0;
-  const isRefreshing = summaryLoading || summaryFetching || bookingsLoading;
+  const [isManualRefresh, setIsManualRefresh] = useState(false);
 
-  const handleRefresh = useCallback(() => {
-    void refetchSummary();
-    void refetchBookings();
+  const handleRefresh = useCallback(async () => {
+    setIsManualRefresh(true);
+    try {
+      await Promise.all([refetchSummary(), refetchBookings()]);
+    } finally {
+      setIsManualRefresh(false);
+    }
   }, [refetchSummary, refetchBookings]);
 
   const headerLocation = (() => {
@@ -156,7 +158,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing}
+            refreshing={isManualRefresh}
             onRefresh={handleRefresh}
             tintColor={Stitch.colors.primary}
           />
