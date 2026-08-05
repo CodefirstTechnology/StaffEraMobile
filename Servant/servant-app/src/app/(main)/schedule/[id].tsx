@@ -385,12 +385,6 @@ export default function ScheduleDetailScreen() {
             showMyLocation
             showMapInitially={trackEnabled}
             height={220}
-            visitAddress={{
-              flatNo: booking.flatNo,
-              building: booking.building,
-              area: booking.area,
-              address: booking.address,
-            }}
             caption={
               trackEnabled
                 ? t('servantHome.sharingLocation')
@@ -466,7 +460,6 @@ export default function ScheduleDetailScreen() {
         <LocationMapPreview
           latitude={booking.latitude}
           longitude={booking.longitude}
-          address={booking.address}
           height={160}
         />
       ) : null}
