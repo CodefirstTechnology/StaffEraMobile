@@ -183,6 +183,12 @@ const verifyWorkOtpSchema = z.object({
   })
 });
 
+const respondExtensionSchema = z.object({
+  body: z.object({
+    accept: z.boolean()
+  })
+});
+
 const updateBookingSchema = z.object({
   body: z
     .object({
@@ -277,5 +283,6 @@ module.exports = {
   reviewSchema,
   rejectBookingSchema,
   updateTrackingSchema,
-  verifyWorkOtpSchema
+  verifyWorkOtpSchema,
+  respondExtensionSchema
 };

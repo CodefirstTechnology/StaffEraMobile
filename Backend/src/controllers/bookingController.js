@@ -1224,14 +1224,44 @@ exports.verifyWorkOtp = async (req, res) => {
 };
 
 const addMinutesToTime = (timeStr, mins) => {
+  if (!timeStr || typeof timeStr !== "string") {
+    throw new ApiError(400, "Booking has no scheduled end time");
+  }
   const [h, m] = timeStr.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) {
+    throw new ApiError(400, "Invalid session end time");
+  }
   const totalMins = h * 60 + m + mins;
   const newH = Math.floor(totalMins / 60) % 24;
   const newM = totalMins % 60;
   return `${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
 };
 
+const resolveSessionEndTime = (booking) => {
+  if (booking?.sessionEndTime) return booking.sessionEndTime;
+
+  const raw = booking?.sessionSlots;
+  let slots = [];
+  if (Array.isArray(raw)) {
+    slots = raw;
+  } else {
+    try {
+      slots = JSON.parse(raw || "[]");
+    } catch {
+      slots = [];
+    }
+  }
+
+  if (slots.length > 0 && slots[slots.length - 1]?.end) {
+    return slots[slots.length - 1].end;
+  }
+
+  return null;
+};
+
 const checkServantNextHourBooking = async (servantId, sessionDate, sessionEndTime, bookingId) => {
+  if (!servantId || !sessionDate || !sessionEndTime) return null;
+
   const startTime = sessionEndTime;
   const endTime = addMinutesToTime(sessionEndTime, 60);
 
@@ -1324,17 +1354,34 @@ exports.requestExtension = async (req, res) => {
   const booking = await loadBooking(id);
 
   if (!booking) throw new ApiError(404, "Booking not found");
+  if (booking.houseOwner.userId !== req.user.id) {
+    throw new ApiError(403, "Not your booking");
+  }
   if (booking.bookingType !== "SESSION") {
     throw new ApiError(400, "Only session bookings can be extended");
   }
   if (!["CONFIRMED", "ACTIVE"].includes(booking.status)) {
     throw new ApiError(400, "Booking is not active or confirmed");
   }
+  if (!booking.servantId) {
+    throw new ApiError(400, "No helper assigned to this booking");
+  }
+
+  const sessionEndTime = resolveSessionEndTime(booking);
+  if (!sessionEndTime) {
+    throw new ApiError(400, "Booking has no scheduled end time");
+  }
+  if (booking.extensionStatus === "PENDING") {
+    throw new ApiError(400, "Extension request already pending");
+  }
+  if (booking.extensionStatus === "ACCEPTED") {
+    throw new ApiError(400, "Extension already accepted for this booking");
+  }
 
   const conflict = await checkServantNextHourBooking(
     booking.servantId,
     booking.sessionDate,
-    booking.sessionEndTime,
+    sessionEndTime,
     booking.id
   );
 
@@ -1342,7 +1389,7 @@ exports.requestExtension = async (req, res) => {
     throw new ApiError(400, "Helper is not available for extension (booked for next hour)");
   }
 
-  const extensionRequestedEndTime = addMinutesToTime(booking.sessionEndTime, 15);
+  const extensionRequestedEndTime = addMinutesToTime(sessionEndTime, 15);
 
   const updated = await prisma.booking.update({
     where: { id },
@@ -1357,13 +1404,13 @@ exports.requestExtension = async (req, res) => {
     await createNotification({
       userId: booking.servant.user.id,
       title: "Session extension requested",
-      body: `Your session is about to end. Do you want to extend the duration from ${booking.sessionEndTime} to ${extensionRequestedEndTime}?`,
+      body: `Your session is about to end. Do you want to extend the duration from ${sessionEndTime} to ${extensionRequestedEndTime}?`,
       type: "EXTENSION_REQUESTED",
       data: { bookingId: id }
     });
   }
 
-  sendSuccess(res, { booking: updated, message: "Extension requested successfully" });
+  sendSuccess(res, { booking: normalizeBookingRow(updated), message: "Extension requested successfully" });
 };
 
 exports.respondExtension = async (req, res) => {
@@ -1383,10 +1430,11 @@ exports.respondExtension = async (req, res) => {
   }
 
   if (accept) {
+    const sessionEndTime = resolveSessionEndTime(booking);
     const conflict = await checkServantNextHourBooking(
       booking.servantId,
       booking.sessionDate,
-      booking.sessionEndTime,
+      sessionEndTime,
       booking.id
     );
 
@@ -1406,6 +1454,13 @@ exports.respondExtension = async (req, res) => {
     }
     if (slots.length > 0) {
       slots[slots.length - 1].end = booking.extensionRequestedEndTime;
+    } else if (sessionEndTime && booking.extensionRequestedEndTime) {
+      slots = [
+        {
+          start: booking.sessionStartTime || sessionEndTime,
+          end: booking.extensionRequestedEndTime
+        }
+      ];
     }
     const newSessionSlots = JSON.stringify(slots);
 
@@ -1431,7 +1486,7 @@ exports.respondExtension = async (req, res) => {
       });
     }
 
-    sendSuccess(res, { booking: updated, message: "Extension accepted successfully" });
+    sendSuccess(res, { booking: normalizeBookingRow(updated), message: "Extension accepted successfully" });
   } else {
     const updated = await prisma.booking.update({
       where: { id },
@@ -1451,6 +1506,6 @@ exports.respondExtension = async (req, res) => {
       });
     }
 
-    sendSuccess(res, { booking: updated, message: "Extension declined successfully" });
+    sendSuccess(res, { booking: normalizeBookingRow(updated), message: "Extension declined successfully" });
   }
 };

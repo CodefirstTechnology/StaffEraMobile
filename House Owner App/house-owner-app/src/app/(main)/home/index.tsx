@@ -94,7 +94,7 @@ export default function HomeScreen() {
       const res = await api.get('/bookings');
       return res.data.data.bookings as BookingSummary[];
     },
-    refetchInterval: (query) => bookingsListPollInterval(query.state.data as BookingSummary[] | undefined),
+    refetchInterval: (query) => bookingsListPollInterval(query.state.data),
   });
 
   useFocusEffect(

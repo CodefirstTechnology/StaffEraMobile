@@ -9,7 +9,8 @@ const {
   reviewSchema,
   rejectBookingSchema,
   updateTrackingSchema,
-  verifyWorkOtpSchema
+  verifyWorkOtpSchema,
+  respondExtensionSchema
 } = require("../validators/bookingValidator");
 
 router.post(
@@ -117,6 +118,7 @@ router.patch(
   "/:id/respond-extension",
   authenticate,
   requireRole("SERVANT"),
+  validate(respondExtensionSchema),
   bookingController.respondExtension
 );
 

@@ -313,13 +313,14 @@ export default function BookingDetailScreen() {
 
       {booking.bookingType === 'SESSION' && ['CONFIRMED', 'ACTIVE'].includes(booking.status) && (
         <View style={styles.extensionContainer}>
-          {!booking.extensionStatus && (
+          {(!booking.extensionStatus || booking.extensionStatus === 'REJECTED') && (
             <GradientButton
               title="Extend Booking by 15 mins"
               onPress={async () => {
                 try {
                   await api.patch(`/bookings/${id}/request-extension`);
-                  qc.invalidateQueries({ queryKey: ['booking', id] });
+                  await qc.invalidateQueries({ queryKey: ['booking', id] });
+                  await qc.refetchQueries({ queryKey: ['booking', id] });
                   showAlert("Success", "Extension requested. Waiting for helper's approval.");
                 } catch (e: unknown) {
                   const err = e as { response?: { data?: { message?: string } } };

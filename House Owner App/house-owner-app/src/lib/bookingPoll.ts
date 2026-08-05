@@ -8,16 +8,21 @@ export const BOOKING_POLL_MS = {
   idle: 15000,
 } as const;
 
-type BookingPollRow = BookingWorkTimesInput & {
+type BookingListPollRow = {
   status: string;
-  servant?: unknown | null;
 };
 
-export function isAwaitingServantAccept(booking: BookingPollRow): boolean {
+type BookingDetailPollRow = BookingWorkTimesInput & {
+  status: string;
+};
+
+export function isAwaitingServantAccept(booking: BookingListPollRow): boolean {
   return booking.status === 'PENDING';
 }
 
-export function bookingsListPollInterval(bookings: BookingPollRow[] | undefined): number | false {
+export function bookingsListPollInterval(
+  bookings: BookingListPollRow[] | undefined,
+): number | false {
   if (!bookings?.length) return false;
   if (bookings.some(isAwaitingServantAccept)) return BOOKING_POLL_MS.awaitingAccept;
   if (bookings.some((b) => b.status === 'ACTIVE')) return BOOKING_POLL_MS.active;
@@ -26,7 +31,7 @@ export function bookingsListPollInterval(bookings: BookingPollRow[] | undefined)
 }
 
 export function bookingDetailPollInterval(
-  booking: BookingPollRow | undefined,
+  booking: BookingDetailPollRow | undefined,
 ): number | false {
   if (!booking) return false;
   if (isAwaitingServantAccept(booking)) return BOOKING_POLL_MS.awaitingAccept;
