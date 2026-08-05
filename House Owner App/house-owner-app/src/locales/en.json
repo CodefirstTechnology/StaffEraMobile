@@ -217,6 +217,7 @@
     "sendRequest": "Send a request",
     "noActive": "No active bookings — send a new request from Home",
     "noRecent": "No past bookings yet — completed visits appear here",
+    "completedJobs": "Completed Jobs",
     "tapTrack": "Tap to open live map when helper is on the way",
     "tapTrackActive": "Tap for live map — work in progress",
     "newBooking": "New booking",

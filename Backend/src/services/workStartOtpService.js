@@ -74,7 +74,7 @@ const verifyWorkStartOtp = async ({ bookingId, otpInput }) => {
 
   const record = await getActiveOtp(bookingId);
   if (!record) {
-    throw new ApiError(400, "OTP expired or not requested. Tap arrived to get a new OTP.");
+    throw new ApiError(400, "OTP expired or not requested. Tap 'Resend OTP' to get a new code.");
   }
 
   if (record.attempts >= MAX_ATTEMPTS) {

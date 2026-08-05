@@ -437,7 +437,7 @@
     "failedTitle": "सत्यापन विफल",
     "invalidTitle": "अमान्य OTP",
     "invalidBody": "गृहस्वामी का 4 अंकीय कोड दर्ज करें।",
-    "expiredBody": "OTP समाप्त हो गया। नया OTP पाने के लिए पहुँचा — OTP लें दबाएँ।",
+    "expiredBody": "OTP समाप्त हो गया। नया कोड पाने के लिए 'OTP पुनः भेजें' दबाएँ।",
     "resentTitle": "नया OTP भेजा",
     "resentBody": "गृहस्वामी को नया कोड भेजा गया।"
   },

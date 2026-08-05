@@ -541,7 +541,7 @@
     "failedTitle": "Could not verify",
     "invalidTitle": "Invalid OTP",
     "invalidBody": "Enter the 4-digit code from the home owner.",
-    "expiredBody": "OTP expired. Tap I arrived to get a new code.",
+    "expiredBody": "OTP expired. Tap 'Resend OTP' to get a new code.",
     "resentTitle": "New OTP sent",
     "resentBody": "A new code was sent to the home owner."
   },
